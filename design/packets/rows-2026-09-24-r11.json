@@ -1,0 +1,3 @@
+[
+  {"id": "ar18-resync", "repo": "agent-relay", "prompt": "design/packets/ar18-resync.md", "depends_on": ["packets-35-relay"], "worktree": true, "model": "claude-opus-5-5", "max_turns": 60, "why": "the post-S12 re-sync: the session's hygiene, doclint and bounded byte-identical with both pins and the 840 s wall in one commit, the 25 packets the new doclint refuses given their verify row (five trimmed under 9,216); the gate reads a last stderr line `bounded: stop: lock|load|wall` as unrun, never red, in the baseline, the verify, the acceptance reruns and the merge (s12a's handover to the relay's gate); the canonical doclint's half of ADV10-4 confirmed by a targeted test, and what the canonical copies leave (six ADV10-4 spellings, ADV10-17) named for the session"}
+]

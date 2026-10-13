@@ -1,0 +1,3 @@
+{"plain": "branch-only", "int": "100", "bool": "true", "wall": "4h",
+ "double": "a \"quoted\" # not a comment", "single": "it's # kept", "empty": "",
+ "null": "", "url": "https://example.com/x"}

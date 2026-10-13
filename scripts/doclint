@@ -1,0 +1,351 @@
+#!/usr/bin/env python3
+"""doclint: the doc gate (conventions section 5).
+
+Rules, each a function returning `path: rule: detail` lines:
+  charter     history/sittings/*.md under 4,096 bytes, in the five-part shape:
+              `# Sitting <date>-<n>: <repo>, <component>`, the table (goal,
+              budget, pin, window, agents), `## Done-ness`, `## Handover`,
+              `## Next act`
+  packet      design/packets/*.md under 9,216 bytes, the header table's six
+              rows (from, pin, wall, may touch, acceptance, budget) and the six
+              sections `## 1.` to `## 6.`; with a `verify` row (the gate's line),
+              no acceptance line runs a whole suite: a command `make check|test`,
+              `go test ./...`, `pytest` with no path argument, or `relay
+              plan|run|gate` without `--rows` (quoted text is not a command; the
+              cell's code spans are its lines, else the cell is one line; rowless
+              packets are grandfathered)
+  size        design/research*.md under 6,144 bytes, design/conventions*.md
+              under 8,192, design/review-*.md under 9,216
+  plugin      every plugin/commands/*.md under 31 lines with `description` and
+              `allowed-tools` in its frontmatter; every plugin/agents/*.md with
+              `name`, `description`, `model` and `tools`; every
+              plugin/skills/*/SKILL.md with `name`, `description` (under 201
+              chars, a `>` or `|` block joined by spaces) and `allowed-tools`,
+              its body under 501 lines; a plugin's verb set is its own
+  link        every relative markdown link in a .md file resolves
+  next        no file named NEXT, except history/sessions/NEXT (the relay's safe
+              next phase, tracked or not)
+
+Files are the repo's tracked and untracked-not-ignored ones.
+Usage: doclint [--repo DIR]. Exit 0 when clean, 2 on a refusal, 1 on usage or
+when git fails.
+"""
+import fnmatch
+import os
+import re
+import subprocess
+import sys
+
+CHARTER_CEILING = 4096
+PACKET_CEILING = 9216
+RECORD_CEILING = 6144
+CONVENTIONS_CEILING = 8192
+CHARTER_ROWS = ("goal", "budget", "pin", "window", "agents")
+CHARTER_PARTS = ("## Done-ness", "## Handover", "## Next act")
+CHARTER_TITLE = re.compile(r"^# Sitting \d{4}-\d{2}-\d{2}-\d+: .+, .+$")
+COMMAND_CEILING = 31
+COMMAND_KEYS = ("description", "allowed-tools")
+AGENT_KEYS = ("name", "description", "model", "tools")
+SKILL_KEYS = ("name", "description", "allowed-tools")
+SKILL_DESCRIPTION_CEILING = 201
+SKILL_BODY_CEILING = 501
+PACKET_ROWS = ("from", "pin", "wall", "may touch", "acceptance", "budget")
+PACKET_SECTIONS = ("What the source says", "Rulings", "Interfaces",
+                   "Findings that name this row", "Forbidden reads", "Report")
+LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
+FENCE = re.compile(r"^\s*(```|~~~)")
+CODE_SPAN = re.compile(r"`[^`]*`")
+CELL_SPLIT = re.compile(r"(?<!\\)\|")
+QUOTED = re.compile(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"")
+COMMAND_SPLIT = re.compile(r"&&|\|\||(?<![<>&])&(?![>&])|[;|()`\n]|\$\(")
+ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+# pytest options that take a value, so the value is not a path
+PYTEST_VALUED = {"-k", "-m", "-p", "-c", "-o", "-W", "--rootdir", "--confcutdir",
+                 "--deselect", "--ignore", "--ignore-glob", "--basetemp", "--maxfail",
+                 "--tb", "-r", "--durations", "--junitxml", "--log-level"}
+SUITE = "acceptance runs a whole suite"
+NEXT_EXEMPT = "history/sessions/NEXT"
+
+
+class UsageError(Exception):
+    pass
+
+
+def files(repo):
+    try:
+        out = subprocess.run(
+            ["git", "-C", repo, "ls-files", "-z", "--cached", "--others",
+             "--exclude-standard"], capture_output=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise UsageError("git ls-files failed in %s: %s" % (repo, exc))
+    paths = {p for p in out.decode("utf-8", "surrogateescape").split("\0") if p}
+    return sorted(p for p in paths if os.path.isfile(os.path.join(repo, p)))
+
+
+def match(path, glob):
+    parts, pats = path.split("/"), glob.split("/")
+    return len(parts) == len(pats) and all(
+        fnmatch.fnmatchcase(p, g) for p, g in zip(parts, pats))
+
+
+def read(repo, path):
+    with open(os.path.join(repo, path), "rb") as fh:
+        return fh.read()
+
+
+def table_rows(lines):
+    """The first-column keys of the first markdown table, header excluded."""
+    rows, seen = [], False
+    for line in lines:
+        if line.startswith("|"):
+            seen = True
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            rows.append(cells[0])
+        elif seen:
+            break
+    return [r for r in rows[1:] if not set(r) <= set("-: ")]
+
+
+def table_cells(lines):
+    """First-column key to second cell, over the first markdown table (`\\|` kept)."""
+    cells, seen = {}, False
+    for line in lines:
+        if line.startswith("|"):
+            seen = True
+            parts = [c.strip() for c in CELL_SPLIT.split(line.strip().strip("|"))]
+            cells.setdefault(parts[0], parts[1] if len(parts) > 1 else "")
+        elif seen:
+            break
+    return cells
+
+
+def runs_suite(command):
+    """True when one shell command (quotes already blanked) runs a whole suite."""
+    words = command.split()
+    while words and ASSIGNMENT.match(words[0]):
+        words = words[1:]
+    if not words:
+        return False
+    head = os.path.basename(words[0])
+    if head == "make":
+        return any(re.match(r"^(check|test)\b", w) for w in words[1:])
+    if head == "go":
+        return words[1:2] == ["test"] and "./..." in words[2:]
+    if head == "relay":
+        return (words[1:2] in (["plan"], ["run"], ["gate"])
+                and not any(w.startswith("--rows") for w in words))
+    if head == "pytest":
+        rest = words[1:]
+    elif head.startswith("python") and words[1:3] == ["-m", "pytest"]:
+        rest = words[3:]
+    else:
+        return False
+    skip = False
+    for w in rest:
+        if skip:
+            skip = False
+        elif w in PYTEST_VALUED:
+            skip = True
+        elif not w.startswith("-") and w != "Q" and not re.match(r"^[0-9]*[<>]", w):
+            return False  # a path argument: targeted
+    return True
+
+
+def suite_lines(cell):
+    """The acceptance cell's commands that run a whole suite."""
+    spans = re.findall(r"`([^`]*)`", cell) or [cell]
+    out = []
+    for span in spans:
+        span = QUOTED.sub(" Q ", span.replace("\\|", "|"))
+        for command in COMMAND_SPLIT.split(span):
+            command = command.strip()
+            if runs_suite(command):
+                out.append(command)
+    return out
+
+
+def check_charters(repo, paths):
+    out = []
+    for path in paths:
+        if not match(path, "history/sittings/*.md"):
+            continue
+        data = read(repo, path)
+        if len(data) >= CHARTER_CEILING:
+            out.append("%s: charter: %d bytes, ceiling %d" % (path, len(data), CHARTER_CEILING))
+        lines = data.decode("utf-8", "replace").splitlines()
+        if not lines or not CHARTER_TITLE.match(lines[0]):
+            out.append("%s: charter: title is not `# Sitting <date>-<n>: <repo>, <component>`" % path)
+        rows = table_rows(lines)
+        for row in CHARTER_ROWS:
+            if row not in rows:
+                out.append("%s: charter: table row missing: %s" % (path, row))
+        heads = [l.rstrip() for l in lines]
+        for part in CHARTER_PARTS:
+            if part not in heads:
+                out.append("%s: charter: part missing: %s" % (path, part))
+    return out
+
+
+def check_packets(repo, paths):
+    out = []
+    for path in paths:
+        if not match(path, "design/packets/*.md"):
+            continue
+        data = read(repo, path)
+        if len(data) >= PACKET_CEILING:
+            out.append("%s: packet: %d bytes, ceiling %d" % (path, len(data), PACKET_CEILING))
+        lines = data.decode("utf-8", "replace").splitlines()
+        rows = table_rows(lines)
+        for row in PACKET_ROWS:
+            if row not in rows:
+                out.append("%s: packet: header row missing: %s" % (path, row))
+        cells = table_cells(lines)
+        if "verify" in cells:
+            for command in suite_lines(cells.get("acceptance", "")):
+                out.append("%s: packet: %s: %s" % (path, SUITE, command))
+        for n, title in enumerate(PACKET_SECTIONS, 1):
+            prefix = "## %d. %s" % (n, title)
+            if not any(l.startswith(prefix) for l in lines):
+                out.append("%s: packet: section missing: %s" % (path, prefix))
+    return out
+
+
+def check_sizes(repo, paths):
+    out = []
+    for path in paths:
+        if match(path, "design/conventions*.md"):
+            ceiling = CONVENTIONS_CEILING
+        elif match(path, "design/research*.md"):
+            ceiling = RECORD_CEILING
+        elif match(path, "design/review-*.md"):
+            ceiling = PACKET_CEILING
+        else:
+            continue
+        size = len(read(repo, path))
+        if size >= ceiling:
+            out.append("%s: size: %d bytes, ceiling %d" % (path, size, ceiling))
+    return out
+
+
+def split_frontmatter(text):
+    """(frontmatter lines, body lines), or (None, all lines) when unfenced."""
+    lines = text.splitlines()
+    if lines and lines[0] == "---":
+        for i, line in enumerate(lines[1:], 1):
+            if line == "---":
+                return lines[1:i], lines[i + 1:]
+    return None, lines
+
+
+def frontmatter(text):
+    """Key to value; a `>` or `|` block's indented lines joined by a space."""
+    head, _ = split_frontmatter(text)
+    fields, block = {}, None
+    for line in head or ():
+        m = re.match(r"^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$", line)
+        if m:
+            key, value = m.group(1), m.group(2).strip()
+            block = key if re.match(r"^[>|][-+]?$", value) else None
+            if block or len(value) < 2 or value[0] != value[-1] or value[0] not in "'\"":
+                fields[key] = "" if block else value
+            else:
+                fields[key] = value[1:-1]
+        elif block and line[:1] in (" ", "\t") and line.strip():
+            fields[block] = (fields[block] + " " + line.strip()).lstrip()
+    return fields
+
+
+def check_plugin(repo, paths):
+    out = []
+    for path in paths:
+        if match(path, "plugin/commands/*.md"):
+            text = read(repo, path).decode("utf-8", "replace")
+            n = len(text.splitlines())
+            if n >= COMMAND_CEILING:
+                out.append("%s: plugin: %d lines, ceiling %d" % (path, n, COMMAND_CEILING))
+            keys = frontmatter(text)
+            for key in COMMAND_KEYS:
+                if key not in keys:
+                    out.append("%s: plugin: frontmatter lacks %s" % (path, key))
+        elif match(path, "plugin/agents/*.md"):
+            keys = frontmatter(read(repo, path).decode("utf-8", "replace"))
+            for key in AGENT_KEYS:
+                if key not in keys:
+                    out.append("%s: plugin: frontmatter lacks %s" % (path, key))
+        elif match(path, "plugin/skills/*/SKILL.md"):
+            text = read(repo, path).decode("utf-8", "replace")
+            fields = frontmatter(text)
+            for key in SKILL_KEYS:
+                if key not in fields:
+                    out.append("%s: plugin: frontmatter lacks %s" % (path, key))
+            n = len(fields.get("description", ""))
+            if n >= SKILL_DESCRIPTION_CEILING:
+                out.append("%s: plugin: description %d chars, ceiling %d"
+                           % (path, n, SKILL_DESCRIPTION_CEILING - 1))
+            n = len(split_frontmatter(text)[1])
+            if n >= SKILL_BODY_CEILING:
+                out.append("%s: plugin: %d body lines, ceiling %d"
+                           % (path, n, SKILL_BODY_CEILING - 1))
+    return out
+
+
+def check_links(repo, paths):
+    out = []
+    for path in paths:
+        if not path.endswith(".md"):
+            continue
+        fenced = False
+        text = read(repo, path).decode("utf-8", "replace")
+        for n, line in enumerate(text.splitlines(), 1):
+            if FENCE.match(line):
+                fenced = not fenced
+                continue
+            if fenced:
+                continue
+            for target in LINK.findall(CODE_SPAN.sub("", line)):
+                target = target.strip("<>")
+                if re.match(r"^[a-z][a-z0-9+.-]*:", target, re.I) or target.startswith("#"):
+                    continue
+                target = target.split("#", 1)[0].split("?", 1)[0]
+                base = repo if target.startswith("/") else os.path.join(repo, os.path.dirname(path))
+                if not os.path.exists(os.path.join(base, target.lstrip("/"))):
+                    out.append("%s: link: line %d does not resolve: %s" % (path, n, target))
+    return out
+
+
+def check_next(repo, paths):
+    return ["%s: next: a NEXT file is present" % p for p in paths
+            if os.path.basename(p) == "NEXT" and p != NEXT_EXEMPT]
+
+
+RULES = (check_charters, check_packets, check_sizes, check_plugin, check_links,
+         check_next)
+
+
+def lint(repo):
+    paths = files(repo)
+    out = []
+    for rule in RULES:
+        out.extend(rule(repo, paths))
+    return out
+
+
+def main(argv):
+    args = argv[1:]
+    repo = "."
+    try:
+        if args[:1] == ["--repo"] and len(args) == 2:
+            repo = args[1]
+        elif args:
+            raise UsageError("unknown arguments: %s" % " ".join(args))
+        refusals = lint(repo)
+    except UsageError as exc:
+        sys.stderr.write("doclint: %s\nusage: doclint [--repo DIR]\n" % exc)
+        return 1
+    for line in refusals:
+        print(line)
+    return 2 if refusals else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

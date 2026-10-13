@@ -1,0 +1,19 @@
+#!/bin/sh
+# The hook shim (conventions §1, AR17B): hand the event to `$RELAY_BIN hook
+# <event>` (ChildEnv sets it to the running relay's absolute path), else to
+# `relay` on PATH. With neither, a sitting (RELAY_ROW set) fails closed: its
+# Bash calls are denied (ADV10-15); outside one the hook says {} (relay
+# doctor reports the missing binary).
+if [ -n "$RELAY_BIN" ] && [ -x "$RELAY_BIN" ]; then
+  exec "$RELAY_BIN" hook "$1"
+fi
+if command -v relay >/dev/null 2>&1; then
+  exec relay hook "$1"
+fi
+cat >/dev/null
+if [ -n "$RELAY_ROW" ] && [ "$1" = PreToolUse ]; then
+  echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"relay: no-binary: no relay binary answers the guards, so a sitting runs nothing until it is found"}}'
+else
+  echo '{}'
+fi
+exit 0

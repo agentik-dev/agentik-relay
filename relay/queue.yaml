@@ -1,0 +1,15 @@
+# The relay's queue (design/relay-r1.md §3, D4). A landed row is dropped, never parked; it
+# waits for nothing, and its record is its rows file (design/packets/rows-2026-09-22.json,
+# design/packets/rows-2026-09-23.json, rows-2026-09-23-r3.json, -r4.json, -r5.json, -r6.json, -r7.json
+# and their successors), its packet under design/packets/ and its merge in git. The rule: a
+# row is dropped by the first queue edit after it merges (this row's own, by the next packet).
+version: 1
+defaults: {model: claude-opus-5-5, turns: 100, context: 130000, usd: 15, wall: 4h,
+           merge: branch-only, device: never, verify: auto}
+words: ""        # the owner's words for every run, quoted verbatim into CONTEXT
+rows:
+  - id: ar30-block-and-acts
+    packet: design/packets/ar30-block-and-acts.md
+    budget: {turns: 100, context: 144000, usd: 25}
+    merge: branch-only
+    device: never

@@ -1,0 +1,3 @@
+[
+  {"id": "ar6-sync-and-readme", "repo": "agent-relay", "prompt": "design/packets/ar6-sync-and-readme.md", "depends_on": ["packets-13", "ar5-ux"], "worktree": true, "model": "claude-opus-5-5", "max_turns": 80, "why": "the post-S7 sync off main after ar5-ux merges: scripts/hygiene and scripts/doclint byte-identical to the session's copies with a Makefile pin (item 26), AP1's plugin rule moved to scripts/pluginlint under validate, the README freshness sidecar design/readme/rendered.sha256 checked by shasum -c --status in place of the mtime rule (item 24), and the four AR2 observation lows outside ar4's and ar5's files (the Notices panic, the $15.50 budget, the yaml closer without opener, the mid-rune stderr tail); 80 turns because four acts reproduce before they fix"}
+]

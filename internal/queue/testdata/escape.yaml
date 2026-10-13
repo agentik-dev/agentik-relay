@@ -1,0 +1,12 @@
+# packet paths that leave the repo: never read.
+version: 1
+defaults: {model: claude-opus-5-5, turns: 100, context: 130000, usd: 15, wall: 4h,
+           merge: branch-only, device: never, verify: auto}
+words: ""
+rows:
+  - id: x
+    packet: ../x.md
+  - id: y
+    packet: /etc/y.md
+  - id: z
+    packet: design/../../z.md

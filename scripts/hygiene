@@ -1,0 +1,330 @@
+#!/usr/bin/env python3
+"""hygiene: the public-hygiene scan (conventions section 6, overhaul-r1 section 5).
+
+Scans the working tree of a repo (`git ls-files -co --exclude-standard`: the
+tracked and untracked-not-ignored regular files and symlinks) for the generic
+pattern groups below and the private list's groups, and prints counts only,
+never a matched line nor a private pattern: an uncommitted file is
+scanned before its commit, an ignored one never. Each file's path is a scanned
+line of that file, for every group; a symlink is its path and its target
+(`readlink`), never the target's content. A file over 4 MiB is scanned by its
+path only and counted as `oversize` (never read). A file starting with a UTF-16
+BOM, or whose first 8 KB have NULs on 90% or more of the odd or the even bytes
+(not both), is decoded as UTF-16 and scanned as text. Else a file whose first
+8 KB hold a NUL is binary: it is scanned for the `home`, `secret` and `email`
+groups only (ADV10-17), over its printable runs of 8 or more bytes (as `strings`
+would), one line per run. `.hygiene-allow` lists
+exceptions, one per line: `<path-glob>: <group>[,<group>]`, `#` comments; a
+glob's `*` stays inside one path segment; a `secret` exception outside
+`tests/fixtures/` is a usage error. Under `history/sittings/` (charters are
+records) the `sibling` group is not evaluated; the rest, and every private
+group, still scan there. `secret` is matched case-sensitively, the others
+ignore case.
+
+The private list: this file holds only generic patterns (a home path, a LAN
+address, a secret's shape, an email address) and the public sibling names.
+The patterns that name an owner, a private repo, a host, a device or a domain
+live outside the repo, in `$AGENTIK_HYGIENE_PRIVATE`, else in
+`${XDG_CONFIG_HOME:-$HOME/.config}/agentik/hygiene-private.tsv`: UTF-8, one
+`group<TAB>regex` per line, `#` comment lines and blank lines skipped; a group
+may be new or add to a generic one, and compiles like the generic ones. An
+absent list prints one stderr line and the scan runs on the generic groups;
+`--require-private` makes an absent or unreadable list exit 2. A malformed
+line is a usage error naming its line number, never its text. An allowlist
+entry may name a group the absent list would have defined.
+
+Usage: hygiene [--json] [--allow FILE] [--repo DIR] [--require-private]
+Exit 0 when no hit lies outside the allowlist, 2 when one does (or when
+`--require-private` finds no list), 1 on usage or when git fails. Stdlib only;
+one file, copied byte-identical into each repo.
+
+The patterns below are written so that this file does not match itself.
+"""
+import fnmatch
+import json
+import os
+import re
+import subprocess
+import sys
+
+GROUPS = (
+    ("home", (r"/Users/[a-z]+", r"~/cod[e]/")),
+    ("lan", (r"192\.168\.", r"\b10\.\d+\.\d+\.\d+",
+             r"\b172\.(?:1[6-9]|2\d|3[01])\.\d+\.\d+",
+             r"\b[a-z0-9-]+\.loca[l](?![\w.-])")),
+    ("sibling", (r"respea[k]", r"decision[s]",
+                 r"claude-code-sessio[n]", r"claude-code-agent[s]")),
+    ("secret", (r"sk-an[t]-[A-Za-z0-9_-]+", r"gh[p]_[A-Za-z0-9]{20,}",
+                r"github_pa[t]_[A-Za-z0-9_]{20,}", r"AGE-SECRET-KE[Y]-1[0-9A-Z]{20,}",
+                r"\bAKI[A][0-9A-Z]{16}\b", r"BEGI[N] [A-Z0-9 ]*PRIVATE KEY")),
+    ("email", (r"\b[A-Za-z0-9._%+-]+[@][A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b",)),
+)
+CASE_SENSITIVE = ("secret",)
+PRIVATE_VAR = "AGENTIK_HYGIENE_PRIVATE"
+PRIVATE_NAME = os.path.join("agentik", "hygiene-private.tsv")
+GROUP_NAME = re.compile(r"[a-z][a-z0-9_-]*\Z")
+COMPILED = []
+GROUP_NAMES = []
+BINARY_PROBE = 8192
+UTF16_NUL = 0.9
+READ_CAP = 4 * 1024 * 1024
+RECORDS = ("history/sittings/",)
+RECORDS_SKIP = ("sibling",)
+BINARY_GROUPS = ("home", "secret", "email")
+PRINTABLE_RUN = re.compile(rb"[\x20-\x7e\t]{8,}")
+SECRET_ALLOW_ROOT = ["tests", "fixtures"]
+
+
+class UsageError(Exception):
+    pass
+
+
+class NoPrivate(Exception):
+    pass
+
+
+def parse_args(argv):
+    opts = {"json": False, "allow": None, "repo": ".", "require_private": False}
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg == "--json":
+            opts["json"] = True
+        elif arg == "--require-private":
+            opts["require_private"] = True
+        elif arg in ("--allow", "--repo"):
+            if i + 1 >= len(argv):
+                raise UsageError("%s needs a value" % arg)
+            opts[arg[2:]] = argv[i + 1]
+            i += 1
+        elif arg in ("-h", "--help"):
+            raise UsageError(None)
+        else:
+            raise UsageError("unknown argument: %s" % arg)
+        i += 1
+    return opts
+
+
+def private_path():
+    """The private list's path: $AGENTIK_HYGIENE_PRIVATE, else the XDG config file."""
+    if os.environ.get(PRIVATE_VAR):
+        return os.environ[PRIVATE_VAR]
+    base = os.environ.get("XDG_CONFIG_HOME") or os.path.join(
+        os.path.expanduser("~"), ".config")
+    return os.path.join(base, PRIVATE_NAME)
+
+
+def load_private(path, required):
+    """[(group, [regex])] from the private list, or None when it is absent or
+    unreadable (NoPrivate when required). A bad line raises UsageError naming
+    its number only: a private pattern is never printed."""
+    try:
+        with open(path, "rb") as fh:
+            data = fh.read()
+    except OSError as exc:
+        if required:
+            raise NoPrivate("hygiene: no private list at %s (%s)"
+                            % (path, exc.strerror or "unreadable"))
+        sys.stderr.write("hygiene: no private list at %s; generic groups only\n" % path)
+        return None
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        raise UsageError("%s: not UTF-8" % path)
+    groups = []
+    for n, raw in enumerate(text.splitlines(), 1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        name, sep, pat = raw.partition("\t")
+        name, pat = name.strip(), pat.strip()
+        if not sep or not GROUP_NAME.match(name) or not pat:
+            raise UsageError("%s:%d: bad line (want group<TAB>regex)" % (path, n))
+        try:
+            re.compile(pat)
+        except re.error:
+            raise UsageError("%s:%d: the regex does not compile" % (path, n))
+        groups.append((name, pat))
+    return groups
+
+
+def build_groups(private):
+    """Set COMPILED and GROUP_NAMES from GROUPS and the private list's groups
+    (each private pattern wrapped, so its alternation stays its own)."""
+    pats = [(name, list(p)) for name, p in GROUPS]
+    for name, pat in private or ():
+        for known, have in pats:
+            if known == name:
+                have.append("(?:%s)" % pat)
+                break
+        else:
+            pats.append((name, ["(?:%s)" % pat]))
+    COMPILED[:] = [(name, re.compile("|".join(p), 0 if name in CASE_SENSITIVE
+                                     else re.IGNORECASE)) for name, p in pats]
+    GROUP_NAMES[:] = [name for name, _ in pats]
+
+
+def load_allow(path, required, strict=True):
+    """Return [(glob, {groups})]; a missing default file is an empty list."""
+    if not os.path.exists(path):
+        if required:
+            raise UsageError("allow file not found: %s" % path)
+        return []
+    entries = []
+    with open(path, encoding="utf-8") as fh:
+        for n, raw in enumerate(fh, 1):
+            line = raw.split("#", 1)[0].strip()
+            if not line:
+                continue
+            glob, sep, groups = line.rpartition(":")
+            names = {g.strip() for g in groups.split(",") if g.strip()}
+            glob = glob.strip()
+            unknown = names - set(GROUP_NAMES)
+            if not strict:
+                unknown = {g for g in unknown if not GROUP_NAME.match(g)}
+            if not sep or not glob or not names or unknown:
+                raise UsageError("%s:%d: bad entry" % (path, n))
+            parts = glob.split("/")
+            if "secret" in names and (parts[:2] != SECRET_ALLOW_ROOT or len(parts) < 3):
+                raise UsageError("%s:%d: a secret exception lies only under tests/fixtures/"
+                                 % (path, n))
+            entries.append((glob, names))
+    return entries
+
+
+def glob_match(path, glob):
+    parts, pats = path.split("/"), glob.split("/")
+    return len(parts) == len(pats) and all(
+        fnmatch.fnmatchcase(p, g) for p, g in zip(parts, pats))
+
+
+def allowed(path, group, entries):
+    return any(group in groups and glob_match(path, glob) for glob, groups in entries)
+
+
+def files(repo):
+    try:
+        out = subprocess.run(
+            ["git", "-C", repo, "ls-files", "-z", "--cached", "--others",
+             "--exclude-standard"], capture_output=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise UsageError("git ls-files failed in %s: %s" % (repo, exc))
+    paths = {p for p in out.decode("utf-8", "surrogateescape").split("\0") if p}
+    return sorted(p for p in paths if os.path.islink(os.path.join(repo, p))
+                  or os.path.isfile(os.path.join(repo, p)))
+
+
+def utf16(data):
+    """The codec a UTF-16 file decodes with, or None: a BOM, or NULs on at
+    least 90% of the odd or the even bytes of the probe (not both: all NUL is
+    binary)."""
+    if data[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        return "utf-16"
+    probe = data[:BINARY_PROBE]
+    even, odd = probe[0::2], probe[1::2]
+    if len(odd) < 2:
+        return None
+    even_nul = even.count(0) >= UTF16_NUL * len(even)
+    odd_nul = odd.count(0) >= UTF16_NUL * len(odd)
+    if odd_nul != even_nul:
+        return "utf-16-le" if odd_nul else "utf-16-be"
+    return None
+
+
+def read_lines(path, full):
+    """([(line, groups)], oversize) for one entry: its path, then a symlink's
+    target, a text file's lines (UTF-16 decoded), or a binary's printable runs
+    (for BINARY_GROUPS only); a file over READ_CAP is its path only."""
+    rows = [(path, GROUP_NAMES)]
+    if os.path.islink(full):
+        target = os.readlink(full)
+        return rows + [(target, GROUP_NAMES)], False
+    with open(full, "rb") as fh:
+        if os.fstat(fh.fileno()).st_size > READ_CAP:
+            return rows, True
+        data = fh.read(READ_CAP + 1)
+    if len(data) > READ_CAP:
+        return rows, True
+    codec = utf16(data)
+    if codec:
+        text = data.decode(codec, "replace")
+    elif b"\0" in data[:BINARY_PROBE]:
+        return rows + [(m.group().decode("ascii"), BINARY_GROUPS)
+                       for m in PRINTABLE_RUN.finditer(data)], False
+    else:
+        text = data.decode("utf-8", "replace")
+    return rows + [(line, GROUP_NAMES) for line in text.splitlines()], False
+
+
+def scan(repo, entries):
+    groups = {name: {"lines": 0, "files": 0} for name in GROUP_NAMES}
+    outside, oversize = [], 0
+    for path in files(repo):
+        counts = dict.fromkeys(GROUP_NAMES, 0)
+        lines, big = read_lines(path, os.path.join(repo, path))
+        oversize += big
+        for line, names in lines:
+            for name, rx in COMPILED:
+                if name not in names:
+                    continue
+                if name in RECORDS_SKIP and path.startswith(RECORDS):
+                    continue
+                if rx.search(line):
+                    counts[name] += 1
+        for name in GROUP_NAMES:
+            if not counts[name]:
+                continue
+            groups[name]["lines"] += counts[name]
+            groups[name]["files"] += 1
+            if not allowed(path, name, entries):
+                outside.append({"path": path, "group": name, "lines": counts[name]})
+    return {"groups": groups,
+            "hits_outside_allowlist": sum(f["lines"] for f in outside),
+            "files": outside, "oversize": oversize}
+
+
+def render(result):
+    rows = ["%-8s %6s %6s" % ("group", "lines", "files")]
+    for name in GROUP_NAMES:
+        g = result["groups"][name]
+        rows.append("%-8s %6d %6d" % (name, g["lines"], g["files"]))
+    if result["files"]:
+        rows.append("")
+        rows.append("outside the allowlist:")
+        for f in result["files"]:
+            rows.append("%s  %s  %d" % (f["path"], f["group"], f["lines"]))
+    if result["oversize"]:
+        rows.append("oversize (scanned by path only): %d" % result["oversize"])
+    rows.append("hits outside allowlist: %d" % result["hits_outside_allowlist"])
+    return "\n".join(rows)
+
+
+def main(argv):
+    try:
+        opts = parse_args(argv[1:])
+        repo = opts["repo"]
+        allow = opts["allow"] or ".hygiene-allow"
+        if not os.path.isabs(allow):
+            allow = os.path.join(repo, allow)
+        private = load_private(private_path(), opts["require_private"])
+        build_groups(private)
+        entries = load_allow(allow, opts["allow"] is not None, private is not None)
+        result = scan(repo, entries)
+    except NoPrivate as exc:
+        sys.stderr.write("%s\n" % exc.args[0])
+        return 2
+    except UsageError as exc:
+        if exc.args and exc.args[0]:
+            sys.stderr.write("hygiene: %s\n" % exc.args[0])
+        sys.stderr.write("usage: hygiene [--json] [--allow FILE] [--repo DIR]"
+                         " [--require-private]\n")
+        return 1
+    if opts["json"]:
+        print(json.dumps(result, indent=1, sort_keys=True))
+    else:
+        print(render(result))
+    return 0 if result["hits_outside_allowlist"] == 0 else 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

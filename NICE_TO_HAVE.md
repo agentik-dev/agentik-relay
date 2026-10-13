@@ -1,0 +1,546 @@
+---
+status: current
+updated: 2026-09-30
+---
+# agent-relay: what a review or a packet left open, none of it blocking
+
+Nothing here blocks a review or a merge. An item leaves when it lands, or when a `DECISIONS.md` entry retires it. Until 2026-09-28 example-mac's `NICE_TO_HAVE.md` held this repo's items; the last section is what moved from there.
+
+## The gsent night's unrun gate (2026-10-01 16:04)
+- **A `.pyc` that python writes by itself moves the pinned python3.** Night 2026-10-01-11's gate on row `gsent` was `unrun`, `tool-moved: python3` (the ledger's `gate` line, 22:54:36 UTC); the row is `red: gate-unrun` with five acts unjudged, $6.79. The relay pinned its tools at 14:50:57 local. At 14:58:09 a process outside the night ran the same Homebrew python and imported `pty` for the first time on this Mac, and python wrote `pty.cpython-314.pyc` and `tty.cpython-314.pyc` into the stdlib's `__pycache__`: two entries added to python3's tree, which `treeSnap.moved` counts (`internal/effects/tree.go:200`). No tool moved. The process was the observer's own verify helper for AR48 (its transcript's timestamp is the files' mtime to the second). Any python on the Mac can do the same: a hook, a plugin script, a `make doclint`. The first `tool-moved` in any ledger. A fix needs a short design, since a planted `.pyc` is a real way to change what the stdlib does: one candidate is a `PYTHONPYCACHEPREFIX` under the relay home in the pinned env, so the gate's python neither reads nor writes the shared `__pycache__`, and the snapshot may then leave those dirs out. (the observer, from the ledger line, the two files' times and the code)
+  - **Landed as AR49** (2026-10-01, `design/pin-pycache-r1.md`, packet `ar49-pin-pycache`). Its review of two refuters blocked on nothing; what it left open is the list below.
+
+## Night 2026-10-01-14, the first orchestrated night on 0567593 (check-in 22, 21:40)
+- `groups.json` names the gate's process group with an empty row: `{"pgid":86463,"started":"Thu Oct  1 21:35:40 2026","row":""}` while row gfix's gate ran `make check-fast`. A reader cannot tell whose gate it is. (the observer, from the file)
+- gfix's row log ends at "turn 30" while its `exit` line reads `turns: 36`. (the attendant; not checked)
+- In an orchestrated night, `relay status --json` holds no orchestrator line and `night-open`'s `rows` omit `orient`, while the plan line read `orient` `ready`. `design/relay-orchestrator-r1.md` §8 says status shows one orchestrator line. It may appear only once the row sits (the loop picks it when no build row is ready, `internal/night/night.go:449-452`); not confirmed either way.
+
+- The same night at 00:38 on 2026-10-02 (check-in 23; the attendant, from both verbs, the ledger and the row logs; none checked by the observer):
+  - The orchestrator row does sit: `orient.1` spawned 23:58:47, once gfix, ewc and ovr were green. That answers the item above; status still showed no orchestrator line before it sat.
+  - `orient.1.log` repeats `turn 63: Agent ""` 94 times while a helper runs, and status lags at turn 60.
+  - ovr's exit text says four tool results ended with a line asking for a status update, and it answered one. The source is not checked; if a headless child is shown that line, it is Claude Code's and not the relay's.
+
+## AR49's review (2026-10-01, two refuters, nothing blocking)
+- Python's temp name for a cache write (`<file>.pyc.<n>`) is still an entry, so a walk that lands inside that write still reads `tool-moved`. The window is the write itself. (the builder; not reproduced)
+- pytest's rewrite cache name (`x.cpython-312-pytest-8.3.4.pyc`) is still an entry. None lies under Homebrew's python today (2,248 cache names, 0 unaccepted). (refuter A, a read-only `find`)
+- Removing a `__pycache__` that holds only tagged files is not moved by `Moved` and is moved by `MovedStrict` alone, as the new-directory stop is (the design's §6). (refuter A)
+- `relay doctor`'s new `python3` row has no test, since `cmd/relay`'s tests were outside the packet. The design's §2 still reads "the plan says so"; §3 and the status line say the line is doctor's. (the builder)
+- Not run by either refuter: that a cache-tagged `.pyc` cannot be imported by name under the prefix. The design's own refuter round ran it (§7, F1); the stray-write guard stopped refuter A's probe at its `rm -rf`.
+
+## The observer's check-in 19 (2026-10-01 15:41)
+- A `plan` ledger line with `state: invalid` names no problem: the line of 21:49:37 UTC for row `gsent` carries `skipped: 1` and an empty baseline, and no key says why the plan was invalid. The printed plan says it; the ledger, which the attendant and the report read, does not. (the observer, from the ledger line's keys)
+- A plan on a dirty root reads `state: ready` with nothing measured: the line of 21:50:26 UTC has `measured: 0, skipped: 12`, each baseline line `unrun` with "the root is dirty (3 paths)". A reader of the state alone takes the row as planned. The night's own plan ten minutes later measured all 12. (the observer, from the ledger)
+- The ended night 2026-10-01-12's report still lists `grem` as waiting on a hand merge after the hand merge (63653612), since status has no `merge_sha` for a merge made by hand. (the observer's helper, not checked) (landed as AR56)
+
+## AR48's verify round (2026-10-01 15:00)
+- A TERM sent to bounded's pid alone, within about a millisecond of `top`'s spawn and before the script records the child, leaves a hung `top` running: 9 of 40 timed runs at a149418. A signal sent to the group takes it once `top` is back in bounded's group (ruling 7). Closing the pid-only case needs the signals masked round the spawn, and the child must not inherit the mask. (the verify adversary)
+- With an invalid override such as `BOUNDED_LOAD_MAX=x` the script ends in a traceback, as `main`'s does. (the verify adversary, two of 29 envs)
+
+## AR48's review round 1 (2026-10-01 14:35)
+- Three mutants of `scripts/bounded` pass all five `TestAR48_` tests: the idle read moved above the load check (ruling 1's last clause), a `BOUNDED_IDLE` series whose last share does not repeat, and a `/proc/stat` parser that sums every field. The fix round pins the other three. (adversary 1, F4)
+- The Python and Go parsers read two inputs differently, neither of which a real `top` or kernel writes: a second `CPU usage:` line behind a control character reads 10 in Python and 90 in Go; `/proc/stat` counts above 2^53 read 50 in Python and are unreadable in Go. (adversary 1, F5)
+- `%g` rounds the share in the stderr line: 25.0000001 prints `idle 25% is above the floor 25%`. (adversary 1, observation)
+- No test covers INT or HUP during a read, or the `/proc/stat` reader end to end; the TERM subtest leaves a `/bin/sleep 2` for two seconds. (adversary 2, observations)
+- Nothing checks `Makefile:15`'s help text against the README's `make check` line. (adversary 2, observation)
+
+## The observer's check-in 18 (2026-10-01 14:05)
+- The hygiene scan refuses a file under `history/sessions/` that names a sibling or a private repo, so another repo's session cannot leave this repo an intake file and writes its asks into a third repo's intake. Reported by a session that met it on 2026-09-29; not reproduced here, and it may be the scan working as meant. If it is, entry 6's route (an intake file in the asker's own `history/sessions/`) should say where this repo reads its asks. (the observer, from a session's handoff)
+- `relay status --watch 5 --hold` in a night's tmux session outlives the night and an install: pid 96985 in `relay-2026-10-01-10` still ran the binary from before 13:56 an hour after the night ended `count-reached`. It only reads. Not confirmed as a defect: the `--hold` may be meant to keep the last frame up. (the observer's helper, from `ps`)
+- The newest night is not the last name `ls` prints: `2026-10-01-10` sorts before `2026-10-01-9`. A reader that takes `ls | tail -1` reads the wrong night; `relay status` with no `--night` is the safe read. (the observer's own slip)
+
+## The observer's check-in 15 (2026-10-01 07:25)
+- Mid-sitting `cost_usd` is 0, so the budget reads "$0.00 so far" against `--max-usd 80` until the sitting exits. (attendant, not confirmed)
+- Every line of the row's log ends `unread`, and status says `unread: false`. (attendant, not confirmed)
+- Status's `started` is the relay's start (06:34:07), nine minutes before the ledger's night-open (13:43:43Z), so the preflight counts in the night's time. It may be one item with the empty status during a preflight. (attendant, not confirmed) (AR60)
+
+## ar47-breaker-idle-key, the merge (2026-10-01 13:02)
+- The Makefile's help for `e2e` still says nine cases; AR47 added `TestE2E_11_Unconfirmed`. (the builder)
+- `TestJSONShapesFrozen` walks the plan's JSON tags by reflection, so a key with `omitempty` is frozen in the golden whether or not a fixture sets it. The packet's ruling 4 said the golden would stand; it gained `plan breaker.unconfirmed`. (the first full check, red; the builder's diagnosis)
+- `make e2e` is never in `make check`, so a change that breaks an end-to-end case passes the gate. AR47 broke `TestE2E_7_Soak` (a fake load with the real `top`) and only the builder's grep found it. Run the e2e cases a change could touch before a merge. (the observer)
+
+## ar47-breaker-idle-key, review round 1 (2026-10-01 10:13)
+- With `Idle` nil, D4 differs from main when the cores change between the read before a line and the read after it: before 40 on 16 and after 3 on 32, main reads not loaded and the branch loaded; before 40 on 32 and after 3 on 16, the reverse. Fakes only; `OSLoad`'s cores are constant. (adversary F4)
+- `Wait` passes `Max` by one idle read (with 10 s reads the clock ends at 10m10s and `WaitS` reads 600), and the idle read ignores `ctx`. (adversary)
+- `/proc/stat`'s iowait counts as idle. It only narrows. (adversary, accepted)
+- Not run in the round: `cmd/relay`'s tests; the golden was checked by diff. The full `make check` before the merge covers both.
+- The verify round (b6c939f, 0 blocking): with a reader set, a context that ends by the first idle read returns false with `opens: 0` and no `open` line, where main records `opens: 1` and an `open` line. The answer and `wait_s` are equal. (adversary)
+
+## The observer's check-in 16 (2026-10-01 09:40)
+- A night id was used up by nothing: `nights/2026-10-01-7` was made at 08:42:22, holds no file, and has no ledger line; the next run opened as `2026-10-01-8`. The cause is not known; it follows a hand merge by a minute. (attendant, not confirmed)
+- For that empty night `relay status --json --night 2026-10-01-7` prints an object with every field blank and exits 0, and `relay report` prints "The night stopped: not yet." Neither says the night never opened. (attendant, not confirmed)
+- gwr's `exit` line carries `"denials":1` and no ledger line says what was denied. (attendant, not confirmed)
+
+## design/breaker-signal-r1, the refuter round (2026-10-01 07:37)
+- The load key misses real saturation: during another session's `go test` the machine read load 17.30 at 2.17% idle, 1.08 x cores, which neither today's rule nor the design's calls loaded. The breaker has never opened: 0 `breaker` lines and 0 opens in 166 plans across five ledgers. A rule that reads the idle share first would see it, at 1.4 s for every measured line; it widens when the breaker fires, so it needs its own design and evidence. (refuter F1, measured)
+- A spawn has no D4 behind it, so a child started beside real load just runs slowly. (refuter, not confirmed)
+
+## ar46-guard-tree-reader, the verify round and its hardening fix (2026-10-01 01:12)
+- On a subagent's call outside a row, four `case`-inside-a-substitution lines that `main` denied `unreadable` are allowed: the tree reads them whole. In a row they are `push`, and the same shape with `relay run` is `helper-relay`. Accepted. (verify F2)
+- `looseNest` counts each `$(` or backquote as a level and never closes one, so a line over 64 KB with five flat substitutions is `unreadable` at the subagent door. (the hardening builder's report)
+- In a row a flat line over 64 KB that ends `; relay run` is `nested-run`, not `unreadable`: the loose reading answers first. Denied either way; pinned as found. (the hardening builder's report)
+
+## The observer's check-in 12 (2026-10-01 01:00)
+- The relay's own breaker reads the same load average as `scripts/bounded` (`internal/effects/load.go`, `sysctl vm.loadavg`), and on this Mac the number does not follow the CPU: 31 to 72 on 16 cores with 59% to 73% idle. Night 2026-10-01-1's plan left 8 of gw's 9 baseline checks `unrun: loaded` at breaker load 40.23 (D4, `internal/night/bound.go:553`). Read the CPU's busy share in both places. (the observer's attendant, confirmed in the ledger and the source; the fix queue's item 1)
+- `relay report` for night 2026-09-30-9 still lists g3 as waiting on a hand merge after the merge landed in main (8ba98396). (attendant, not confirmed) (landed as AR56)
+- A `plan` line at 07:04:45Z names night `2026-09-30-10`; the run it fed opened as `2026-10-01-1`. The plan and the run name the night on either side of local midnight. (attendant, not confirmed)
+- AR45's review, not blocking: the seam `night.RedChecks`, set in `internal/gate`'s `init`, could be a function in `internal/night` that `gate.Red` wraps; the design sentence sits in §5 where the packet said §15. (adversary)
+
+## ar46-guard-tree-reader, review round 1 (2026-09-30 23:55)
+- Over-denials in a row that neither the packet nor the record's §4 named, 34 of 598 ordinary lines (the record's §9 lists the kinds). Eleven come from the builder's two substitution rules; packet 2 drops those when rule 4 lands. The rest are lines one dialect rejects, such as `"${var^^}"`, `"${!name}"` and `sleep 1 &; echo x`, which the shell that runs the line accepts. Consider judging a top-level line by the dialect of the shell that runs it once a test pins which shell that is. (adversary 1, F5 and F6)
+- `let x=1<<2`, `let "x = 1 << 2"`, `ls !(foo)` and `ls *(.)` are `unreadable` in a row. (adversary 2, F5)
+- The loose reading is blind to quotes: outside a row `echo $(( )) "note; git commit --amend"` is `amend` where `main` allows it. Accepted and pinned in `TestAR46_4_ReviewRound1`. (adversary 2, F4; adversary 1, F4)
+- Six existing lines are denied in a row by the mark alone; the class behind adversary 1's F1 may be wider than its one line. The fix round's loose reading should cover it; the verify round checks. (adversary 1, observation)
+- Acts 2 and 3 were not red on `main` on their own: the code for both landed in act 1's commit. (the builder's report)
+
+## The observer, AR46's build (2026-09-30 22:40)
+- `scripts/bounded --load 4` holds `make check` on the 1-minute load average, and on this Mac that number can sit far above the CPU's real use. At 22:39 the load read 72.34, 57.60, 38.22 on 16 cores (the breaker's line is 64) while `top` read 73% idle; `mediaanalysisd` was at 324% CPU and one example-app `go test -race` was running. A check started then would wait and stop `load` with the machine mostly idle. Read the idle share (or the run queue of normal-priority work) instead of the load average. The script is the canonical copy the plugin repos pin, so the fix lands there too. (the observer, measured; the cause of the high number is not confirmed)
+
+## design/guard-parser-r1, the refuter round (2026-09-30 22:06)
+- The round's lens ("a line one shell runs that the union rule allows") was not run: the adversary's step of composing candidate lines was stopped by a safety check and not retried. Shapes outside the spike's corpus are untested until packet 1's zsh corpus and the reviews of the landed code. (the record's §8)
+- From reading `internal/hooks/guards.go` only, untested: the `wrappers` table and the guards cover `command`, `builtin`, `exec`, `nohup`, `time`, `nice`, `env`, `xargs`, `timeout`, `sudo`, the interpreters' `-c`/`-e`, `git -c alias.` and `ssh`; the adversary saw no entry for `source` or `.`, `trap`, `make` or `awk`. Check whether a row can run a guarded command through one of them. (adversary, observation)
+- `mvdan.cc/sh` is BSD 3-Clause. The repo is private and the binary is installed on this Mac only; if either changes, the binary's distribution must carry the library's notice. (the observer)
+
+## The observer's check-in 11 (2026-09-30 22:00)
+- A `sitting` line does not say which check turned it red. Night 2026-09-30-8, row g2b: `"gate":{"clean":true,"commit":true,"is_error":false,"result":"red","verify":{…"status":"green"}}` and `"reason":""`; the red check was `touch` (ten paths outside the packet's `may touch`), which only the separate `gate` and `touch` events carry. `sitting.write` (`internal/night/run.go:659`) builds the object from result, clean, commit and verify alone. Add the names of the red checks to it. (the observer's attendant, confirmed in the ledger and the source; the fix queue's next small packet) (AR62)
+- `status.json` trails the row log between turn lines: at 21:59 night 2026-09-30-9 read turn 20 and 116k while `g3.log` was at turn 27 and 131k, and cost reads `$0.00` until the result event. Say so in `relay status`'s output, or write the status on every turn. (the observer's attendant, observation)
+
+## ar44-unreadable-denies, review round 1 and its fix round (2026-09-30 20:00)
+These wait on OPEN-QUESTIONS 8 (the guard's shell reader); none is patched before it is answered.
+- A heredoc body inside `$(…)` and a quote inside a backtick span are still read flat. No shell probed (sh, zsh, dash) ran a hidden command through either: the first is all heredoc body, and the second is over-read and denied. (builder's handover; adversary 1, observations)
+- A sitting known only by `CLAUDE_SESSION_DEPTH` gets the empty answer on a reader panic and no `Unreadable` guard: the deny keys on `inRow`, since a depth-only sitting's guard table is the owner's. (adversary 1, lens 2)
+- A subagent's call in the owner's own session is denied `relay: unreadable:` for a `$(…)` nested past four or a `case` inside a substitution. Intended (the helper guard's door), and worth a line in the plugin's README if a helper meets it. (the observer)
+- `$((1+2))`, `"$(echo ")")"`, `$(echo \))` and `"$(echo "$(echo "'")")"` are denied `literal` in a row, on main before AR44 too: over-denial, no bypass. (adversary 1, lens 3)
+
+## ar43-quotes-the-shell-nests, review round 1, and check-in 9 (2026-09-30 18:50)
+- `relay resume --help` answers `relay resume: unknown argument "--help"`: help is handled only as the verb (`cmd/relay/main.go:140`). Give each verb `--help`, printing its usage line and exiting 0. (the observer's attendant; seen in example-app's orchestrator, 17:27)
+- Since AR43 a `${` or a `<<` inside double quotes is refused in an acceptance line (`grep "${x}" f`, `grep "<<" f`); single quotes pass. It errs toward refusal and no live packet uses either. (adversary 2, observation)
+- `redirections`' substitution test is quote-blind: `grep -c '$(' f` is refused though the `$(` is a literal inside single quotes (`strings.Contains(line, "$(")`). Read it with `outsideSingle`. (adversary 2, observation)
+- The six-readings bound per nesting level (AR43 act 2, with `let`) measured 6 ms for 16 KB; no cap is needed today. (adversary 1, observation)
+
+## The observer's check-in and ar42's review (2026-09-30 17:32)
+- While `relay plan` measures, it keeps `nights/<the next dated name>/groups.json`, so plain `relay status --json` reads that name with `"state":""` and no rows, and the last night's resume line is hidden for the plan's ten minutes (seen 17:28: `"night":"2026-09-30-6","state":"","rows":[]` while night -5 held `relay resume g1`). `--night <id>` reads it. The dir goes when the plan ends (`trap.go:110-114`). Have status say a plan is measuring and name the newest night that has a `status.json`, or keep a plan's groups under an undated name as the gate keeps `hand`. (the observer's attendant, confirmed)
+- For a row the owner killed, `relay status` gives `"reason":"owner-kill"` and `relay report` prints `g1: failed, stream-error` (night 2026-09-30-5). One of the two reads the child's exit and the other the night's stop; print the same reason in both. (the observer's attendant, confirmed)
+- AR42 review, not blocking: `internal/packet/ar21_3_test.go:5`'s comment still says any `$'` is refused; no test pins `"\$'"` (a literal, passes) or an unclosed quote. (adversary 1, observations)
+- AR42 review F1, F2 and the `>&2x` hole predate AR42 and reach the sitting guards too; they are packet AR43, not items here.
+
+## The observer's check-in (2026-09-30 05:56)
+- `relay report --json` on a running night returns `"state":""` while `relay status` reads `running` (night 2026-09-30-4, 12:40). (the observer's attendant) (landed as AR55)
+- A night's report still lists a row as "waiting on a hand merge" after the row is in main: nights 2026-09-30-1 to -3 list wv2, wv3 and l1a so, and all three are merged (087c1c20 for l1a). Read main's ancestry before printing that line. (the observer's attendant) (landed as AR56)
+- Not confirmed: a sitting's output-token count looks low (2473 for l1a's 126 turns). Check what the ledger's `output_tokens` sums. (the observer's attendant)
+- `relay status` prints a running row's cost as `$0.00` while the row log's turn lines say `unread`. example-app's wv2 read `$0.00` at 20 turns (06:37) and `$17.55` once its sitting ended. Print `-` or `unread` until the cost is read.
+- A hand `relay gate` keeps no log and writes all its ledger lines in one batch when it ends. example-app's `relay gate wv1` ran from 05:45:28 to 05:54:56 PDT, and all 13 of its lines carry `12:54:56Z`, so while it runs the gate shows only in `ps`. Write each check's line as it finishes, and tee `make`'s output to `nights/hand/<row>.log`.
+- A hand gate's ledger lines carry `night:"hand"`, not the night whose branch they gate, so a grep of a night's lines misses the gate that merged its rows. Add the row's night (from its last `night-open`) as a second key.
+
+## ar41-child-session-role, review round 1 (2026-09-30)
+- The comment at `run.go:226-228`, `relay-r1.md:176` and ar41's charter say `RowPlan.Row` is "set only by SittingPlan"; `plan.go:267` also sets it on the standing orchestrator row's plan entry, which never spawns (`night.go:491`, `plan.go:502`). Name both setters. (F3)
+- The launch layer outranks a repo's `session.profile` and `posture`, so a repo cannot give its build rows `posture: signal`; `deny` gates only Agent, Task and Workflow, which build rows lack. (observation)
+
+## ar40-helper-relay-guard, review round 1 (2026-09-30)
+- A helper's read-only line is denied when a word holding `cmd/relay` comes before a verb word: `find cmd/relay -name '*.go' -exec grep -l stop {} +` and `grep -rn cmd/relay -e stop` read `helper-relay`. Check only `words[bin+1]`, the one word the binary reads as its verb (`cmd/relay/main.go:68`). (F1)
+- The guard's reason says a helper never builds the relay, but `make build`, `make install`, `go install ./...` and `cd cmd/relay && go build -o /tmp/r .` pass. Deny `make build|install` in this repo and `go build|install ./...` to helpers. (F2)
+- `$(which relay) stop`, `` `which relay` stop ``, `r=relay; $r stop` and `pkill -f 'relay run'` pass from a helper. Give helpers RowShapes' `literal` guard. (F3)
+- A `claude --agent` session's main thread carries `agent_type`, so it would be held as a helper. The relay spawns no child with `--agent` (checked 2026-09-30), and no loop runs that way; revisit if one does. `relay stop --help` is denied to helpers. (observation)
+
+## ar39-latest-skips-hand, review round 1 (2026-09-30)
+- `TestAR39_1_NightsDatedOnly` does not pin either anchor of the night-name regexp (`status.go:312`): dropping `^` or `$` leaves all three AR39 tests green, and without `$` a dir `2026-09-30-3-old` would be listed and could become the latest. Add `2026-09-30-3-old` and `x2026-09-30-4` to its fixture. (F1)
+- A plain file under `nights/` whose name matches the pattern is listed as a night; `Nights` could keep directories only. Predates AR39. (observation)
+
+## ar38-measure-budget, the build (2026-09-30)
+
+- The plan still counts the measure's cut as `budget`: `Print`'s last line reads `K past the budget`, and `Plan.Budget`, every `plan` line and `plan --json` carry the key `budget`. The stop no longer says it, but these can still read as money; renaming them moves the frozen key set. (AR38 act 2)
+- `relay run --dry` builds the plan but does not print `measure: <s> s (<source>)`, since a test freezes its line count; its first line could carry it. (AR38 act 1)
+
+## ar37-status-names-repo, review round 1 (2026-09-30)
+
+The fix round took F1 (a night with no readable `status.json` names no repo), F2 (a linked worktree of the root got the note) and F4 (`HOME` with a trailing slash, or equal to the root, was not `~`).
+
+- The dashboard's first line, `night <id> in <root>: <state>; …`, passes 100 columns with a long root; `TestAR30_3_StatusShowsActs` holds the rest of the table under 100 with the root `$REPO`. Fix: put the root on a line of its own when the first line would pass 100. (review 1, F3)
+- `relay resume` with no row prints `night <id>: N red or failed row(s)` without the root, and `stop --json` / `kill --json` carry no `root`. (AR37 build, left)
+- Between the measure's end (`WatchGroups` removes `groups.json`, and the night directory when empty) and `night.Run`'s first `groups.json`, the night is briefly not listed, so `relay stop` then targets the night before. It predates AR37. (fix round)
+- `relay gate`'s `hand` night passes no root to `WatchGroups`. A status with no root and no `groups.json` reads the ledger's day files from the night's date on at each call, and at each `--watch` tick. (fix round)
+
+## ar36-pid-file-guard, review round 1 (2026-09-30)
+
+- A binary linked with `LockPortLink` and no `PidHomeLink` loses the Write hook's pid-dir deny: `hooks.PidDir` is `night.PidDir` (`internal/night/pidfile.go:99`), which refuses there, and the deny is skipped on any `PidDir` error (`internal/hooks/guards.go:1098`). The fix needs no `internal/hooks` change: `pidfile.go:99` can give hooks a resolver that skips the link check. No release binary is linked that way. (AR36 act 2; review 1, A1-F1 and A2-F5)
+- A relay that died holding the lock but is not yet reaped (ps stat `Z`) is refused as a live holder by AR36's check, where `main` recovers its file; the refusal clears once it is reaped. Fix: count a `Z` pid as not live in `maybeLiveHolder`. (review 1, A1-F2)
+- `TestAR36_1_LiveHolderFileIsNotReplaced` checks only `127.0.0.1:P` after the refusal, so a refusal that closed the loopback fd but not the wildcard binds (`closeAll(fd, nil)`) still passes, and the next take gets `NestedError`. Fix: also bind `:P` after the refusal. (review 1, A1-F3)
+- A `resume` refused by AR36's rule exits 2 and prints nothing: `refused` (`cmd/relay/main.go:1492`) runs for `NestedError` only, though its doc comment (:1477-1478) and relay-r1's AR22 paragraph say a refused resume with a row prints the line it would have exec'd. Fix: run `refused` for this error too, or narrow that sentence to `NestedError`. (review 1, A1-F4 and A2-F4)
+- `PidFile` reads `relay.pid` and then renames over it, so a live holder's line landing between the two (during the `ps` for a stale line) is replaced; not seen outside a staged probe, and the packet prescribed read-then-write. Fix: name it as a residual in relay-r1's AR22 paragraph, or create the file with `link(2)` and fall back only for a dead pid. (review 1, A2-F1)
+- `ps -o lstart` prints by locale (LANG goes into the pinned env for `ps`, `internal/effects/pin.go:291-292`), so a taker under another LANG, and perhaps another time zone (untested), reads a live holder's start as a reused pid's and replaces its file. It predates AR36; en_US and C print alike on this account. Fix: set `LC_ALL=C` for the pinned `ps`. (review 1, A2-F3)
+
+## ar36-pid-file-guard, the build (2026-09-30)
+
+- On 2026-09-30 a probe removed a live night's `relay.pid` and the night stopped `lock-moved`, though its port was still held. Should a missing advisory file stop a night whose port is still held, or should its holder write the file again? Not decided here. (AR36)
+
+## ar34-stop-in-measure, review round 1 (2026-09-30)
+
+Two adversaries read the branch at bfef314. The fix commit took F1 (the queue re-read's plan watched the control file) and both F2s (a stop before the first `status.json`; a stop during the root-lock wait read `budget`).
+
+- `relay stop` during `relay plan` prints `the night is still measuring: it stops within a few seconds` (`cmd/relay/main.go:1404`), but the plan never polls: the trap made the night's directory, the plan ran on for 16 s, and afterwards the directory held only `control`, so the verb printed the same line again and the next plan took the next name (`night 2026-09-29-2`). Print the measuring line only when `groups.json` names a live relay. (adversary 2 F3, adversary 1 observation 1)
+- Merged with `ar32c-words-push-view`, `internal/night/control.go:64` and `cmd/relay/ar34_2_test.go:42` do not compile (`ReadControl` returns 3 values there); three keep-both conflicts (`control.go`, the loop's `kills`/`said` block, the `Plan` struct). (adversary 2, observation)
+- The verb's "within a few seconds" can be the 30 s kill grace, and a line waiting on the root lock is not woken by the stop, only cut once it holds the lock. (adversary 2, observation)
+
+## ar34-stop-in-measure, the build (2026-09-30)
+
+- `relay stop` and `relay kill` pick the latest night by its directory, which the trap makes only once a measured line's group is live. A stop said before the measure's first line lands in the previous night's control file, and this night's measure never reads it. The run could make its night's directory before the plan measures. (AR34 act 2)
+- The measure's watch and the open read the control file's time with `os.Stat`, since `effects.FS` has no stat, so a `FakeFS` control file is never read before the loop. An `FS.ModTime` would put both behind the seam. (AR34)
+
+## ar32b-orchestrator-merges, the two review rounds (2026-09-29)
+
+Two review rounds read the branch. Line numbers are the branch's at eafe5d2. Findings that the fix commits took are not listed. `make check` was 0 on the branch. The charter records kill-timing tests (`TestAR10_9`, `TestControlKill`, `TestCeilingKill`) that failed only under load at acts 2 and 3 and at fix 2, and each passed alone three times.
+
+- The gate proves merge commits only (`internal/gate/gate.go:626-677`, `provenMerges` and `ownNames`). A branch-only row leaves main where it was, so a red row's branch can start at the next sitting's base. A plain `git merge <red row>` then fast-forwards and makes no merge commit. The red row's commits sit on the sitting's first-parent line as its own, pass touch under the orchestrator's wider bounds, and the gate reads green with no `row-unproven`, although design §5 says a red row's commit reds. With a green row the same fast-forward means the row never reads landed, so a `DONE:` holds. A scratch gate test showed it: b2 red (b2.txt outside its `may_touch`), o.1 runs `git merge -q b2` and commits its charter, and the gate reads `green "" unproven=false outside=[]`. The orchestrator could write the same bytes itself, so this blocks nothing. Fix: red `row-unproven` for any first-parent commit on `base..head` that another staged row's tip reaches and that did not arrive through a proven merge. (ff-1)
+- The stop notice cuts `unmerged` at `valueCap`, 48 bytes, with no mark (`internal/effects/notify.go:32`, applied at :97; the body's cap is 200). With three row ids the notice names a row that does not exist: `unmerged=ar34-push-check,ar35-live-view,ar36-soft-usd-not`. Design §6 says the stop's notice names each unmerged row. The ledger's `stop` line holds the whole list. Fix: cap `unmerged` by whole ids and append `+N` for the ids left out. (notice-1)
+- CONTEXT's `green branches to merge` holds every green build row with no `MergeSHA` (`internal/night/night.go:684`). That includes a merge-on-green row whose relay merge failed with a plain error: main red, `verify` red on the merged tree, or the branch moved. The RULES then invite the sitting to merge work the relay just refused to land, and only the orchestrator row's inherited `verify` stands in the way. Design §6 speaks of branch-only rows. Not reproduced. (context-1)
+- The orchestrator writes a build row's packet, so it can set that row's `may_touch` to name the orchestrator's own brief. The row's green head then arrives through a proven merge, which touch exempts, so a sitting can rewrite its own instructions despite design §5. In ar32a the same path ran through merge-on-green, so it predates ar32b. (brief-1)
+- `throughSitting` (`internal/night/plan.go:658`) finds the hop only while `refs/heads/<o>.<n>` exists. Deleting a landed sitting's branch un-lands every row merged through it: `landed` and `DepSatisfied` read false, and later nights list those rows as unmerged. Each call also runs `for-each-ref` and up to two first-parent walks over main per sitting branch. `relay clean` never deletes those branches, so the cost of each `landed` and `DepSatisfied` call grows with every sitting ever run. (hop-1)
+- The gate's `git merge-tree --write-tree` runs in its fresh repository under hermetic config, while the sitting's `git merge` uses the root's config and attributes. A merge that was automatic in the sitting could then read `row-unproven` in a repo that departs from git's defaults: `merge.renames`, `diff.renames`, a rename limit, or a union driver set only in the global `core.attributesFile`. A probe showed that `merge-tree --write-tree` in a bare clone ignores a `.gitattributes` `merge=union` driver (exit 1) while a work tree's merge succeeds. The gate's fresh clone has a work tree at head, so a repo-level attribute should hold. Not reproduced through the gate. (merge-tree-1)
+- `ReadActs` (`internal/night/acts.go:21-35`) reads every commit on `base..<branch>`, so `relay status` lists a merged build row's commits as the orchestrator sitting's own acts. In a scratch e2e with two rows, o.2 made two commits, the merge and its own, and status read `acts 3` with b's commit among them. Fix: read an orchestrator sitting's acts with `--first-parent`. (acts-1)
+- A row left green and unmerged by a `--max-sittings` stop is skipped by the next orchestrated night (`stage b: the worktree ... exists`). That night's CONTEXT reads `green branches to merge: none`, and its stop line reads `done` with `unmerged: []`, so only the earlier night's notice names the row. Design §6 says the next night re-gates it at plan, and §11 leaves that re-gate to a later packet. (next-night-1)
+- With two rows added, a sitting that merges one and writes `DONE:` stops the night `waiting` at once, with `unmerged: [c]`. Design §4 says the next sitting merges those rows, but none starts: WAITING releases only when a build row ends or on the owner's words, which is ar32c's `idle` hold. This matches ar32a's WAITING. (waiting-1)
+- Stacked rows: if the orchestrator merges b, cut from r, before r, then r's content lands but r never reads landed. A later `git merge r` is already up to date and makes no merge commit, so a `DONE:` holds and the stop names r as unmerged. CONTEXT's queue order normally lists r first. Reasoned from `landed` and `throughSitting`, not run. (stack-1)
+- Design §6's "What ar32b built" says rows take the sitting's merge sha "after a sitting's merge and before its Next act is read". It does not say that the step runs only when the sitting's own merge succeeds, before any early return (round 1's F1, since fixed). (design-1)
+- The fake's `.merge` knob (`internal/effects/testdata/fakeclaude/main.go:211-234`) runs only when `FAKECLAUDE_ACTS` is 0 for that row, because `files()` runs only then. The fake's doc comment does not say so. (fake-1)
+- The report's stop section prints `unmerged: ` with nothing after it for an empty list, while `resume` prints `none` (`stopValue`, `internal/night/report.go:203`). (report-1)
+- The e2e harness rewrites `relay/queue.yaml` from `f.queue` on every `f.run` (`cmd/relay/e2e_test.go:164-172`, through `f.start`). A multi-night orchestrated e2e must re-read the queue from main between nights, or it drops the rows the orchestrator added. This is a harness caveat, not a defect. (e2e-1)
+
+## ar31-short-tmp-line-log, review round 1 (2026-09-29)
+
+Round 1 read 1e00e0d against ae38a32, on the branch, in four slices. Nothing blocked, and each of the owner's four lines failed under its mutation. The round changed no code, so there was no second round. Each item below is a test that could be stronger or a line that could be clearer; the code is right today.
+
+- No test covers four of the temp root's rules. Removing the sticky rule (`internal/effects/pin.go:606`), the parent rule (609), `sweepTmp`'s uid rule (659) or its own-pid skip (651) leaves `TestAR31_1_*` and `TestAR22_1_*` green. These rules guard other accounts. Add one case per rule. (tmp-1)
+- The log's tests use one stream at a time. None runs both pipes at once, a timeout or a kill, a write error in the middle of a run, the cap's boundary, or close-on-exec. A change that made `lineLog.Write` return its error would shorten the tails and the last line, and no test would see it. (log-1)
+- A log cut short by a write error carries no mark (`internal/effects/log.go:172`). A full disk leaves a log that looks whole, or looks like a line that printed nothing. The design chose this (D19). One best-effort line would tell the owner the log is partial. (log-2)
+- The log's label is cut at 64 bytes (`internal/effects/log.go:93`). A branch name over about 57 bytes loses the `-lineN`, `-verify` or `-merge` suffix from the file name. The files stay distinct; the name no longer says which line it is. (log-3)
+- `TestAR31_2_NightNamesLog` sets `BranchLog` by hand. The night's real log is proved only by `TestAR5_NightLinesResumeAndTilde`'s prefix match, which does not open the file. Assert that the printed path holds the red line's output. (surfaces-1)
+- Three cases of D13 have no test: a same-as-main or unrun check that keeps and names its log, the merge's bounded-stop refusal naming its log, and exit 124. A scratch test showed the first two work. (surfaces-2)
+- The key `log` names two files. In `run --json` a row's `log` is its live stream log; in `doctor --verify --json` and in the night's `relay <row>: log:` line it is a line log. In `--json` mode the gate's line logs reach stderr only. Name the two meanings in the record, or rename one key. (surfaces-3)
+- No test proves that `relay gate --json` or its text carries a red line's log. Clearing every `BranchLog` in `gateVerb` after `gate.Hand` (`cmd/relay/main.go:673`) leaves the whole `cmd/relay` suite green. The owner's third line is still proved, by `TestAR31_2_DoctorKeepsLog`, `TestAR31_2_GateKeepsLog` and the golden. Add a red-line `relay gate --json` test that reads `branch_log`. (acceptance-1)
+- `tmpWorst` is checked against its own formula, not against the scratch's layout (`internal/effects/pin.go:575`). With the scratch's dir name made longer, the start-time refusal understates the worst case and `TestAR31_1_*` stay green. The scratch's own cap still holds each line's `TMPDIR` to 62 bytes. Derive the worst case in the test from a padded scratch path. (acceptance-2)
+
+## ar31-short-tmp-line-log, the design's refuter round (2026-09-29)
+
+The round read the record's amendment before code. What the design took is in `design/relay-r1.md` §6 and §15.
+
+- The ledger cuts every string at `TextCap`, 400 bytes, without a mark (`internal/effects/ledger.go:85-128`). A line log's path is the state root plus up to 102 bytes, so under a state root over 298 bytes a `gate` or `merge` line's `log` is cut and names no file. The JSON and the printed lines carry the path whole. Exempt `log` from `TextCap`. (log-5)
+
+## ar30-block-and-acts, the two review rounds (2026-09-28)
+
+Round 1 read e0afc2f and round 2 read 8bbab91, on the branch, not yet on main. Line numbers are the branch's. Findings the branch's own fix round takes are not listed.
+
+- A symlinked `CLAUDE.md` at main is read as its link text. `internal/night/plan.go:98` runs `git cat-file blob <sha>:CLAUDE.md`, which prints the target's path, so the plan reports `none: not rendered` and prepends nothing, while the child reads the block through the link and `rules_hash` does not record it. No portfolio repo has a symlinked `CLAUDE.md` today. Resolve a mode-120000 blob to its target in the tree, or report a plan problem. (r1; r2 F3)
+- The plan's template line passes 100 columns: `plan.go:804` prints the stops, the template sha and the block on one line, 103 columns with `none: not rendered`, 110 with a block, 131 with `--until`, against `design/ux-review.md` item 6. The packet dictated that form. Print the block on its own line. (r1)
+- `internal/prompt/block.go:24` splits on `\n` only, while `render.py`'s apply uses `splitlines()`. On a CR-only `CLAUDE.md` render finds and replaces the block, but `prompt.Block` returns nil with no error. Negligible in practice. (r1)
+- A row that re-renders `CLAUDE.md` and merges mid-night (`internal/night/night.go:623`, merge-on-green) leaves later rows with the plan-time block in their prompt while their worktree's `CLAUDE.md` holds the new one. The packet's §15 names only chained rows. No reproduction yet. (r1)
+- `TestAR30_1_PlanReadsBlock` does not cover a ledger with no `CLAUDE.md` at main, nor a failed git read. `FakeGit.Hermetic` (`internal/effects/fake.go:291`) answers an unmapped key with an empty string and no error, so the choice that a git error is a plan problem is untested. (r1)
+- `internal/night/acts.go:80` clips an act line to 83 runes, not 83 display columns, so a subject in wide characters passes the promised 100 columns: 120 CJK characters give 99 runes and 179 columns. Clip by East Asian display width. (r2 F5)
+- The new `acts` column (`internal/night/status.go:195-197`) widens a status table that already passes 100 columns for a realistic row: header 114 and row 121, against 108 and 115 on main. The test's claim that every line is under 100 columns holds only for its row `r1`. Narrow the table, or limit the claim to the act lines. (r2 F6)
+- `ReadStatus` (`status.go:306-319`) leaves a missing `acts` as nil, so `relay status --json` on a night written before AR30 prints `"acts":null`, although §9 promises `[]`. Set a nil `Acts` to `[]Act{}` there. (r2 F7)
+- `relay doctor` prints the template hash without the block: `cmd/relay/main.go:267` calls `prompt.TemplateHash()`, while the plan and the spawn record `TemplateHashFor(Block)`, so for a repo with a rendered block doctor's `template` line differs from the plan's. Have doctor read the block as the plan does, or label its line as the no-block hash. (r1 #5)
+
+## The design, the ledger and the gate (sitting example-mac 2026-09-28-6)
+
+- `design/relay-r1.md:46` still says a helper writes packets into example-mac's `relay/prompts/` and that the stand-in's queue row names the file. Both lapsed with the stand-in (`DECISIONS.md` entry 2 as amended at 3eb54e4). Rewrite the paragraph to match entry 2.
+- The repo has no `CLAUDE.md`, so `decisions render --check` is red: example-mac `DECISIONS.md` entry 4 wants the `Every session` block in the `CLAUDE.md` for its scope. Until it exists, ar30's plan reads `none` or `none: not rendered` for this repo's own rows.
+- `relay plan` should flag a toolchain mismatch. A later brew Go upgrade turns main and the branch red at vet together, and the gate reads that as `same-as-main`, which is green. (example-mac `history/research/2026-09-28-unattended-readiness.md` §4, step 5 note)
+- The ar30 cutter found this repo's own verify baseline on main red under the relay's pin (exit 2), although plain `make check` at 6b3b314 exits 0. A row should find why before this repo's rows run through the relay. ar31 act 3 (2026-09-29) ran `relay doctor --verify .` once with the relay built at 2ea6c66 (the short `TMPDIR` and the kept log): green, exit 0, the line 227 s, last `readme: fresh`, so no log was kept and the red did not recur. Its cause is still not found; a red run from now on keeps its whole output under `<state>/logs`, named by `log`.
+
+## Moved from example-mac's NICE_TO_HAVE.md (2026-09-28)
+
+- `kill <row>` stops the whole night. A kill-one-row event can join a later packet if a night ever needs it. (example-mac ledger 2026-09-22-3 item 10)
+- A sitting killed before its result event is counted at its row's full dollar budget. That is conservative; pricing the streamed usage is the alternative, and it matters once rows run in parallel. (example-mac ledger 2026-09-25-2 item 3; charter 2026-09-25-3)
+- AR35 made the five timing tests that flaked under load hold on a loaded machine (`TestCeilingKill`, `TestAR5_OwnerKillEscalates`, `TestAR28_3_CostUnread`, `TestAR10_9_WaitReturnsWithinASecond`, `TestAR20_3_LsRemoteTimesOut`); `TestControlKill`, named in an earlier review above as failing only under load, was outside the packet and is left as it was.
+- ar29's fifth act, the design text for its acts, is unwritten: `design/relay-r1.md` names act 1 (ADV17-1, §6) and nothing of acts 2 to 4 (ADV17-2 to -4). It becomes a follow-up row. (example-mac charter 2026-09-25-5, Children)
+- AR28 left three questions open, and each waits for a night's evidence. Does `claude -p` hand a PostToolUse hook's `additionalContext` to the model? Where does the hard kill belong, read from a night's `tune` lines? The 120% line stands until they say otherwise. A new process pins the ignore anew, so an ignore edited between nights changes what the next night's root reads. (`design/relay-r1.md` §15 AR28)
+- The status window's watch reads the relay's start time once, then signal 0 each tick, so a relay that crashes without its stop line and whose pid is reused keeps an old window redrawing until the next night's open closes it. Reading the start time each tick without a process (darwin sysctl `kern.proc.pid`) closes that. (AR33 review round 1, F4)
+- `relay status` takes about 1 s of CPU to start, and 15 s of wall time at a load of 17, before its first frame. The watch pays it once per window, not per tick; a plain `relay status` pays it every call. (AR33 review round 2)
+- Under `tmux: required`, when the night's own session already exists, `NewSession` fails after the sweep has killed the others, and the night errors before `night-open`, so those kills reach no ledger line. `new-window -t <session>:` still takes a prefix target. (AR33 review round 1, observations)
+- Since AR35, `TestCeilingKill` and `TestAR5_OwnerKillEscalates` guard a hang at 20 s, so a SIGKILL that lands several seconds after `KillGrace` passes both (a 10 s grace passed at the head, failed on main). One timing test in the three-try shape, SIGKILL within the grace plus 1 s on both kill paths, closes it. (AR35 review, F1)
+- `groups.json` is rewritten in place during the measure (trap.go:100), so a reader in that window gets no root: 163 of 40,205 reads in a probe that looped Add and Done. Write it by temp file and rename, as status.json now is. And an old status.json with no root now shows the ledger's root, which §9 reserves for a night with no readable status.json. (AR37 review round 2)
+- AR38 review: `relay run --dry` prints no `measure:` line (main.go:1183-1189); a quoted `measure_seconds: "3000"` loads though a string should be refused (queue.go:257-262); with the budget from the flag, the stop detail still advises the queue key, which the flag outranks (bound.go:209-211); `--measure-seconds` has no upper bound, so a huge value overflows the duration and runs the measure unbounded (main.go:468-473, plan.go:219-220): cap it at `queue.MaxMeasureSeconds`.
+- Seen in night 2026-09-29-11 (check-in, 2026-09-30 03:45): the ledger file is chosen by local date while its lines carry UTC timestamps, so a night that crosses local midnight splits across two files.
+
+## The observer's check-in 25 (2026-10-02 05:30)
+- On the night 2026-10-01-14 (the attendant, and the observer ran both verbs at 05:30) the report lists `ovr` under "Waiting on a hand merge" though the orchestrator aborted that merge and replaced the row with ovr2, which is in main. The report has no word for a green row that another row replaced.
+
+## AR50 landed (2026-10-02): what its two reviews and its verify left open
+- `tree.go:126` reads `ctx.Err() != nil` after the wait, so a tool that exits non-zero by itself between the deadline less `askWait` and the deadline, and leaves a holder, is called timed out: with both set to 2 s and a fake that exits 1 at 1 s, the error reads `timed out after 2s: exit status 1`. On the real values it needs an exit between 28 s and 30 s. Gate that text on the process having been signalled. (the verify adversary, with a reproduction)
+- The ask's bound kills the direct child and closes the pipes; the holder itself is left running. (review 2, read from the code)
+- `TestAR50_1_AsksBounded` holds `askWait` in (0, 5 s], not at 2 s, as the packet allows. (the verify adversary)
+- One run of the acceptance logged the pin helper's relative path at 217 bytes against `LastCap` 200. (review 1, not checked)
+- Guards stop reviewers, three times on 2026-10-02, none checked against the guard's own tests:
+  - the relay guard refused a `du`, `mkdir` and `rsync -a --exclude .git` of a worktree into the agent's scratchpad as "device: a sitting never touches a device", in a helper that is no sitting;
+  - the stray-write guard (`~/.claude/hooks/deny-stray-repo-writes.py`) refused a scratch driver script over an `rm -rf "$DIR"` whose `DIR` was a temp dir it had just made;
+  - an adversary is read-only and cannot edit in place, so a mutant runs through `go test -overlay` with a copy of one file. The adversary agent's text could say so, since two reviewers each found it for themselves.
+
+## The observer's check-in 27 (2026-10-02 09:41)
+- No ledger line records the relay's own revision: `night-open` carries `queue_hash` and `template_hash` only, and the source has no `ReadBuildInfo`. After an install, the only way to say which binary a night ran is `go version -m` on the path of the live pid. A `revision` key on `night-open` (the build's `vcs.revision` and `vcs.modified`) would let a reader tell a night on 3b64cb4 from one on 0567593. (the attendant, by grep; the observer read the binary's build info) (landed as AR56)
+- Night 2026-10-01-14 sat from 07:35:10, its last merge, to 07:44:47 before it stopped `until-reached` (until 07:00), with no ledger line between. (the attendant; the cause is not checked)
+- A row's turns pass its budget: es1 exited at 61 turns against a queue budget of 60. (the attendant; row budgets not binding is a known reading)
+
+## AR51 landed (2026-10-02): what its two reviews left open
+Two refuters, nothing blocking: the acceptance reads 5 and 1, `go vet` is clean, no JSON key moved, and no night shape written by this relay makes the night's burn differ between status and the report.
+- No test holds a row with only a `spawn` line (ruling 2's third leg, `status.go:150-154` and `193-198`): the mutant that drops it passes `TestAR51_`. Add a lone-`spawn` row to `TestAR51_2`'s literal lines and expect 3 sittings, 3 in flight. (refuter A, by overlay)
+- No test in the package puts a running row's `turn` line through the tap (`night.go:325`): with `turn` dropped from `tap.keep`, `TestAR51_` and the older `Status`, `Report`, `AR28_`, `AR32` and `AR38_` tests all pass. The fixture `ok.jsonl` has 3 turns and writes no `turn` line. Hold a fixture of ten or more turns before its result and compare the two burns there. (refuter A, by overlay; a scratch test of the tap over 12 stages showed the code right)
+- A `sitting` line with no `spawn` counts as a sitting with an unread cost (`status.go:170`). An owner stop or kill in the breaker wait, a load-open or a refused `spawn` line gives one `spawn` line and two `sitting` lines, and both verbs read "2 sittings, 3 turns, $1.20 + 1 unread". Ruling 2's heading says a sitting counts from its spawn and its derivation says the `sitting` line if written; the code follows the derivation. Skip a `sitting` line when no spawn is open, or reword the ruling. (refuter B, by probe)
+- In those shapes, and when the child cannot start, status's row reads `$0.00` where the report's row reads `unread`, and the `stop` line says `unread: 0` against the verbs' "+ 1 unread" (`night.go:308`, `1251`). `cost_usd` is equal. Set the row's unread from the `sitting` line. (refuter B, by probe)
+- A refused ledger append still updates status's row (`night.go:289-317`): after a refused `exit`, the row reads `$1.20` while the burn and the report read `$0.00` until the `sitting` line; after a refused `sitting`, the row has 1 builder and the burn has 0. Update the row only when the append returned no error. (refuter B, by an injected fault)
+- `tap.Append` does not hold its lock across the ledger's append and `keep` (`night.go:267-282`), so under `--parallel` the cost's float sum can differ in the last bit: 0.6 against 0.6000000000000001, both printed `$0.60`. Seen only with a sleep forced between the two. (refuter B)
+- During a merge, the report of a live night reads "1 waiting on a hand merge" while status has the row `running`: the `sitting` line is written green before the merge runs (`night.go:979-981`, `report.go:108-109`). The burn agrees. (refuter B, by probe)
+- A row's state can differ: `collect` overrides it after the `sitting` line is written, so status read `failed: owner-kill` where the report read `failed: stream-error`. It predates AR51. (refuter B, by probe)
+- A row's context can differ: status's row kept 20000 from the last `turn` line where the `sitting` line, and so the report, held 0. Context is outside rulings 1 to 4. Night 2026-10-02-1 shows the same zero: es2a's log reads `turn 37 … 206k`, then `turn 38 … 0k`, and its `exit` and `sitting` lines carry `context: 0` after the child died on the usage limit. (refuter B, by probe; the attendant and the observer read the ledger)
+- Nights written before AR51 still read two ways, and so does a night live across the install: old `sitting` lines hold the tally's turns and `nightBurn` prefers them, so the report read 118 then 101 turns where the `exit` lines sum to 146. The packet puts old nights out of scope. Taking the open `exit` line's turns in the `sitting` case would cover them. (refuter B, from literal lines)
+- A relay killed mid-sitting leaves a `spawn` with no `sitting`, so the report reads "1 sitting (1 in flight), $0.00" for a dead night for good. (refuter B, from literal lines; refuter A saw the same by reading)
+- `relay resume` writes no ledger line, so a resumed row's turns and cost are in neither verb (`cmd/relay/main.go:1573`). (refuter B, by reading)
+- Not probed: status.json trailing the ledger by one control poll; the real `FileLedger` (every probe used the fake); what `cmd/relay` prints.
+
+## The observer's check-in 28 (2026-10-02 14:20)
+- Status and report disagree, a ninth sighting, on the stopped night 2026-10-02-1 under binary 3b64cb4: status reads 61 and 44 turns (the `exit` lines), the report 33 and 38 (the `sitting` lines). AR51 ends this for nights written after its install; this night is one of the old ones above. (the attendant; the observer read the ledger)
+- The `stop` line carries `budget: 0` on a night whose `night-open` line carries `max_usd: 190`, and the six `plan` lines carry `budget: 0` as well. What the key means is not checked. (the observer, from `ledger/2026-10-02.jsonl`)
+- `nights/hand/groups.json` records `"row": ""` for a group that `relay gate es2a` started, and the same for `relay gate es1`. (the attendant and the observer, by reading the file)
+
+## AR52 landed (2026-10-02): what its review left open
+One refuter, nothing blocking: the acceptance reads 2, 1, 1 and 1; python's argv at `ar48_test.go:457-459` is the same 14 arguments before and after; `make -n check` prints the `-B` and starts nothing.
+- `scripts/bounded`'s guardian is started as `sys.executable <bounded> --guard` with no `-B` (`scripts/bounded:464-465`) and repeats the parent's imports, so `check` and `validate` can still write bytecode through it. `python3 -B <copy>/bounded --wall 10 -- sh -c 'ps -o args= -p $PPID'` prints the guardian's line without `-B`. The guardian's argv should take `-B`; the file is shared with the plugin repos, so it goes with their copies. (the refuter, by run) (landed as AR57)
+- `TestAR52_2` reads lines, so a launch split before `py` (`exec.Command(\n py, script)`), one whose context argument holds a comma, and a split launch beside a comment that shows the right shape each pass it. Parsing with `go/ast` would close these. (the refuter, by overlay)
+- `TestAR52_1` matches `$(PY)` only: `${PY} scripts/hygiene`, a literal `python3 scripts/hygiene`, a bare `scripts/hygiene` (the `#!` line) and `-- python3 scripts/doclint` each pass it. (the refuter, by overlay)
+- Outside ruling 2, and not caught by either test: python started under another variable, by a literal path, through `sh -c`, by `&exec.Cmd{}`, or from a non-test file.
+- Left as they are, on purpose: `internal/effects/ar49_test.go:74`, `:80` and `:103`, `ar25_1_test.go:37`, and `tree.go:92` and `:119` start python without `-B` under the pinned `PYTHONPYCACHEPREFIX`. `ar49_test.go:80` proves the pinned env alone keeps the root clean, and `-B` there would make it pass for nothing. (the builder and the refuter, by reading; the observer decided to leave them)
+
+## The observer's check-in 30 (2026-10-02 18:08)
+- AR51 holds on its first real night: on night 2026-10-02-3 (relay b5fe535), `relay status --json` and `relay report` agree on every number: 3 sittings (1 in flight), 56 turns, $11.17, 0 unread, 0 builders; per row esfix 18 turns and $5.56, es2c 28 and $5.61, es2b 10 and $0.00. The `exit` and `sitting` lines carry the same turns (18, 28). (the attendant, by command)
+- **Night 2026-10-02-2 stopped `measure-timeout`** with $0 spent, after a plan that had cut the same checks and said so only as a count; the plan now names the stop (`run_stop`) (landed as AR54).
+- `relay report --json` gives the night's `state` as `""` for a live night, where status gives `running` and the text report says "not stopped". (the attendant; the observer ran `report --json`) (landed as AR55)
+- A running row's turns move only at each tenth turn (the `turn` line), so both verbs read es2b at 10 while its log was at 14, and its cost reads $0.00 until its `exit`. It is how the ledger is written; worth one sentence in §9. (the attendant)
+
+## The observer's check-in 32 (2026-10-03 03:08)
+- **Git's own housekeeping moves the git state** (landed as AR53).
+- Not in AR53: children and the relay's own git calls run with git's auto-gc on, so loose objects are packed mid-night. `gc.auto=0` in the child env and the runner would stop it, at the cost of loose objects until a hand `git gc`. (the scout)
+
+## AR53's review (2026-10-03)
+Its F1, `update-server-info`'s temp file `info/refs_` plus six characters, landed as AR53's act 4. The three below were already on `main` and block nothing.
+- F2: `WorktreeAdd` (`internal/effects/git.go:405`): when the repo's config sets `branch.autoSetupMerge=always`, `worktree add -b` writes `branch.<id>.*` into the common config, so every later stage reads git-state-moved ("config changed since the root's first stage"). Passing `--no-track` would stop it. (the review)
+- F3: a FIFO under `info/` or `hooks/`, even one named `info/refs`, blocks `digestTree`'s `os.ReadFile` (`internal/effects/git.go:903`) forever. Hashing an entry that is not a regular file, a directory or a symlink by its type alone, and never reading it, would close it. (the review)
+- F4: the digest encodes a symlink ambiguously, so an inert `hooks/pre-commit a` → `b` and a live `hooks/pre-commit` → `a b` digest the same; a child cannot reach this without first tripping the guard. Length-prefixing the name and the target, or separating them, would close it. (the review)
+- F5: act 4's rule counts runes, so `info/refs_éééééé`, `info/refs_日本語日本語` and `info/refs_ab cd!` leave the digest too, though git's mkstemp only writes `refs_[A-Za-z0-9]{6}` (git 2.50.1: 321 real temp names seen, all in that alphabet). A child gains nothing new, since an unread `info/refs_Ab3dEf` was already out. Matching only that alphabet would close it. (the verify round, not a regression)
+
+## AR54's review (2026-10-03)
+Its F1, the frozen `--json` keys, and F3, what an empty `run_stop` means, landed as AR54's act 4. The two below block nothing.
+- F2: `internal/night/plan.go:411`: `relay run` builds its own plan (`cmd/relay/main.go:1222`), and lines a hand plan measured come back from the memo free, so a hand plan can say "measure-timeout: 5 checks unrun" while the run's own plan cuts 0 and the night spawns. The warning errs on the safe side: the session raises the measure. Not blocking. (the review)
+- F4: `internal/night/night.go:592`: a plan handed to `Run` with `Budget > 0` and an empty `RunStop` writes an empty stop detail. No production path builds such a plan, since `BuildPlan` always sets both; a fallback to `MeasureTimeoutDetail(p)` would close it. Not blocking. (the review)
+- F5: `RunStop`'s doc comment (`internal/night/plan.go:68-69`) and `design/relay-r1.md:496` give "a plan with no ready row" as stopping `gate-failed-dependency`; a plan whose rows have all landed stops `queue-empty` instead. "A plan whose rows all wait on an unmet dependency" is the exact case. (the verify round, not a regression)
+
+## AR55's review (2026-10-03)
+Its F1, the attendant's claim that `status` tells a live night from a dead one, was fixed before the merge. The four below block nothing.
+- F2: `night.go:1247`'s bug path writes `night-close` with no `stop`, so the report reads "not stopped" for a closed night. Reading `night-close`'s state when there is no `stop` line would close it. (the review)
+- F3: `report --night` for a night with no lines at all reads "not stopped" (`report.go:132`). Keeping `""` when there is no `night-open` line would close it. (the review) (AR60)
+- F4: `Markdown(Report{Night: X})`, built without `BuildReport`, writes the title `# Night X: ` with nothing after it (`report.go:260`). No production caller does this. Keeping `or(r.State, NotStopped)` would close it. (the review) (AR60)
+- F5: `design/relay-r1.md:212` and the attendant do not say that `state` is `""` with no night at all. (the review)
+- `ReadStatus` (`status.go:436`) never checks the night's pid, so a dead relay's night reads `running`. The attendant now says to check it with `ps -p`. Status could mark it itself. (the review)
+
+## AR56's review (2026-10-03)
+Its F1, a red row with no commit reading merged at a merge that took the cut, and F2, a reused branch name reading an older night's row merged, landed as AR56's act 5. The two below block nothing.
+- F3: a hand merge the owner later reverted still reads merged in `status` and the report, since `landed` reads it so: the merge stays on main's first-parent line with the branch's tip as a later parent. (the review)
+- F4: `HandMerges` runs one first-parent `git log` per row (`landed`'s `FirstParentMerged`), taking 1.04 s over 5,000 merges and 20 rows (`BuildReport` 1.54 s). Reading main's log once would fix it. (the review)
+- Verify round (not merged on; two rounds are the cap, entry 15): a red row with no commit has `head_after` equal to its cut, an ancestor of any later tip, so when a later night reuses its branch name and merges it, the older night's row reads merged and loses its resume line (`report.go:269`). In the usual case, the same row redone and merged later, that is the right reading; skipping a row whose `head_after` equals its `head_before` would close the rest. (the verify round)
+- A row amended or rebased after the night and then merged by hand keeps its resume line or stays waiting: `head_after` is no longer an ancestor of the tip (`report.go:269`). (the verify round)
+- A row hand-merged at M1, whose branch name a later night then reuses and merges at M2, reads merged at M2, the wrong sha (`report.go:283`). (the verify round)
+
+## AR57 landed (2026-10-04): what its build left open
+- ADV11-1 came with the canonical bytes and has no test here: nothing reads the guardian's pgid report on its second fd, or shows the fallback killing the command's group before the guardian's and waiting up to 2 s for it to be gone. A test would stop the guardian (SIGSTOP) under a short wall and read the command's group gone when bounded exits. (the builder, by reading the diff)
+
+## The observer, 2026-10-04 (check-in 45): an unreachable API reads as a red row
+- Night 2026-10-04-2 (relay be3f58b) lost two rows to this Mac's network:
+  - es4's child exited 1 at 20:43:59Z after one turn ($2.40), and fen2b's at 20:47:01Z ($0.00). Both carry `"result_tail": "API Error: Can't reach the API server — check your internet or DNS (ENOTFOUND)"`.
+  - The night stopped `stream-error` with es4 `red: gate-unrun` and fen2b `failed: stream-error`, each needing `relay resume`.
+- An unreachable API is the machine's state, not the row's. Read that result as its own reason (say `api-unreachable`), leave the row pending rather than red, and hold the next spawn behind a probe, as the breaker holds on load. The stop is right; the red verdict and the second spawn are not. (the observer, from the ledger)
+## AR58 landed (2026-10-04): what its build left open
+- A refused row's dependents are doomed for the night, as a stage-skipped row's were. A green unmerged row from an earlier night is now refused at plan, with the skip line `stage b: the branch b exists` written at the night's open, instead of skipped at stage. It is still never re-gated, and the orchestrator's CONTEXT still reads `green branches to merge: none`. The re-gate stays with the `--max-sittings` line above. (ar58-2)
+- `Stage`'s branch refusal reads `stage r: the branch r exists (<nil>)`, the `%v` of a nil error. A row refused at plan reads it without ` (<nil>)`. Dropping the suffix in `stage.go` would make the two read alike. (ar58-4)
+
+## The observer, 2026-10-06 (check-in 58): a verify line cut at 900 s reads as a failure (AR59)
+- example-app's verify line ran past `effects.Timeout` (900 s, §6) twice today on a loaded Mac, with no failing test:
+  - gacc's night gate at 05:01:28Z, and the session's hand `relay gate fen3b` at 11:17:02Z. Both lines read `"check":"verify","exit":124`, and fen3b's `last` is `ok … internal/converge 41.699s` (log `20261006T110153Z-fen3b-verify-3532707309.log`, 95 lines, cut mid-suite).
+  - The gate's end line reads `"result":"red","reason":""`, so the report shows a red row whose last line is a pass. (AR62)
+- The design reads a deadline as exit 124 and red (relay-r1, AR10 act 9), while bounded's own `wall` stop at the same 900 s reads unrun. Two readings help the owner: name the cut in the red line (say `verify: cut at 900 s`), and let a repo's verify line carry a measured limit from `relay doctor --verify`. Whether a deadline is red or unrun is the owner's call. (the observer, from the ledger)
+
+## AR59 landed (2026-10-10): what its build left open
+- `README.md`'s config list lacks `verify_seconds`. `make readme` renders it and spawns claude, so no row runs it; the next owner's `make readme` adds the key from relay-r1 §9. (ar59-1)
+- `Check.Cut` and `Gate.VerifySeconds` are not in `gate --json` or `plan --json`. Their tags would move `internal/night/testdata/json-keys.golden`, which AR59 could not touch, so both read `json:"-"` as `PacketDiffers` does; a row that may re-freeze the golden adds `cut` and `verify_seconds`. (ar59-2)
+
+## The observer, 2026-10-07 (check-in 69): a row closed at its soft ceiling one act short costs the night's stack
+- On 10-07, two example-app nights each lost a whole stack this way:
+  - Night 2026-10-07-1: ws3a reached its ceiling at 328,650 context (16:46:23Z), exited cleanly at 341,586, and went red on acceptance 2 and 4. Nine dependents were skipped (`gate-failed-dependency`, 17:02:36Z).
+  - Night 2026-10-07-2: ws3bx reached its ceiling at 326,779 (21:28:49Z), exited at 348,573, and went red on one acceptance line. Seven dependents were skipped (21:58:51Z).
+  - Both children did what the soft ceiling asks: they landed the act in flight, committed, left a clean tree and closed their charters.
+- The root is packet size, which portfolio entry 22 already rules on: a packet fits one sitting, about four acts, and ws3bx carried six. Two things in the relay would make the miss cheaper:
+  - A plan warning when a packet's acts exceed the entry's four.
+  - One continuation sitting on the same branch, within `--max-sittings`, for a row whose exit was clean, whose tree is clean, and whose only reds are acceptance lines. The second is an architecture change and the owner's call. (the observer, from the ledger)
+
+## The observer, 2026-10-08 (check-in 78): an acceptance line that reads the harness can never pass
+- Night 2026-10-08-4 (example-app): row pc1 went red at its gate only because an acceptance line grepped the `Makefile` for the row's own change. The gate lays main's `Makefile` and `scripts` over the branch (relay-r1 §6 item 6, AR17A act 1; AR20's harness list), so the line read main's file. The session checked 11 of 11 by hand and merged the row (example-app c906fcd4); the red still stopped the night's dependents.
+- The packet parser or `relay plan` could warn on an acceptance line that names a harness path (`Makefile`, `GNUmakefile`, `makefile`, `scripts/`, or the row's `harness:` list), since that line judges main's copy. (the observer, from the merge note)
+- ar59-3 (AR59 round one, adversary 1, note): `verify_seconds` accepts the quoted forms `"900"` and `'900'`, plus `+900` and `0900`, through strconv.Atoi, as `measure_seconds` does. Every other odd form is refused with its file, line and key. A list or map value prints as `""` in the refusal.
+- ar59-4 (AR59 rounds one and two, both adversaries, note): several cmd/relay and effects tests depend on the length of TMPDIR. Under a GOTMPDIR of about 100 bytes, TestRunVerb (its 100-column check), TestAR59_4_DoctorSuggests, TestAR27A_1 (GOBIN) and TestAR50_2 (TMPDIR) fail. The relay caps a line's TMPDIR at 62 bytes (pin.go:85), so the gate passes, but a hand run with a long GOTMPDIR reds them. The cause in TestAR59_4 is `verify.go:104`: it cuts the config error to 200 bytes from its start, which drops the line and key for a repo path over about 130 bytes. Keep the error's tail, give `--json` an `error` field beside limit 0, and test with a short repo path.
+
+## usage-limit-resume-r1, verify round (2026-10-10): notes for its packets
+- Packet 3 is about five acts: split it at the cut. No packet owns `nextSitting` or `orc.stuck`; name an owner. Install packet 3 only with packet 4. (AR65) (AR66: packet 4 owns both, since only its wake cuts a sitting after a pause and a paused sitting never merges, so `judge` never counts it; AR66 took `redSittings`) (AR68: `nextSitting`'s red list skips a sitting the wake halted, `Night.Woken`; `orc.stuck` unchanged, a halted sitting never merges)
+- The CLI's docs name `hit your Opus limit`, which reads as unknown today: add it to the model texts when packet 1 is cut. (AR63)
+- The verify round's two blocks were closed by the observer in one edit (the `limit reached|N` form is a fixture, not measured; the status line and entry 23's proposal name the model and unknown pauses, and an unknown limit gets one 30-minute probe). Not re-verified: entry 15 allows two rounds.
+
+## AR60's review (2026-10-10)
+- `deadPlan` (`internal/night/groups.go`) keeps a dead plan's mark when its pid is now the reaper's own, or a live pid and the mark has no recorded start, so such a mark reads `planning` until a later run's Reap; and the start a mark records is `ps -o lstart`, which follows TZ (local `Sat Oct 10 19:46:53`, UTC `Sun Oct 11 02:46:53`), so a reaper under another TZ than the marking relay's would read a live mark's relay as gone (as `Reap` already reads groups.json). Neither is reproduced against a real run. (the review)
+- AR60's round two (the review, 2026-10-10; not a regression, so not blocking under entry 15): a plan killed before its plan lines, then reaped by a later run that itself fails before night-open (for example `tmux: required` with no tmux), leaves a bare night directory that the default night takes, since `neverOpened` (`status.go:456`) skips only a night the ledger names without night-open; status, resume and report then read the bare night ("nothing to resume", "not opened"). Main does the same. Fix: `reapPlan` writes a ledger line naming the night it reaped. Also seen: before a reap, a dead planning mark is the default night, and `night.go:581` drops a failed night-open append, so that night is skipped.
+
+## AR61 landed (2026-10-10): what its build left open
+- An orchestrator sitting's `RowPlan` (`SittingPlan`, `internal/night/orchestrator.go`, outside AR61's may-touch) keeps nil `Warnings`. It never reaches `plan --json`, which reads `[]` for every planned row, so nothing prints `null` today; a row that touches that file may set `[]` there too. (ar61-1)
+- `OrdersPerAct` reads the verify line as the queue spells it: a packet that orders the same suite under another spelling (`go test ./...` where the line is `make check`) takes no warning, as ruling 3 says. The warning shows in `plan` and its `--json` only; `status` and `report` do not name it. (ar61-2)
+
+## AR61 round one (2026-10-10): the two adversaries' notes, no block
+- The prompt lens (reports in the observer's scratch, ar61adv1): on example-app's packets 192 of 196 that parse warn, all true per-act orders. Missed or false: ws1a ("never through a pipe" trips the guard); "at the end" warns falsely; double backticks, "per-act", fenced blocks and the budget row are unread; packets that spell the line `make -k check-fast`.
+- The 540 s once-clause is thin beside example-app's measured verify runs (267 to 798 s in the gate logs): a run past it reads "not timed" and goes to the background. Rows added mid-night keep the first plan's seconds; memo entries from older relays carry no seconds.
+- A fast red verify on main reads as "once". With `verify: auto` unmeasured, CONTEXT names `make check` even where the repo has none. builder.md's bullet omits the not-timed case.
+- The clause's wording is outside the template hash, and the ledger does not record which clause a row got.
+- TestAR61_6 runs in `make check`, so a future agent-relay packet that orders the verify line per act turns `make check` red.
+- The merge lens (ar61adv2): AR60 and AR61 conflict only in docs (NICE_TO_HAVE, relay-r1 §9 and §11); the AR60 and AR61 charters share the number 2026-10-10-2; AR62's `report.go` positional `StoppedRow{...}` needs its new `Cause` field.
+
+## AR62 round one (2026-10-10): the two adversaries' notes beside F1 (fixed in the fix round)
+- `exit: is_error` also names a child that exited non-zero under a clean result (the night passes `isError` as `Result==nil || IsError || exit!=0`, run.go), so that row's ledger contradicts itself; `exit: child exit <n>` needs the exit code in `ExitFacts`. The sitting line's `gate.is_error` conflates the same. No real case. (ar62-1, both lenses)
+- A stacked row whose base branch moved while main did not reads `main-moved: main at <main's sha12>` and never names the base; name the base and its sha when it is not main. No real case. (ar62-2)
+- `relay.CheckLost` is set nowhere outside tests, so a lost verify's `verify: exit <e>, last …` cannot be reached; were it, `exit 0` would mislead and `verify: lost` would be truer. (ar62-3)
+- For `exits N` and `as main` lines the cause shows the last line, not the exit that decided the check (`acceptance 1: last "ok", want exits 0` for exit 2); the reader goes to the `gate` line. (ar62-4)
+- A row the killer ends (ceiling-kill, owner-kill before the gate, stalled) carries a cause such as `exit: no result event; …` beside its reason: true facts, but the kill's consequence. As specified. (ar62-5)
+- `clip` counts runes, not columns, so wide runes can pass 100 columns; a clipped cause can leave an unclosed backtick span in the markdown. (ar62-6)
+- `plugin/commands/status.md` and `resume.md` print rows through fixed templates that omit `cause`, so `/agent-relay:status` still shows the empty reason; both are outside AR62's may touch. (ar62-7)
+- Checked and sound (no work): the notices send only `gate.result`; `redSittings`, `resumeTarget` and the tap are unaffected; an old sitting line or status.json reads `cause` `""`; `TakeMerges` keeps it; nothing parses the live `cause:` line; the end line's `reason` and `StopReasons` are unchanged; orphans only in the sitting line, as §5 says; `StoppedRow.Cause` beyond red or failed is unreachable today.
+
+## AR63 round one (2026-10-10): the two adversaries' notes
+F1 (the fall-back day's reset a day late) was fixed in the fix round, with the model words for `reached your <word> limit` and the exit line's capped `scope`. The rest, none blocking:
+- The two Fable cells (`account-cells.tsv`, `reset-cells.tsv`) paraphrase the texts the packet elided (`to keep going`, `with /usage-credits.`). The measured texts end `to continue or switch models with /model.` and, the sdk-cli one, `manage usage credits at <the settings page>, to continue.` The kind is the same; respeak's re-sync copies this table, so put in the verbatim texts.
+- A late read falls to the text and rolls a day: an event `resetsAt` 12 s before the hit (the measured minimum gap, four session lines) is not after the hit, and the text's `8:10pm` reads the next day's. As ruled; packet 3 should read a just-past event reset as now.
+- `time.LoadLocation` reads the system zoneinfo first, case-insensitively on this Mac's APFS: `(america/los_angeles)` resolves here and reads none on a case-sensitive host. No measured text is lowercase.
+- `<word>` is one token: `hit your Opus weekly limit · resets Oct 6 at 1pm (…)` and `reached your Fable 5.1 limit` stop nothing, on main too. Unmeasured.
+- `TestAR63_3` cannot tell the hit at the first stop event from the clock at the exit line (the step clock is still), and asserts neither the killed row's nor the clean exit's missing `limit` (probes show both right). Its red on the bare pin is `stopped:stream-error`, not a missing `limit`.
+- `Tally.Limit` at a zero hit gives a year-1 reset for a zoneless text; `RunRow` always sets the hit before it reads the limit.
+- The first refused event's unusable `resetsAt` is kept, and a later refused event's usable one ignored (only a later result fills); a `rateLimitType` other than `five_hour` or `seven_day` (`seven_day_opus`) falls to the text's kind.
+- The key `limit` is also `doctor --verify`'s verify seconds (`cmd/relay/verify.go:31`): two vocabularies, one word.
+- ar63-r2 (AR63 round two, note; f72b844 does the same, so no regression): `internal/stream/limit.go:222` tries the candidate plus or minus 1 h only, so a zone whose fall-back is 30 minutes or 2 h reads the second pass: `1:30am (Australia/Lord_Howe)` at 2026-04-05T00:00+11:00 gives 01:30+10:30, 30 minutes late; Antarctica/Troll is 2 h late. Try the zone's real offsets. The TestAR63Fix tests fall outside the acceptance `-run`.
+
+
+## AR64's refuter (2026-10-10): notes for packets 3 to 5
+The packet ran as is; N5 (§1's actions sentence names paused) was folded in act 2, and N6 (the packet's §1 says the failure rule names planning; it names running and draining) harms nothing. The rest, none blocking:
+- `tmux-gone` is refused on paused, but `Windows.Check` reports `gone` once and `checkWindows` turns a loss outside running into file windows for the rest of the night (`internal/night/night.go`), so under `required` a session lost during a pause makes the wake's continuations run in file windows. Packet 3 should skip `checkWindows` while paused, or the machine take paused to `tmux-gone`. (N1)
+- Paused takes `until` and `budget` as "a check while other rows run", but running steps them only once no row runs. Packet 3 should say whether a paused night stops with rows outside a model's scope still running. (N2) (AR71: while a model's scope holds the loop picks as a running night does, but steps none of them; the wake checks `--until` and `--max-usd`)
+- Paused to `stopped:owner-stop` skips draining; in a model's pause, rows outside its scope may still run, so §1's draining ("the running ones finish") does not hold there. The record kept "no draining while paused" before its §7 scoped a model's limit. (N3) (AR71: the stop is `owner-stop` at once, and the rows outside the scope finish before the `stop` line)
+- A sibling gated again at the wake is stepped from a literal `Exited` (`RunRow`), so §1's table never shows paused to green, red or failed. Packet 5 may want a pair. (N4) (AR70: paused takes the four gate events)
+- Halt to failed owes `[ledger, notify]`: a halted paused row would get a second `sitting` line and its own notice, which the record's halt names neither. Packet 3 decides. (N7)
+- `Night.tla` has no paused state; nothing in `check` reads it, and the record's §6 names the gap. (N8)
+- §1's no-progress ("a row attempted twice in one night") needs the continuation's exception (the record's §2); no packet in the record's §5 owns that sentence. Packet 4, with `picked`, is the natural owner. (N9) (AR67: relay-r1 §1's no-progress names the continuation, which never passes `PickIn`)
+- ar64-r1 (AR64 round one, notes, no block): for packet 3: a paused sitting refuses a late exit and is not terminal, so packet 3 must discard a killed sibling's exit; night.go:1280 skips paused rows instead of failing them, and night.go:1098 lets a kill of a paused row stop nothing. For packet 4: at the wake, the `--max-sittings` poll (night.go:1180) can stop the night before any continuation starts. relay-r1 §1's sitting row reads as current behaviour where only the night-state lines say the loop does not step the new pairs yet. Two TestAR64 lines can panic instead of failing. (AR65) (AR66: a kill naming a paused row, and a stop, now stop a paused night) (AR67: the wake checks `--until` and `--max-usd` only; the `--max-sittings` poll reads only after the continuations start, and a continuation adds nothing to the count)
+
+## Observer, 2026-10-11: the landing of AR60 to AR66's packets
+- The full `make check` at 2545944 went red under a load of 20 on 16 cores: a example-app hand gate (`relay gate gguest2`) started 4 minutes into it. TestAR59_2_GateUsesLimit took 3.047 s against its limit, and `internal/night` hit go's default 10-minute package timeout. Alone, the gate test passed three times (about 10 s each) and `internal/night` passed in 316 s. At 316 s alone, the night package uses over half of the default timeout, so twice the load fails it. A `-timeout` in the Makefile's test line, or splitting the package's slowest tests, would keep a loaded check from timing out.
+- Night 2026-10-10-4 is an empty `nights/` directory (made 22:14 on 10-10) whose only ledger lines are 276 `plan` events. example-app's orient charter (331fc437) says its first `relay run` that evening was "refused as nested by a stale relay plan". Not reproduced: a `relay plan` that writes its lines under a night id leaves a night record that `ls nights/` and the observer read as a real night, and the refusal may not name the plan that holds the lock. Check what the refusal printed before packeting.
+
+## AR65 rounds one and two (2026-10-11): notes, no block (F1 fixed at c3c2581)
+- Install AR65 only together with AR66: `pause` is not in `noticeFields` until AR66, so in AR65 alone a pause notifies no one for up to 6 h (relay-r1 §1 says the notice is the pause line's; ruling 10 gives it to AR66).
+- Behavior change by design, to state at install: an unknown or window limit with no reset (the old `usage limit reached|N` form, `API Error: 429 rate_limit_error`) now pauses 30 minutes instead of stopping.
+- No e2e case drives a pause, the halt or the 30-minute fallback through the built binary; TestE2E_10 drives only the weekly stop. relay-r1 §11 and Makefile:54 still say "nine" cases where eleven run.
+- night.go:1010-1019, for packet 5: a sibling the pause kills is discarded unseen. Its own weekly hit is lost, so the night stays paused until the five-hour wake where the record's §2 says it stops at once (probe C). (AR69) A sibling killed in its gate writes its line unheld and unlocks its stage, where §2 keeps the stage lock (probe B). (AR70) A killed sibling whose run ends otherwise (a green gate, orphans) is halted failed usage-limit at the end. (AR70) A paused night does not stop invariant on a killed sibling's broken line (the verify's N1, present at de6a260). (AR70)
+- The pause with `--max-usd` or `--max-sittings` already reached holds relay.pid until the wake, then stops budget-reached (night.go:1251-1265); stopping at once would be kinder.
+- The held line's wall time and invariant facts are read at collect time, not at RunRow's end (night.go:1016, :1029); while draining, a usage-limit hit with a kind overwrites the stop line's detail with "the night is draining" (night.go:1066-1068). Both harmless today.
+- `internal/night -race` took 585 s under a example-app full gate's load (the builder's fix round): the package's timeout margin (above) is now the check's likeliest red.
+
+## AR66 round one (2026-10-11): two adversaries, no block, these notes
+- stage.go:216-223: `LiveHolder` reads an empty lock (a crash's leftover) as held by pid 0, and `clean --stale` does not reap it, so `clean --merged` keeps that merged tree for good while `Stage` would take the lock over (both lenses; a probe confirmed it). The builder chose this, following `StaleLock`. Better: read the flock, not the file.
+- main.go:994-998: the keep covers any live holder, not only a paused row's, so `clean --merged` during a live night keeps a running row's fresh tree with exit 1, where base removed it out from under its child with exit 0. It is an improvement, and a script that reads clean's exit code should know.
+- notify.go:52: "priority 3, so quiet hours keep it" does not match DECISIONS entry 7's window, which no code builds. Reword it.
+- night.go:1181: `kill r3` naming a waiting row while the night is paused is used up silently. Packet 6 should give it words.
+- Existing behavior: after the halt, `clean --merged` removes the halted tree, because AccountKept guards only `--stale`. Read AccountKept in `--merged` too.
+- A long scratch GOTMPDIR reds two tests each in cmd/relay and effects, on base as on head (the ar59-4 note).
+
+## Packets AR67 and AR68, refuted (2026-10-11): notes left out of the folds
+- AR67's interim orchestrator stop is acceptable only because AR65 to AR68 install together; the wake also waits for packet 5 (the guards), since without it nothing caps the pauses. (AR69)
+- Portfolio entry 23 (example-ops DECISIONS.md) still says a usage limit stops the whole run. The owner's word of 2026-10-10 21:06 (pause until the reset, then resume the same row) is not yet in the ledger, and the AR65 to AR68 behavior follows his word. The amendment is owed by example-ops.
+
+## AR67 rounds one and two (2026-10-11): notes, no block (F1, the frozen elapsed, fixed at 28b5583)
+- Packet 5 owns these. Re-pauses are unbounded until the pause count lands, so install AR67 and AR68 with packet 5. (AR69) A killed sibling continues with the full budget (probe: r2 turns=100, usd=5); its remainders should come from its part 1. (Left by AR69 ruling 8, neither AR70 nor AR71: its part 1's tally and `spawn` line's `usd` stand.) A sibling whose outcome is still uncollected at the pause is stopped as "killed in its gate" even when it was not in its gate (not reproduced; timing). (AR70) The floor can exceed the row's budget. (AR69)
+- Packet 6 owns these. The kill line of a continued part carries no `part`. The B1 sibling's sitting line holds its gate's verdict (AR65). After a reread, rows[id] and the plan's argv can differ.
+- Tests: internal/night/ar65_test.go:279 and :312 now have empty `detail` values, so that check never runs. No test checks that a stop at the wake writes the `wake` line first. TestAR67_4 does not check for a single sitting line, or for the stop line's resume.
+- The tree check conforms to the record's §2 (the design lens's N6), and B1 and B2 hold under a double-pause probe.
+
+## Night 2026-10-11-1 (example-app, 2026-10-11): the observer's check-in 93
+- A red verify's cause quotes the log's last line, as AR62 ruled, so an environment failure reads as a code one. wacct's verify (logs/20261011T175954Z-wacct-verify-2591330687.log) failed on "no space left on device" at lines 7 to 26 in the per-pid Go cache, and the cause reads `verify: exit 2, last "internal/workflow/workflow.go:862:5: var errShortWrite is..."`. A known environment fact in the log (no space left, a killed compile) could lead the cause.
+- The exit line's `output` read 649 tokens for wacct's 62 turns, against 7.8M `cache_read`. It may be the last message's count, not the sitting's. Not confirmed.
+
+## Packet AR69, refuted (2026-10-11): notes left out of the fold (B1, B2 folded at 5b4cdb3)
+- The probe stop counts refusals since the last fallback wake, not the whole night, so a fallback pause, then an event pause, then a no-reset hit is missed. That is stricter than the record's §2 and matches proposed entry 23; entry 23 as in force still stops on any usage limit. (N2)
+- AR70 (a sibling killed in its gate, gated again at the wake) and AR71 (a model's pause) are numbered by the drafter; packet 6 (the readers) has no number yet. (N4)
+- AR69's gofmt acceptance line passes on main; only the night and stream lines start red. (N5)
+- Installing AR65 to AR69 without AR70 and AR71: each known gap ends in a stop at the first wake. A sibling killed in its gate writes its gate's result unheld (a green one never merges) and unlocks its stage, then the paused rows halt failed and keep their trees. (AR70: the verdict lands) A model's limit with a reset (none measured) pauses every row up to 6 h or `--until`, with re-pauses capped at 12.
+
+## The adversary agent runs out of turns before its report (2026-10-11, the observer) (AR72)
+- `plugin/agents/adversary.md` sets `maxTurns: 80` and asks for no report checkpoint, so a long refutation ends at the cap with no report and needs a message to write one. It happened three times on 2026-10-11: AR68's packet refuter (07:03), AR68's round-one design lens, and the AR70 and AR71 refuter. A prompt line saying "report by turn 70" did not prevent it, because the agent cannot see its turn count. Fix: a rule in the agent body that bounds the probes by count (for example, after about 50 tool calls, write the report with what you have), and perhaps `maxTurns: 100`.
+
+## Packets AR70 and AR71, refuted (2026-10-11): AR70 PASS; AR71 BLOCK B1, waiting on question 12
+- AR71 is not built until the owner answers question 12: the model-scoped pause is only in the proposed entry 23, and the owner's word of 10-10 21:06 covers the 5-hour window. Before its build, fold N1: an every-row scope ("") must stay every row when a sibling's own model hit adds its model, with a test of a window pause then a sibling's model hit. (Folded into the packet's ruling 3 and `TestAR71_3`, 2026-10-12, after the owner's answer to 12.)
+- AR70 ruling 1 holds: the gate takes no context (cmd/relay/main.go:1313-1316) and its shell runs on `context.Background()` (effects/shell.go:101), so a late verdict is complete; the record re-gated only because the late outcome was thrown away and the stage unlocked.
+- AR70's builder: TestAR67_5 as ruled advances the clock once r1 and r2 read paused, so it races TestAR70_2 (the wake line could read `[r1 r2]`); it should wait for status to show r2 green. Ruling 9's first edge (a kill between the child's exit and the cause read, run.go:444) gives the sibling a child where the record says never; the record's part-with-nothing-left handling makes it cheap, but the packet should say so. (N2, N3) (AR70: TestAR67_5 waits for status to read r2 green; relay-r1 §1 says the edge)
+- landSitting returns before re-reading the queue when the night is not running; moot while an orchestrator sitting never runs beside a build row. `--max-usd` reached during a model pause idles the night until the wake. `--parallel` cannot be exceeded (paused rows stay busy). AR67's B1 is not reopened while the wake skips rows still running. (N4, N5, N7, N8)
+
+## AR68 rounds one and two (2026-10-11): notes, no block (F1 the lost resume line and F2 the blank line, fixed at 37ecd7c)
+- A nested claude that inherits `RELAY_ROW` and `RELAY_HEAD_BEFORE` records the parent's cut, not its own HEAD (internal/hooks/start.go:44), so Stop may skip the no-commit nudge: fewer nudges, never more. No e2e case runs SessionStart (the fake claude runs no hooks); only internal/hooks covers the hook.
+- `relay run --json` adds `relay resume` for any failed sitting without reading `Woken` (cmd/relay/main.go:1333), and `report.go:151` prints `relay resume o.1` for a woken sitting: packet 6's readers.
+- The RESUME block keeps porcelain's quoting and renames (`"b c.txt"`, `a -> b`, internal/night/wake.go:91), and a failed git read prints the whole git error. `resumeStdin` turns a prompt ending in a blank line into two blank lines, and an empty prompt into a leading blank line.
+- relay-r1 says "staged and spawned", but the code marks a sitting woken at launch, before the spawn. No test covers a second halt (o.2 halted, then o.3's cut failing).
+- Portfolio entry 23 still says a usage limit stops the whole run; the owner's 10-10 amendment is owed by example-ops.
+
+## AR69 rounds one and two (2026-10-11): notes, no block (F1, the probe guard's scope, fixed at 4b423b0)
+- A sibling's reset that moves a 30-minute fallback wake lets the probe be refused again with no reset and wait another 30 minutes instead of stopping (§2 says stop); the 12-pause cap bounds it. (round one, design N1)
+- The floor is capped per continuation, not across parts: an 8-turn, $3 row that spent 7 turns and $2.50 gets 8 turns and $3 more (wake.go:43-44). The earlier note "the floor can exceed the row's budget" is narrowed, not closed. (design N3)
+- `Named` prefers a stale event `resetsAt` over a later reset named in the text (limit.go:99), so a wake sitting whose event repeats the old reset stops. A text reset given as a time only rolls to the next day, so with `--until` more than a day away the night pauses about 24 h (not reproduced). (regressions N3, design N4)
+- A row that ends red as stalled, or is skipped before spawning, counts as the probe passing. The Makefile's `e2e` help still says nine cases; eleven run. (round two N1, regressions N4)
+
+## AR70 landed (2026-10-11): what its build left open
+- Ruling 9's first edge: a kill landing after the child's exit but before `RunRow` reads its cause (run.go's cause read, before the gate) reads as the pause's kill, so the sibling holds its line and continues into a part 2 with its acts done. Cheap (the RESUME block lists the commits, no `no-commit` nudge, one cut), and relay-r1 §1 says so; reading the child's exit before the cause would close it.
+- Ruling 9's second edge: a held outcome collected after the wake (a kill outlasting the 2-minute slack, the child still dying) finds the night running and the row still paused; since the fix round's F1 it fails `usage-limit` and stops the night naming it (as before AR70), where a continuation was owed. Every sibling the pause kills carries that mark or the owner's kill, so `pauseFor` is never asked there.
+- A paused row with no outcome out and no held stage at the wake now reads as a bug (`ErrBug`), where AR67 stopped `killed in its gate`; unreachable today (a skipped outcome needs the owner's stop, which ends the night), so no test drives it.
+
+## AR70 rounds one and two (2026-10-11): notes, no block, S4 (F1, a held line on a running night, fixed at e08f389)
+- After the wake, a held sibling's own limit now stops `usage-limit` as main does, but the ledger differs: three spawns where main makes two (r1's part 2 spawns, then takes a `kill` line), r1's part-2 `sitting` line reads green while r1 fails `usage-limit`, and the stop line's detail is empty where main writes `r2: killed in its gate`. Repro: round two's scratch TestZZProbe_Own (AR69_6's spawner, r2 held until the `wake` line). (round two N1)
+- If the night is draining after the wake, the stop loses 2a504c2's detail "the night is draining" (read from the code, not run). (round two N3)
+- Under a bug, the landing's `stepSitting` (night.go:1141) skips `setRow`. (round one, design N2)
+- Two paused siblings in their gates, where one lands `auth` and the other lands green and merges: not reproduced. (design N3)
+- The `fresh` gate on the probe (night.go:1123) is named by no ruling; it matters only on a verdict that lands after a fallback wake. (regressions N1)
+- A broken held line (night.go:1112-1125) skips `ForgetHead` and the row's cause; since the fix round it ends `usage-limit` on a running night, as main and ruling 9 do. (regressions N3, round two N2)
+- After an owner stop while paused, a sibling's green verdict now merges, which ruling 3 allows. (regressions N5)
+
+## `relay plan` stamps its lines with a night it does not own (2026-10-11, the observer; S4)
+- A plain `relay plan` names itself the next night (`NightName`, cmd/relay/main.go:528) and writes one `plan` line per row under that id (internal/night/plan.go:436), with no open, stop or close line; its measure writes `nights/<id>/groups.json` (trap.go:95). Night 2026-10-10-4 is two such plans (04:47:26Z and 04:47:43Z, the queue invalid, so nothing measured; 276 lines), and a third plan, killed in its measure, left the dir that the next night's `Reap` emptied (05:14Z). A reader taking the newest night name, as the observer's brief and `relay status` do, finds an empty record. Repro: `TestPlan` with cycle.yaml run twice gives the same id and no dir. Fix: stamp a plan's lines with no night (or a `check` field), keep its groups.json outside `nights/`, and let `Reap` remove a dir it empties. Orient's "refused as nested" (331fc437) was the third plan holding the pid lock; that refusal writes nothing.
+
+## AR72 round one and its verify (2026-10-11): notes, S4 (F1, the builder's 80% checkpoint, fixed at b23dbd5)
+- No guard ties a change under `plugin/` to a version bump. `claude plugin update` caches by version and `make install` runs only `go install ./cmd/relay`, so the installed plugin stayed the 0.1.1 copy of 09-30 while AR60 to AR62 changed builder.md, attendant.md and the plan and status commands (F6, the observer). A check (a test over `git diff <last tag>.. -- plugin/` against the manifests' version, or an install target that runs the plugin update) would close it.
+- `design/readme/source.md:104` names plugin 0.1.0; `make readme-status` rewrites it at the next README render.
+- The builder ran `make validate` (`claude plugin validate plugin/`, read-only) when its prompt barred `claude plugin` commands; the packet listed it. A packet that lists a command a caller bars should say which wins.
+
+## The attendant runs out of turns on a check-in (2026-10-11, the observer; S4) (AR73)
+- `plugin/agents/attendant.md` keeps `maxTurns: 20` with no report bound (AR72 ruling 4 left it out: "two verbs, no probe loop"). The observer's check-in 95 asked it for status, the ledger, tmux, ps, git and the orient charter, and it stopped at 20 turns with no report (24 tool calls) and wrote one on a message. Fix: the same report bound as the adversary's (about 12 tool calls) and maxTurns 30, under TestAR72_1's margin.
+- The observer, 2026-10-11 (check-in 96), S4, F2's other face: while orient's `relay plan --rows wstore1,eccrate` (pid 86098) ran, `relay status --night 2026-10-11-4` read `state: ""` with pid 0, and `relay report` read "not opened". The night's directory held only the plan's `groups.json`, which names pid 86098, and no `status.json`. A reader cannot tell a live plan from a dead one, and with no `--night` the default read lands on night 3. Also, the tmux session `relay-2026-10-11-3` (its `relay status --watch 5 --hold` window) was still open on relay.sock four hours after that night stopped.
+- AR73's round one (2026-10-11 20:46, one adversary, PASS): the bound's number and the bullet's place are not pinned; "about 10" or the bullet after "Change nothing" passes all three tests. A lower bound is the safe direction, so neither is a block. (S4)
+
+## AR71's fix round (2026-10-12): notes, S4 (F1 to F4 fixed in the fix round's commit)
+- `ofModel` misses `opusplan` and `claude-opus5` for `opus` by ruling 1's letter (one piece, cut at every rune not a letter or digit): `ofModel("opusplan", "opus")` reads false. (S4)
+- In `pickPaused` a `picked` row stops the night `no-progress` with no `stop` detail, as the running pick does (`night.go`, `pickPaused`); read from the code, not run. (S4)
+- Not reproduced: a wake whose tree-moved check stops the night may leave rows outside the scope running until they end, their verdicts landing after the stop. (S4)
+- AR71's verify (2026-10-12, the observer; S4): F3 (a sibling counts against its own pause, not the latest) has no test of its own; `TestAR71_6` passes once F2 lands, and the 12-pause cap cannot show it (a sibling's Count stays at most 11 either way), so the charter's note is wrong. The verify's probe shows it alone: pause 1 on a bare 429, a fallback wake, a `five_hour` hit as pause 2, then pause 1's sibling back with a bare 429: at 4a988c9 `stopped:usage-limit` "refused again after the 30-minute wait, with no reset"; at c906535 it stays paused and ends `queue-empty`. Make it `TestAR71_8`.
+- The observer, 2026-10-12 (check-in 100), S4: `relay version` prints `0.1.0-dev` with no commit, so a reader cannot tell which build is installed; AR71's install at 12:31Z was confirmed only by the binary's file time. `make install` could stamp the commit (`-ldflags -X`) and `version` print it.
+
+## AR74's report-lens review (2026-10-12): notes, S4 (the in-flight part's verdict fixed in the fix round, item 3)
+- The report's Stopped, Resume and Waiting list rows in the order of their last sitting, while `status` lists plan order: lines r1 red, r2 red, r1 red give the report's Resume `[relay resume r2, relay resume r1]`. (S4)
+- Older than AR74: a woken orchestrator sitting (`orc.1` failed `usage-limit`, then `orc.2` green) still gets `relay resume orc.1` in the report, which `status` drops through `n.Woken` (`night.go`, the sitting's resume line; AR68). (S4)
+- A row whose `stage` line moves it to another branch between sittings has only the last branch's charters read (`report.go`, the handover loop's `stages[id]`); no code path does this today. (S4)
+- The observer, check-in 105 (2026-10-12), S4, unconfirmed: a row log's `turn N:` lines can fall short of status's `turns`. On night 2026-10-12-4, wshealth has 42 lines and 42 turns, wsrev 79 and 80, wsdoc 41 and 48. The likely cause is that a turn with no tool call writes no line. If so, the log reads as if the row stopped early. Confirm, then log every turn or say in the README that tool-less turns go unlogged.
+- The observer, check-in 109 (2026-10-13), S3, confirmed from the ledger: a transient `git ls-remote` timeout during the gate makes a finished row `unrun` with an empty reason, and nothing retries it. Night 2026-10-13-2, an example-app row, 15:01:59Z: `{"detail":"ls-remote: git ls-remote https://github.com/owner/example-app.git: timed out after 30s","event":"gate","reason":"","result":"unrun"}`; `relay status` and `relay report` show `cause: ""`, so the timeout is visible only in the ledger. The stop is `internal/gate/gate.go:331` (`return stop("ls-remote", err)`). Name a reason (for example `remote-timeout`) so status and report carry it, and retry the read once or twice before giving up.
+- The observer, 2026-10-13 (the owner's plugin review, not reproduced), S4: `make readme` (Makefile:50) spawns `claude -p` with neither `CLAUDE_SESSION_HELPER=1` nor a depth bump, so the session plugin may meter that child as its parent and `guards.go:420` may not count it. The review's other two sites (claude-api-agent:1530, claude-fanout:467) run `claude --bare`, which loads no hooks, so they are out. Confirm with one `make readme` under a metered seat (its `meter.json` turns before and after) before any fix.
+- The observer, check-in 110 (2026-10-13), S4, from the attendant's read: night 2026-10-13-2's `stop` line names `relay resume <row>` while its status.json has `resume: []`, and the report lists that row both merged (gated by hand) and stopped red; one of the three is stale.
+- The observer, check-in 110 (2026-10-13), S4: night 2026-10-13-3's gate lines all carry 17:37:06 though the row exited 17:22:37, so a 14.5-minute gate shows no time per check; the row also has two `plan` lines two seconds apart (17:11:26, 17:11:28).

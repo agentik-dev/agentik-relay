@@ -1,0 +1,552 @@
+#!/usr/bin/env python3
+"""bounded: run a command under a wall, a per-tree lock and a load breaker (R6 C1, ADV10).
+
+Usage: bounded [--lock FILE] [--wall S] [--load N] -- cmd...
+
+  --lock FILE `flock(LOCK_EX|LOCK_NB)` on FILE, which holds the holder's pid and start
+              (for the message only). Held: exit 2, at any age. The kernel releases it
+              when the last holder dies, SIGKILL included: no staleness, no takeover.
+              A mkdir-era lock directory is removed when its owner pid is dead, else exit 2.
+  --wall S    counted from bounded's start, the load wait included; at S seconds the
+              command's group gets SIGTERM, then SIGKILL after a grace: exit 124.
+  --load N    while the 1-minute load average is above N x cores and the CPU confirms it
+              (its idle share is at or under the floor, 25%), poll every 30 s, up to 600 s
+              or the wall, whichever is first, then exit 2. Taken after the lock. The idle
+              share is read only above the load line, over one second: above the floor
+              one line says the load is not confirmed and there is no wait, and two polls
+              in a row above it end a wait. Unreadable, it leaves the load alone to decide.
+              A read never outlasts the wait or the wall, and its time comes out of the
+              poll's sleep.
+
+The lifeline (ADV10-1): bounded spawns a guardian (`python -B bounded --guard FD RFD -- cmd`)
+in a new session, holding the read end of a pipe and the lock. The guardian runs cmd in cmd's
+own group, reports that pgid (`<pgid>\n`) on RFD (ADV11-1), and watches the pipe and cmd. On EOF (bounded died, SIGKILL included, or reached
+its wall) it kills cmd's group (TERM, the grace, KILL) and exits; when cmd exits it kills
+the rest of cmd's group and exits with cmd's code. So no member of the group outlives
+bounded by more than the grace plus 1 s, and the lock lives exactly as long as the group.
+When the guardian itself does not finish (stopped, starved), bounded SIGKILLs the reported
+group, then the guardian's, and waits up to 2 s for the group to be gone: once the pgid is
+reported, bounded never exits while that group lives, so the lock is never free beside it.
+
+On a refusal or the wall the last stderr line is `bounded: stop: lock|load|wall`: the
+command did not run to its end, so the gate reads it as unrun, never red (conventions §5).
+bounded puts BOUNDED_DEPTH (its own plus one) in the command's environment; a bounded that
+starts above depth 0 writes `bounded: nested stop: <why>` instead, so an inner wall under
+the gate is a plain red and only the outermost stop reads unrun (ADV11-2).
+
+Exits: the command's own (128+signal when a signal ended it), 124 at the wall, 2 lock or
+load, 1 usage, 127 when cmd cannot start; 128+signum, no traceback, when bounded itself
+gets TERM, INT or HUP (the group is cut first, with or without --wall). Test overrides: BOUNDED_GRACE (s, default 5),
+BOUNDED_LOAD_POLL (30), BOUNDED_LOAD_MAX (600), BOUNDED_LOADAVG (a fake 1-minute reading),
+BOUNDED_IDLE (a fake idle share in percent, or several by commas, read in order, the last
+repeating; a fake load without it reads no idle share), BOUNDED_IDLE_FLOOR (percent, 25,
+floats taken).
+"""
+import fcntl
+import math
+import os
+import re
+import select
+import shutil
+import signal
+import subprocess
+import sys
+import time
+
+USAGE = "usage: bounded [--lock FILE] [--wall S] [--load N] -- cmd..."
+TICK = 0.05
+LOAD_POLL = 30.0  # seconds between two reads of the load while it waits
+# The idle share of the CPU, in percent, at or under which a high load is confirmed: the
+# relay's night.DefaultIdleFloor (0.25, a share), and the two move together.
+IDLE_FLOOR = 25.0
+IDLE_WAIT = 5  # seconds `top` may take before the read is given up
+IDLE_SAMPLE = 1  # seconds between the two reads of /proc/stat
+READER = {"child": None}  # the idle reader's `top` while a read is in flight
+PERCENT = re.compile(r"[0-9]+(?:\.[0-9]+)?")
+TOP_SHARE = re.compile(r"([0-9]+(?:\.[0-9]+)?)% ([a-z]+)")  # `72.25% idle`
+COUNT = re.compile(r"[0-9]+")
+
+
+class Usage(Exception):
+    pass
+
+
+class Refused(Exception):
+    def __init__(self, message, reason):
+        super().__init__(message)
+        self.reason = reason
+
+
+def parse(args):
+    opts = {"lock": None, "wall": None, "load": None}
+    if "--" not in args:
+        raise Usage("missing --")
+    i = args.index("--")
+    head, cmd = args[:i], args[i + 1:]
+    if not cmd:
+        raise Usage("no command")
+    if len(head) % 2:
+        raise Usage("an option lacks its value")
+    for flag, value in zip(head[::2], head[1::2]):
+        key = flag[2:] if flag.startswith("--") else None
+        if key not in opts:
+            raise Usage("unknown option %s" % flag)
+        if key == "lock":
+            opts[key] = value
+        else:
+            try:
+                opts[key] = float(value)
+            except ValueError:
+                raise Usage("%s wants a number, got %s" % (flag, value))
+            if not math.isfinite(opts[key]):
+                raise Usage("%s wants a finite number, got %s" % (flag, value))
+            if opts[key] <= 0:
+                raise Usage("%s wants a positive number" % flag)
+    return opts, cmd
+
+
+def env_float(name, default):
+    try:
+        return float(os.environ.get(name, default))
+    except ValueError:
+        return float(default)
+
+
+def pid_alive(pid):
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def owner_of(path):
+    """(pid, start) from an owner line; (-1, 0) when unreadable."""
+    try:
+        with open(path) as fh:
+            pid, start = fh.read().split()[:2]
+        return int(pid), float(start)
+    except (OSError, ValueError):
+        return -1, 0.0
+
+
+def take_lock(path):
+    """The flocked fd, or Refused. The pid written is bounded's; the guardian's replaces it."""
+    if os.path.isdir(path):
+        pid, _ = owner_of(os.path.join(path, "owner"))
+        if pid_alive(pid):
+            raise Refused("bounded: %s is a mkdir-era lock held by live pid %d" % (path, pid),
+                          "lock")
+        sys.stderr.write("bounded: removing the mkdir-era lock %s (pid %d dead)\n" % (path, pid))
+        shutil.rmtree(path, ignore_errors=True)
+    try:
+        fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o644)
+    except OSError as exc:
+        raise Refused("bounded: cannot open %s: %s" % (path, exc), "lock")
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(fd)
+        pid, start = owner_of(path)
+        raise Refused("bounded: %s held by pid %d for %d s" % (
+            path, pid, time.time() - start if start else 0), "lock")
+    write_owner(fd, os.getpid())
+    return fd
+
+
+def write_owner(fd, pid):
+    os.ftruncate(fd, 0)
+    os.pwrite(fd, ("%d %d\n" % (pid, int(time.time()))).encode(), 0)
+
+
+def percent(text):
+    """A percentage, 0 to 100, in plain digits with a point; None for anything else, so a
+    NaN, an inf, a sign, an exponent and a comma decimal are each unreadable, never misread."""
+    text = text.strip()
+    if not PERCENT.fullmatch(text):
+        return None
+    value = float(text)
+    return value if 0 <= value <= 100 else None
+
+
+def parse_top_idle(text):
+    """The idle share, in percent, of top's last `CPU usage:` line, as in
+    `CPU usage: 12.50% user, 15.25% sys, 72.25% idle`; None when it is unreadable.
+
+    Unreadable is: no such line; a last line that is not wholly a list of such shares (a
+    NaN is none, and a comma decimal splits into parts that are none); one with no
+    `% idle`; a value outside 0 to 100."""
+    last = None
+    for line in text.split("\n"):
+        line = line.strip()
+        if line.startswith("CPU usage:"):
+            last = line[len("CPU usage:"):]
+    if last is None:
+        return None
+    idle = None
+    for part in last.split(","):
+        share = TOP_SHARE.fullmatch(part.strip())
+        if not share:
+            return None
+        if share.group(2) == "idle":
+            idle = percent(share.group(1))
+            if idle is None:
+                return None
+    return idle
+
+
+def stat_cpu(text):
+    """(idle, total) of /proc/stat's `cpu` line in its own ticks, idle and iowait counted
+    as idle over the first eight fields; None when there is no such line or no such count."""
+    for line in text.split("\n"):
+        fields = line.split()
+        if not fields or fields[0] != "cpu":
+            continue
+        if len(fields) < 5:
+            return None
+        idle = total = 0
+        for i, field in enumerate(fields[1:9]):
+            if not COUNT.fullmatch(field):
+                return None
+            total += int(field)
+            if i in (3, 4):  # idle, iowait
+                idle += int(field)
+        return idle, total
+    return None
+
+
+def parse_stat_idle(before, after):
+    """The idle share, in percent, of the time that passed between two reads of /proc/stat;
+    None when either has no `cpu` line or no time passed between them."""
+    first, second = stat_cpu(before), stat_cpu(after)
+    if first is None or second is None:
+        return None
+    idle, total = second[0] - first[0], second[1] - first[1]
+    if total <= 0 or idle < 0 or idle > total:
+        return None
+    return 100.0 * idle / total
+
+
+def kill_reader():
+    """SIGKILL the idle reader's `top` by its pid, if a read is in flight."""
+    child = READER["child"]
+    if child is not None:
+        try:
+            child.kill()  # polls first, and never blocks: a reaped pid is not signalled
+        except OSError:
+            pass
+
+
+def os_idle(timeout=IDLE_WAIT):
+    """The idle share of the CPU in percent over one second, as the relay's breaker reads
+    it; None when it is unreadable (the reader failing or not done in timeout seconds, or
+    its text).
+
+    On darwin the last `CPU usage:` line of `top -l 2 -n 0 -s 1`: the second sample is the
+    change over the one-second wait. `top` stays in bounded's process group, so a kill of
+    the group takes it; it is killed by its pid at the timeout, and by kill_reader when a
+    signal ends bounded, and its pipe is closed unread, whoever else holds it. Elsewhere
+    two reads of /proc/stat one second apart, when the timeout leaves that second."""
+    try:
+        if sys.platform == "darwin":
+            with subprocess.Popen(["top", "-l", "2", "-n", "0", "-s", "1"],
+                                  stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                  stderr=subprocess.DEVNULL) as top:
+                READER["child"] = top
+                try:
+                    out, _ = top.communicate(timeout=timeout)
+                except subprocess.TimeoutExpired:
+                    kill_reader()
+                    return None
+                finally:
+                    READER["child"] = None
+            return parse_top_idle(out.decode("utf-8", "replace")) if top.returncode == 0 else None
+        if timeout < IDLE_SAMPLE:
+            return None
+        with open("/proc/stat") as fh:
+            before = fh.read()
+        time.sleep(IDLE_SAMPLE)
+        with open("/proc/stat") as fh:
+            after = fh.read()
+        return parse_stat_idle(before, after)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+def idle_floor():
+    """The floor in percent: BOUNDED_IDLE_FLOOR when it is a number in 0 to 100 (any that
+    float reads: `+50`, `5e1`), else IDLE_FLOOR. A NaN is in no range."""
+    try:
+        floor = float(os.environ.get("BOUNDED_IDLE_FLOOR", ""))
+    except ValueError:
+        return IDLE_FLOOR
+    return floor if 0 <= floor <= 100 else IDLE_FLOOR
+
+
+def idle_reader():
+    """A function that reads the idle share of the CPU in percent, given the seconds it
+    may take; None is unreadable.
+
+    BOUNDED_IDLE fakes it: one percentage, or several separated by commas, read in order
+    with the last one repeating; one that is no percentage is an unreadable read. A faked
+    load with no BOUNDED_IDLE reads nothing, so a test that fakes only the load never runs
+    `top`. With neither, the machine is read."""
+    fake = os.environ.get("BOUNDED_IDLE")
+    if not fake:
+        return (lambda timeout: None) if os.environ.get("BOUNDED_LOADAVG") else os_idle
+    shares, taken = fake.split(","), [0]
+
+    def read(timeout):
+        text = shares[min(taken[0], len(shares) - 1)]
+        taken[0] += 1
+        return percent(text)
+    return read
+
+
+def wait_for_load(ceiling, deadline):
+    """Hold the command while the machine is loaded: the 1-minute load is above ceiling x
+    cores and the idle share of the CPU is at or under the floor. The idle share is read
+    only after the load has turned its key; unreadable, it leaves the load alone to decide.
+    One reading above the floor means no wait; once a wait has begun, the load at or under
+    its line ends it, or two polls in a row above the floor.
+
+    The load is sampled when it was before the idle key: at or past the limit bounded
+    refuses before any read, a read gets the smaller of IDLE_WAIT and the time left, and
+    its time comes out of that poll's sleep. A poll that is not positive is the default."""
+    poll = env_float("BOUNDED_LOAD_POLL", LOAD_POLL)
+    if not poll > 0:  # a zero, a negative or a NaN poll would spin the loop
+        poll = LOAD_POLL
+    limit = time.monotonic() + env_float("BOUNDED_LOAD_MAX", 600)
+    if deadline is not None:
+        limit = min(limit, deadline)
+    limit_load = ceiling * (os.cpu_count() or 1)
+    floor = idle_floor()
+    read_idle = idle_reader()
+    t0 = time.monotonic()
+    waiting = False
+    quiet = 0  # the polls in a row that read the idle share above the floor
+    while True:
+        fake = os.environ.get("BOUNDED_LOADAVG")
+        load = float(fake) if fake else os.getloadavg()[0]
+        if load <= limit_load:
+            return
+        now = time.monotonic()
+        if now >= limit:
+            raise Refused("bounded: load %.2f above %.2f (%g x %d cores) for %d s"
+                          % (load, limit_load, ceiling, os.cpu_count() or 1, now - t0), "load")
+        idle = read_idle(min(IDLE_WAIT, limit - now))
+        quiet = quiet + 1 if idle is not None and idle > floor else 0
+        if quiet >= (2 if waiting else 1):
+            sys.stderr.write("bounded: load %.2f above %.2f is not confirmed: idle %g%% is "
+                             "above the floor %g%%\n" % (load, limit_load, idle, floor))
+            return
+        if not waiting:
+            waiting = True
+            if idle is None:
+                sys.stderr.write("bounded: load %.2f above %.2f; waiting up to %d s\n"
+                                 % (load, limit_load, limit - now))
+            else:
+                sys.stderr.write("bounded: load %.2f above %.2f and idle %g%% at or under the "
+                                 "floor %g%%; waiting up to %d s\n"
+                                 % (load, limit_load, idle, floor, limit - now))
+        time.sleep(max(min(poll, limit - now) - (time.monotonic() - now), 0))
+
+
+def kill_group(pgid, child):
+    """SIGTERM the group, then SIGKILL whatever is left after the grace; reap the child."""
+    grace = env_float("BOUNDED_GRACE", 5)
+    try:
+        os.killpg(pgid, signal.SIGTERM)
+    except OSError:
+        child.poll()
+        return
+    deadline = time.monotonic() + grace
+    while time.monotonic() < deadline:
+        child.poll()
+        try:
+            os.killpg(pgid, 0)
+        except OSError:
+            return
+        time.sleep(TICK)
+    try:
+        os.killpg(pgid, signal.SIGKILL)
+    except OSError:
+        pass
+    try:
+        child.wait(timeout=1)
+    except subprocess.TimeoutExpired:
+        pass
+
+
+def reap(pid, seconds):
+    """True once pid is reaped (or was already: ChildProcessError), polling WNOHANG."""
+    deadline = time.monotonic() + seconds
+    while True:
+        try:
+            if os.waitpid(pid, os.WNOHANG)[0] == pid:
+                return True
+        except ChildProcessError:
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(TICK)
+
+
+def read_pgid(fd, deadline):
+    """The command's pgid from the guardian's report, or None (it could not start, or the
+    wall came first). Closes fd."""
+    data = b""
+    try:
+        while not data.endswith(b"\n"):
+            wait = None if deadline is None else max(deadline - time.monotonic(), 0)
+            if not select.select([fd], [], [], wait)[0]:
+                return None
+            chunk = os.read(fd, 32)
+            if not chunk:
+                break
+            data += chunk
+        return int(data) if data.strip() else None
+    except (OSError, ValueError):
+        return None
+    finally:
+        os.close(fd)
+
+
+def exit_code(code):
+    return 128 - code if code < 0 else code
+
+
+def guard(fd, report, cmd):
+    """The guardian: cmd in its own group, reported on `report`; the pipe's EOF or cmd's
+    exit ends the group."""
+    try:
+        child = subprocess.Popen(cmd, process_group=0)
+    except OSError as exc:
+        os.close(report)
+        sys.stderr.write("bounded: cannot run %s: %s\n" % (cmd[0], exc))
+        return 127
+    try:
+        os.write(report, b"%d\n" % child.pid)
+    except OSError:
+        pass
+    os.close(report)
+    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        signal.signal(sig, signal.SIG_IGN)  # only the pipe ends a guardian
+    while True:
+        ready, _, _ = select.select([fd], [], [], TICK)
+        if ready and not os.read(fd, 64):
+            kill_group(child.pid, child)
+            return exit_code(child.returncode) if child.returncode is not None else 137
+        code = child.poll()
+        if code is not None:
+            kill_group(child.pid, child)  # the rest of cmd's group: nothing outlives it
+            return exit_code(code)
+
+
+def main(argv):
+    t0 = time.monotonic()
+    if argv[1:2] == ["--guard"] and len(argv) > 5 and argv[4] == "--":
+        return guard(int(argv[2]), int(argv[3]), argv[5:])
+    try:
+        opts, cmd = parse(argv[1:])
+    except Usage as exc:
+        sys.stderr.write("bounded: %s\n%s\n" % (exc, USAGE))
+        return 1
+    deadline = t0 + opts["wall"] if opts["wall"] else None
+    try:
+        depth = max(int(os.environ.get("BOUNDED_DEPTH", "0")), 0)
+    except ValueError:
+        depth = 0
+    state = {"guardian": None, "pipe": None, "pgid": None}
+
+    def cut(guardian):
+        """Close the lifeline and wait out the guardian (grace plus 1 s at most).
+
+        Polls waitpid, never Popen.wait: a signal handler runs on the main thread while
+        its blocking wait holds Popen's lock, so a wait there only times out (d12)."""
+        if state["pipe"] is not None:
+            os.close(state["pipe"])
+            state["pipe"] = None
+        if guardian is None:
+            return
+        if not reap(guardian.pid, env_float("BOUNDED_GRACE", 5) + 1):
+            # the command's group first: the guardian's group is the guardian alone (ADV11-1)
+            for pgid in (state["pgid"], guardian.pid):
+                if pgid is None:
+                    continue
+                try:
+                    os.killpg(pgid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    pass
+            reap(guardian.pid, 1)
+            if state["pgid"] is not None:
+                gone_by = time.monotonic() + 2
+                while time.monotonic() < gone_by:
+                    try:
+                        os.killpg(state["pgid"], 0)
+                    except (ProcessLookupError, PermissionError):
+                        break
+                    time.sleep(TICK)
+
+    def on_signal(signum, _frame):
+        for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+            signal.signal(sig, signal.SIG_IGN)  # one cut; a second signal never re-enters
+        kill_reader()  # no `top` of an idle read in flight outlives bounded
+        cut(state["guardian"])
+        os._exit(128 + signum)
+
+    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        signal.signal(sig, on_signal)
+    lockfd = None
+    try:
+        if opts["lock"]:
+            lockfd = take_lock(opts["lock"])
+        if opts["load"] is not None:
+            wait_for_load(opts["load"], deadline)
+        if deadline is not None and time.monotonic() >= deadline:
+            raise Refused("bounded: wall of %g s spent before the command ran" % opts["wall"],
+                          "wall")
+        r, w = os.pipe()
+        state["pipe"] = w
+        rr, rw = os.pipe()
+        keep = (r, rw) if lockfd is None else (r, rw, lockfd)
+        try:
+            guardian = subprocess.Popen(
+                [sys.executable, "-B", os.path.abspath(__file__), "--guard", str(r), str(rw),
+                 "--", *cmd], pass_fds=keep, start_new_session=True,
+                env=dict(os.environ, BOUNDED_DEPTH=str(depth + 1)))
+        finally:
+            os.close(r)
+            os.close(rw)
+        state["guardian"] = guardian
+        state["pgid"] = read_pgid(rr, deadline)
+        if lockfd is not None:
+            write_owner(lockfd, guardian.pid)
+            os.close(lockfd)  # the guardian holds it now, exactly while the group lives
+            lockfd = None
+        try:
+            code = guardian.wait(timeout=None if deadline is None
+                                 else max(deadline - time.monotonic(), 0))
+        except subprocess.TimeoutExpired:
+            sys.stderr.write("bounded: wall of %g s reached; killing the command's group\n"
+                             % opts["wall"])
+            cut(guardian)
+            raise Refused(None, "wall")
+        cut(None)
+        return exit_code(code)
+    except Refused as exc:
+        if exc.args[0]:
+            sys.stderr.write("%s\n" % exc.args[0])
+        sys.stderr.write("bounded: %sstop: %s\n" % ("nested " if depth else "", exc.reason))
+        return 124 if exc.reason == "wall" else 2
+    finally:
+        if lockfd is not None:
+            os.close(lockfd)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

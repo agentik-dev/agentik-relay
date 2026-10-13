@@ -1,0 +1,71 @@
+# .hygiene-allow: <path-glob>: <group>[,<group>]; `*` stays inside one path segment.
+# The groups `person` and `env` come from the private list outside the repo (scripts/hygiene's docstring);
+# without that list these entries match nothing.
+
+# The copyright line and the plugin's author field keep the owner's name (packet public-r1's table).
+LICENSE: person
+plugin/.claude-plugin/plugin.json: person
+
+# The relay's push notifier is a public push service the product supports, and these files name it
+# (its config key, the effects notifier type, doctor's check). The private list names that service's
+# word for the owner's setup; these files name the product's feature, never a host or topic of the owner's.
+DECISIONS.md: env
+README.md: env
+design/readme/source.md: env
+plugin/commands/doctor.md: env
+cmd/relay/main.go: env
+cmd/relay/main_test.go: env
+cmd/relay/nonotify_test.go: env
+cmd/relay/ar32a_test.go: env
+cmd/relay/ar32a_fix_test.go: env
+cmd/relay/ar32b_test.go: env
+cmd/relay/ar66_test.go: env
+internal/effects/config.go: env
+internal/effects/config_test.go: env
+internal/effects/notify.go: env
+internal/effects/notify_test.go: env
+design/relay-r1.md: env
+design/relay-orchestrator-r1.md: env
+design/review-r6.md: env
+design/packets/a5-effects-plan.md: env
+design/packets/a8-night.md: env
+design/packets/a9-tmux-notify.md: env
+design/packets/ar3-readme.md: env
+design/packets/ar32a-orchestrator-row.md: env
+design/packets/ux1-review.md: env
+design/packets/rows-2026-09-22-tail.json: env
+internal/packet/testdata/a5-effects-plan.md: env
+internal/packet/testdata/a8-night.md: env
+history/sittings/2026-09-22-2.md: env
+history/sittings/2026-09-22-8.md: env
+history/sittings/2026-09-22-10.md: env
+
+# AR2-9's test feeds an invented home-shaped path to prove the exit line drops it.
+internal/night/ar2_test.go: home
+# The e2e and AR13 landed fixtures commit as an @example.invalid identity.
+cmd/relay/e2e_test.go: email
+internal/night/ar13_landed_test.go: email
+
+# `sibling` holds only the public sibling plugins' names (respeak, decisions, session, agents), so these
+# entries allow nothing private. Design records, packets and ledgers name the siblings; the packets entry
+# stays a glob because the relay copies each row's packet in, and a gate must not go red on a public name.
+design/*.md: sibling
+design/packets/*.md: sibling
+design/readme/source.md: sibling
+README.md: sibling
+Makefile: sibling
+DECISION[S].md: sibling
+DESIGN.md: sibling
+NICE_TO_HAVE.md: sibling
+OPEN-QUESTIONS.md: sibling
+decision[s]/*: sibling
+# The effects, the prompt's block reader and the night's plan name the session plugin or the ledger file.
+internal/effects/*.go: sibling
+internal/prompt/block.go: sibling
+internal/night/plan.go: sibling
+# The plugin's commands and agents name an optional sibling plugin they detect.
+plugin/commands/*.md: sibling
+plugin/agents/*.md: sibling
+# The respeak config names the plugin in its path, and this file names that path.
+.claude/respeak/config.yaml: sibling
+.hygiene-allow: sibling

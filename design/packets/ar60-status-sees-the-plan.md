@@ -1,0 +1,44 @@
+# Packet AR60: the night's status says it is planning
+
+| item | value |
+|---|---|
+| from | `NICE_TO_HAVE.md`'s check-in 15 entry (the empty status during a preflight, confirmed 2026-10-10) and AR55's review F3 and F4; `relay-r1.md` §1 (night states) and §9 (`run`, `status`, `stop`, `report`) |
+| pin | agent-relay `main` at the commit that lands this packet; worktree `.claude/worktrees/ar60-status-sees-the-plan`, branch `ar60-status-sees-the-plan` |
+| wall | this repo only. No push, `--amend`, rebase, device, ssh or network. Never build a `relay` binary by hand or run one outside `make`'s test harness. No `relay` verb against the account's state: a night may be live. No `make check`, `make readme`, `make e2e` or `go test ./...`: the acceptance lines and other package-scoped tests, `go vet` of the two packages, `make doclint` and `make hygiene` only, one at a time, each at `nice -n 10`. **Python:** every shell line carries `PYTHONDONTWRITEBYTECODE=1`. Before the report, `make doclint` exits 0 and `make hygiene` reads `hits outside allowlist: 0` |
+| may touch | `internal/night/night.go`, `internal/night/status.go`, `internal/night/groups.go`, `internal/night/report.go`, `internal/night/trap.go` (the run trap and its comment), `cmd/relay/main.go`, `plugin/commands/status.md` (its planning line), `internal/night/ar60_test.go` and `cmd/relay/ar60_test.go` (new), `design/relay-r1.md` (§9, §11 only), `plugin/agents/attendant.md` (its report-state bullet only), `NICE_TO_HAVE.md`, `history/sittings/*.md`. Nothing else |
+| acceptance | `go test ./internal/night -run "^TestAR60_" -count=1 -timeout 300s -v 2>&1 \| grep -c "^--- PASS: TestAR60_"` reads 4; `go test ./cmd/relay -run "^TestAR60_" -count=1 -timeout 300s -v 2>&1 \| grep -c "^--- PASS: TestAR60_"` reads 2; `go test ./internal/night -run "^Test(Run\|Report\|StatusResume\|AR13_2_\|AR34Fix_\|AR37_1\|AR37Fix_\|AR51_\|AR55_)" -count=1 -timeout 300s 2>&1 \| tail -1 \| grep -c "^ok"` reads 1; `go test ./cmd/relay -run "^Test(RunVerb\|NightVerbs\|Plan\|JSONShapesFrozen\|AR33_1_\|AR34_2_\|AR37_2_\|AR37Fix_\|AR56_)" -count=1 -timeout 300s 2>&1 \| tail -1 \| grep -c "^ok"` reads 1; `go test ./cmd/relay -run "^TestAR59_4_Gofmt" -count=1 -timeout 300s 2>&1 \| tail -1 \| grep -c "^ok"` reads 1 |
+| budget | 60 turns, 180k context, `claude-opus-5-5`; one commit per act |
+| verify | `make check` |
+
+## 1. What the source says (quoted)
+
+The observer, 2026-10-10: a `relay run` spent about its first 13 minutes in the plan, whose verify baseline runs the repo's verify line on main in the root. All that time its night directory held only `groups.json`, `relay status --json --night <n>` printed `"state":"","pid":0,"started":"","rows":[]`, and `relay report --night <n>` read `not stopped`. A reader cannot tell a planning night from no night.
+
+AR55's F3: "`report --night` for a night with no lines at all reads "not stopped" (`report.go:132`). Keeping `""` when there is no `night-open` line would close it." F4: `Markdown` of a report with no state writes the title `# Night X: ` with nothing after it.
+
+The code: `relay run` builds its plan in `loadPlan` (`cmd/relay/main.go:535`) before `night.Run`, which takes it as `Plan`; Run's own `BuildPlan` (`night.go:445`) runs only when `Plan` is nil. Run's first `status.json` is written at `night.go:1162`, after `OnPlanned`, so no status ever reads `planning`. `controlVerb` takes a missing `status.json` for "still measuring" (`main.go:1428`). `Watch` already ends on a status whose relay is gone.
+
+## 2. Rulings
+
+1. **Act 1, the mark.** `night.MarkPlanning(fx, state, night, root)` makes the night's directory and writes its `status.json`: `state` `planning`, `pid` `os.Getpid()`, `started` `selfStarted(fx.Procs)` (Run's own pair), `root`, `rows` and `resume` `[]`. It writes through `writeStatus`, Run's temp-and-rename write, which `status()` (`night.go:674`) now calls too. `loadPlan` gains `mark bool` and calls it after `NightName` (`main.go:523`), before `BuildPlan`; `runVerb` passes `mark` unless `--dry`; `plan` passes false. A dry run and `relay plan` open no night and write no status, as now.
+2. **Act 1, the end.** `MarkPlanning` returns `end(r relay.StopReason)`: while the night's status reads `planning` under this pid, it is rewritten `stopped:<r>`, `reason` `r`, `pid` and `started` kept; else it does nothing. `runVerb` defers it after `loadPlan` and drops it once `night.Run` returns a Night (Run's status is the record from its open). The reason is `owner-kill` when `trapped` caught a signal during the plan (Run's own for a signal), else `queue-invalid` (§1: a queue that does not "load, validate or plan"): a plan not valid or with no row, an error of `BuildPlan`, `RenderPrompt` or the tmux mode, or `Run` refusing before its open. The error prints and `--json`'s `error` holds it, as now; exit codes are unchanged.
+3. **Act 2, a dead plan.** `Reap` (`groups.go:56`, the next run's cleanup of a dead relay) also removes each night's `status.json` that reads `planning` under a pid and start that name no live process (its own test, `fx.Procs.Started`; never this process's pid; without Procs, nothing), and the directory when then empty: a relay killed mid-plan by `SIGKILL` opened no night, and no stop reason is known. Until then `status --watch` ends on it, as on any night whose relay is gone. A dead `running` night stays AR55's filed note.
+4. **Act 2, the readers.** `relay status` prints the mark as any status (`night <id> in <root>: planning; 0 rows`); `--json` gains no key. `controlVerb`'s "still measuring" line holds when `ReadStatus` reads `""` or `planning`, not only with no file. `BuildReport` keeps `State` `""` for a night with no `night-open` line (F3); an opened night with no `stop` keeps `not stopped`. `(*Report).TakeStatus(s Status)` sets a `""` state to `s.State`, and `reportVerb` calls it with `ReadStatus`, so a planning night reads `planning` and a plan that never opened reads its end's stop. `Markdown`'s title writes `NotOpened` for `""` (F4).
+5. **Tests.** night (`FakeFS`, `FakeProcs`): `_1_MarkPlanning` (`ReadStatus` reads `planning`, the pid, `started`, `root`, `rows` `[]`; `PrintStatus`'s first line ends `: planning; 0 rows`); `_2_End` (`end(QueueInvalid)`: `stopped:queue-invalid`, `NightTerminal`, the pid kept; `end(OwnerKill)` on a fresh mark; a status rewritten `running` after the mark is left byte for byte; a second `end` changes nothing); `_3_ReapDeadPlanning` (a `planning` status under a pid `FakeProcs` does not know: gone, and its empty directory; one under a known pid and start, one under this pid, and a `running` one under an unknown pid: kept); `_4_ReportState` (only a `plan` line: `""`, title `# Night <n>: not opened`; `TakeStatus` of `planning` and of `stopped:queue-invalid`: that state in the field, the JSON and the title; with `night-open`, `TakeStatus` leaves `not stopped`). cmd/relay: `_5_VerbsReadPlanning` (a mark in `fakeEnv`'s state: `status --json` reads `planning` and a pid over 0, `status`'s first line ends `: planning; 0 rows`, `report --json` reads `planning`, `stop` reads AR34's "the night is still measuring"); `_6_RunEndsPlanning` (`TestRunVerb`'s fixture, its `effectsFor` handing `effects.OSFS{}`: `run --rows nosuchrow` exits 2 and its night's status reads `stopped:queue-invalid` with this process's pid; the same with `--dry` adds no night directory).
+6. **The record, in act 2.** §9: the `run` row (the mark and its end), `status` (a planning night), `stop` (the measuring line), `report` (`state`: `""`, `planning` or the end's stop with no `night-open`); §11: the six tests. `plugin/agents/attendant.md`: a planning night reads `planning` in both verbs, with its `pid`. In `NICE_TO_HAVE.md` the check-in 15 entry and F3, F4 gain `(AR60)`.
+
+## 3. Interfaces (signatures, not prose)
+
+`night`: `func MarkPlanning(fx effects.Effects, state, night, root string) (end func(relay.StopReason))`, `func writeStatus(fs effects.FS, dir string, st Status)`, `func (r *Report) TakeStatus(s Status)`, `const NotOpened = "not opened"`. `cmd/relay`: `func loadPlan(path string, opts night.Options, reg *effects.Groups, run, mark bool)`, results unchanged; `planned.end func(relay.StopReason)`, nil when unmarked. Tests `func TestAR60_<n>_<Name>(t *testing.T)`.
+
+## 4. Findings that name this row
+
+The observer, 2026-10-10 19:13 PDT: a run started 19:01:45 was 11 minutes into its plan with no status; a watcher waiting on status's `running` header saw nothing. The check-in 15 entry (filed "not confirmed") is this item.
+
+## 5. Forbidden reads
+
+Transcripts; the account's relay state directory. Read no other repo.
+
+## 6. Report (capped)
+
+At most 150 words. The table: each acceptance line with its count, `go vet`'s exit, `make doclint`'s exit and `make hygiene`'s last line. Bullets: which TestAR60 tests were red on `main` and why; each existing test changed; anything filed. Last line: branch, head sha.

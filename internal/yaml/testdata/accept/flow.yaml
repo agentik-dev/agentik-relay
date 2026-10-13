@@ -1,0 +1,6 @@
+deps: [a2-relay-design, ar1-relay-hooks]   # a flow list
+none: []
+budget: {turns: 100, context: 130000, usd: 15, wall: 4h}
+quoted: ["a, b", 'c']
+defaults: {model: claude-opus-5-5, turns: 100,
+           merge: branch-only}

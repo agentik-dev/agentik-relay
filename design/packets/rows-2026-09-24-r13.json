@@ -1,0 +1,3 @@
+[
+  {"id": "ar20-fixes-adv11", "repo": "agent-relay", "prompt": "design/packets/ar20-fixes-adv11.md", "depends_on": ["packets-38-relay"], "worktree": true, "model": "claude-opus-5-5", "max_turns": 80, "why": "the ADV11 fix packet: one rule, the gate and the merge read nothing the child can write (a hermetic git with a stage-time digest of config, hooks and info; main bound for every row with merge shas held in memory; every make spelling and a per-repo harness list; remotes bound by URL with a timeout and a re-check after the lines; a pid file not keyed on the env; acceptance by allowlist with the spent stems); the owner's push word (denied only under RELAY_ROW); the account cells in one shared table; ADV11-21 recorded as history not rewritten"}
+]

@@ -1,0 +1,4 @@
+{"indented": ["one", "two"], "same-indent": ["three", "four"],
+ "rows": [{"id": "a3-machine", "depends_on": ["a2-relay-design"], "budget": {"turns": "100"}},
+          {"id": "a4-schemas", "parked": ""},
+          {"id": "a5-effects-plan"}]}

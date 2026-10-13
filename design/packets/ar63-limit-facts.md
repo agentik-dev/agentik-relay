@@ -1,0 +1,45 @@
+# Packet AR63: the usage limit's facts
+
+| item | value |
+|---|---|
+| from | `design/usage-limit-resume-r1.md` §5 packet 1 (§2's recognition, kind and reset; §4 test 5); `NICE_TO_HAVE.md`'s usage-limit-resume-r1 verify-round note; `design/relay-r1.md` §5, §10 |
+| pin | agent-relay `main` at the merge of `land-ar60-ar61` (`bad2001`: main plus AR60 and AR61); worktree `.claude/worktrees/ar63-limit-facts`, branch `ar63-limit-facts` |
+| wall | this repo only. No push, `--amend`, rebase, device, ssh or network. Never build a `relay` binary by hand or run one outside `make`'s test harness. No `relay` verb against the account's state: a night may be live. No `make check`, `make readme`, `make e2e` or `go test ./...`: the acceptance lines and package-scoped tests, `go vet` of the two packages, `make doclint` and `make hygiene`, one at a time at `nice -n 10`; every shell line carries `PYTHONDONTWRITEBYTECODE=1`. Before the report, `make doclint` exits 0 and `make hygiene` reads `hits outside allowlist: 0` |
+| may touch | `internal/stream/account.go`, `internal/stream/stream.go` (`Tally`, `Add`), `internal/stream/limit.go` (new), `internal/stream/ar63_test.go` (new), `internal/stream/testdata/account-cells.tsv`, `internal/stream/testdata/reset-cells.tsv` (new), `internal/night/run.go` (the parse callback and the `exit` line only), `internal/night/ar63_test.go` (new), `design/relay-r1.md` (§5, §10, §11 only), `NICE_TO_HAVE.md`, `history/sittings/*.md`. Nothing else |
+| acceptance | `go test ./internal/stream -run "^Test(AR63_\|AR17D_0_\|AR20_6_\|ParseFixtures)" -count=1 -timeout 300s -v 2>&1 \| grep -c -E "^(--- PASS: TestAR63_\|ok )"` reads 3; `go test ./internal/night -run "^Test(AR63_\|AR17D_0_)" -count=1 -timeout 300s -v 2>&1 \| grep -c -E "^(--- PASS: TestAR63_\|ok )"` reads 2; `go test ./cmd/relay -run "^TestAR59_4_Gofmt" -count=1 -timeout 300s 2>&1 \| tail -1 \| grep -c "^ok"` reads 1 |
+| budget | 70 turns, 180k context, `claude-opus-5-5`; one commit per act |
+| verify | `make check` |
+
+## 1. What the source says (quoted)
+
+The record, §2: "The needles gain `hit your <word> limit` and `reached your <word> limit` (`<word>` one word). The kind is the event's `rateLimitType`, else the text's: `five_hour` or `session`, the **window**; `seven_day` or `weekly`, **weekly**; `reached your <word> limit`, a **model's** (both Fable texts); else **unknown**." "**The reset** reads only the measured forms, `resets <when> (<zone>)`: a time (`1:30am`, `6:20pm`, `2pm`) or a date and time (`Sep 28 at 4pm`), the first such after the hit. The zone is an IANA name (`time.LoadLocation`, with `time/tzdata`); absent, the local one. [...] Any other text, an unknown zone, or a reset not after the hit or past 8 days: no reset." §3: "a `Limit` (reason, reset, source, kind, scope) on `Tally`; `testdata/account-cells.tsv` and a new `reset-cells.tsv` of the measured texts." §1's texts: `You've hit your session limit · resets 1:30am …` (`6:20pm`, `10pm`), `You've hit your weekly limit · resets Sep 28 at 4pm …` (`2pm`), `You've reached your Fable limit. Run /usage-credits … or switch models with /model.` and `… Switch to another model, or manage usage credits …` (`…` is `(America/Los_Angeles)` in the first two). The verify-round note: "The CLI's docs name `hit your Opus limit`, which reads as unknown today: add it to the model texts when packet 1 is cut."
+
+The code at `bad2001`: the usage needles (`internal/stream/account.go:22-23`) hold none of these texts; `Account` reads a `rate_limit_event`'s status alone (`:38-47`), never `resetsAt`, and lowercases a result (`:54`). `Tally.Account` (`stream.go:87`) keeps the first stop (`:182`). `RunRow` kills on a refused event (`internal/night/run.go:340`) and writes the `exit` line (`:435-456`), `reason` the stop (`:443`), no reset.
+
+## 2. Rulings
+
+The charter is `history/sittings/<the build date>-<n>-ar63.md` in doclint's five-part shape, opened at act 1, closed before the last commit, no home path. Each act's first test is red on the pin; its red line goes in the commit message. Nothing pauses yet: the night still stops `usage-limit`.
+
+1. **Act 1, the needles and the kind.** The usage row gains `hit your <word> limit` and `reached your <word> limit`, `<word>` one run of letters, digits or `-`, whole words as the others; the existing cells keep their reasons. The kind: a refused event's `rate_limit_info.rateLimitType`, `five_hour` `window`, `seven_day` `weekly`; else the first usage-limit result's text: `session limit` or `5-hour limit`, `window`; `weekly limit`, `weekly`; `reached your <word> limit`, or `hit your <word> limit` with `<word>` `fable`, `opus`, `sonnet` or `haiku`, `model`; else `unknown`. A model's `Scope` is that word, lowercased; every other kind's is `""`.
+2. **Act 1, the reset.** `ResetIn(text, hit)` reads the first `resets <when>[ (<zone>)]` of the text as written (`LoadLocation` is case-sensitive): `<when>` is `H[:MM]am|pm` or `Mon D at H[:MM]am|pm`, `Mon` an English month's three letters; a weekday or any other form, none. The zone: `time.LoadLocation`, `time/tzdata` imported; absent, the hit's own location (the local zone in a night). A time is the first such instant after the hit; a date is that day in the hit's year, the next year's when not after the hit. A reset not after the hit, or past the hit plus 8 × 24 h, is none. The event's `resetsAt` under the same bound outranks the text: `Source` `event`, else `text`, `""` with none. A refused event missing a usable `resetsAt`, or a type, takes it from a later usage-limit result. `Reason` stays the first event's.
+3. **Act 1, the cells.** `account-cells.tsv` gains the session, weekly, both Fable and the Opus texts, each `usage-limit`. `reset-cells.tsv` (`text`, `hit`, `kind`, `reset`, `scope`; RFC3339, `reset` empty for none) is test 5: `1:30am (America/Los_Angeles)` at 22:00 PDT, 01:30 the next day; `6:20pm`, `10pm` that day; the weekly `2pm (…)` at 10:36, 14:00 that day, at 15:00 the next; `Sep 28 at 4pm (…)` on 09-25, that date, on 10-02 none (past 8 days); both Fable texts and `You've hit your Opus limit`, `model`, none, scope `fable`, `fable`, `opus`; `Claude AI usage limit reached|1758000000`, `unknown`, none (a fixture's form); `(Mars/Olympus)`, none; no zone at a `-04:00` hit, 18:20 at that offset.
+4. **Act 2, the exit line.** `RunRow`'s parse callback keeps `hit`, `fx.Clock.Now()` at the first event whose tally names an account stop. When `tally.Account` is `usage-limit`, the `exit` line gains `limit` (`Limit.Line()`): `kind`, `resets_at` (RFC3339 in the reset's zone, `""` with none), `source`, `scope`. An `auth` stop, a row killed by another row's stop and a clean exit carry none. The state, reason, `kill` and `sitting` lines stay.
+5. **Tests.** stream: `TestAR63_1_ResetCells` (each `reset-cells.tsv` cell as an `is_error` result through `Parse`, then `Limit(hit)`: `usage-limit`, the kind, the reset, `Source` `text` or `""`, the scope); `TestAR63_2_EventLimit` (a refused `five_hour` event, `resetsAt` hit plus 1 h: `window`, that reset, `event`; `seven_day`, `weekly`; a past `resetsAt` or one 9 days on, none, the kind kept; no type, then a result holding the session text: `window`, its clause, `text`; an auth result: `auth`, `Kind` `""`; no stop: the zero `Limit`). night: `TestAR63_3_ExitLineLimit` (`accountStops`' world, r1's `FAKECLAUDE_RESULT` the session text at `1:30am (America/Los_Angeles)`: still `stopped:usage-limit`; r1's one `exit` line's `limit` reads `window`, `text`, scope `""`, `resets_at` exactly `2026-09-22T01:30:00-07:00` (the world's FakeClock hit at 2026-09-22T01:00Z); under `authText`, no `limit`).
+6. **The record, in act 2.** relay-r1 §5's `exit` entry gains `limit` (AR63); §10's account stop names the two needles, the kind and `reset-cells.tsv`; §11, the three tests. The verify-round note in `NICE_TO_HAVE.md` gains `(AR63)`.
+7. **Not done.** The pause, its states, lines and wake (packets 2 to 5); `Account`'s signature; the readers (packet 6).
+
+## 3. Interfaces (signatures, not prose)
+
+`stream`: `type Limit struct { Reason relay.StopReason; Kind string; Reset time.Time; Source, Scope string }`, `const KindWindow, KindWeekly, KindModel, KindUnknown = "window", "weekly", "model", "unknown"`, `func (t Tally) Limit(hit time.Time) Limit`, `func (l Limit) Line() map[string]any`, `func ResetIn(text string, hit time.Time) (time.Time, bool)`. Tests `func TestAR63_<n>_<Name>(t *testing.T)`; red on the pin: `_1`, `_2` (undefined names), `_3` (no `limit` key).
+
+## 4. Findings that name this row
+
+The record's §1: five ledger hits (es2a, mutdiff weekly; rtfix3, ws5y, fen3c the Fable limit), each `exit` line `child_exit` 143 with no reset kept.
+
+## 5. Forbidden reads
+
+Transcripts; the CLI's project records; the account's relay state directory. Read no other repo.
+
+## 6. Report (capped)
+
+At most 150 words. The table: each acceptance line with its count, `go vet`'s exit on the two packages, `make doclint`'s exit and `make hygiene`'s last line. Bullets: the TestAR63 tests red on the pin and why; each existing test changed; anything filed. Last line: branch, head sha.

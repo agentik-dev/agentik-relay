@@ -1,0 +1,18 @@
+text	hit	kind	reset	scope
+You've hit your session limit · resets 1:30am (America/Los_Angeles)	2026-09-21T22:00:00-07:00	window	2026-09-22T01:30:00-07:00	
+You've hit your session limit · resets 6:20pm (America/Los_Angeles)	2026-09-21T16:48:00-07:00	window	2026-09-21T18:20:00-07:00	
+You've hit your session limit · resets 10pm (America/Los_Angeles)	2026-09-21T20:05:00-07:00	window	2026-09-21T22:00:00-07:00	
+You've hit your session limit · resets 12am (America/Los_Angeles)	2026-09-21T22:00:00-07:00	window	2026-09-22T00:00:00-07:00	
+You've hit your session limit · resets 12:30pm (America/Los_Angeles)	2026-09-21T10:00:00-07:00	window	2026-09-21T12:30:00-07:00	
+You've hit your weekly limit · resets 2pm (America/Los_Angeles)	2026-10-02T10:36:00-07:00	weekly	2026-10-02T14:00:00-07:00	
+You've hit your weekly limit · resets 2pm (America/Los_Angeles)	2026-10-02T15:00:00-07:00	weekly	2026-10-03T14:00:00-07:00	
+You've hit your weekly limit · resets Sep 28 at 4pm (America/Los_Angeles)	2026-09-25T09:00:00-07:00	weekly	2026-09-28T16:00:00-07:00	
+You've hit your weekly limit · resets Sep 28 at 4pm (America/Los_Angeles)	2026-10-02T09:00:00-07:00	weekly		
+You've reached your Fable limit. Run /usage-credits to keep going or switch models with /model.	2026-10-07T19:57:00-07:00	model		fable
+You've reached your Fable limit. Switch to another model, or manage usage credits with /usage-credits.	2026-10-08T05:41:00-07:00	model		fable
+You've hit your Opus limit	2026-10-09T00:38:00-07:00	model		opus
+Claude AI usage limit reached|1758000000	2026-09-21T22:00:00-07:00	unknown		
+You've hit your session limit · resets 1:30am (Mars/Olympus)	2026-09-21T22:00:00-07:00	window		
+You've hit your session limit · resets 1:30am (Local)	2026-09-21T22:00:00-07:00	window		
+Weekly limit reached ∙ resets Mon 9am	2026-09-21T22:00:00-07:00	weekly		
+You've hit your session limit · resets 6:20pm	2026-09-21T12:00:00-04:00	window	2026-09-21T18:20:00-04:00	

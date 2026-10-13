@@ -1,0 +1,22 @@
+# a3 waits on a5, which is cut off a4, which is cut off a3.
+version: 1
+defaults: {model: claude-opus-5-5, turns: 100, context: 130000, usd: 15, wall: 4h,
+           merge: branch-only, device: never, verify: auto}
+words: ""
+rows:
+  - id: a3-machine
+    packet: internal/packet/testdata/a3-machine.md
+    depends_on: [a5-effects-plan]
+    base: main
+  - id: a4-schemas
+    packet: internal/packet/testdata/a4-schemas.md
+    depends_on: []
+    base: a3-machine
+  - id: a5-effects-plan
+    packet: internal/packet/testdata/a5-effects-plan.md
+    depends_on: []
+    base: a4-schemas
+  - id: a8-night
+    packet: internal/packet/testdata/a8-night.md
+    depends_on: [a2-relay-design]
+    base: main

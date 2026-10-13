@@ -1,0 +1,13 @@
+# a4's packet is not there.
+version: 1
+defaults: {model: claude-opus-5-5, turns: 100, context: 130000, usd: 15, wall: 4h,
+           merge: branch-only, device: never, verify: auto}
+words: ""
+rows:
+  - id: a3-machine
+    packet: internal/packet/testdata/a3-machine.md
+    depends_on: []
+    base: main
+  - id: a4-schemas
+    packet: internal/packet/testdata/absent/a4-schemas.md
+    base: a3-machine

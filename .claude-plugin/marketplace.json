@@ -1,0 +1,17 @@
+{
+  "name": "agent-relay",
+  "owner": {
+    "name": "agentik-dev"
+  },
+  "metadata": {
+    "description": "One marketplace for this repo: the agent-relay plugin."
+  },
+  "plugins": [
+    {
+      "name": "agent-relay",
+      "source": "./plugin",
+      "description": "Resume a stopped sitting with /agent-relay:resume; status, plan, gate, report and doctor over the relay binary, plus the guards: one commit per act, no remote writes.",
+      "version": "0.1.3"
+    }
+  ]
+}

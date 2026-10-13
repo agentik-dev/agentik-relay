@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit|Agent",
+        "hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run\" PreToolUse"}]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run\" PostToolUse"}]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run\" Stop"}]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run\" SessionStart"}]
+      }
+    ]
+  }
+}

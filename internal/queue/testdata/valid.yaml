@@ -1,0 +1,32 @@
+# The six rows over the packet fixtures (paths from the repo root).
+version: 1
+defaults: {model: claude-opus-5-5, turns: 100, context: 130000, usd: 15, wall: 4h,
+           merge: branch-only, device: never, verify: auto}
+words: ""
+rows:
+  - id: a3-machine
+    packet: internal/packet/testdata/a3-machine.md
+    depends_on: [a2-relay-design, ar1-relay-hooks]
+    base: ar1-relay-hooks
+    budget: {turns: 100, context: 110000, usd: 10, wall: 2h30m}
+  - id: a4-schemas
+    packet: internal/packet/testdata/a4-schemas.md
+    depends_on: [a2-relay-design, a3-machine]
+    base: a3-machine
+  - id: a5-effects-plan
+    packet: internal/packet/testdata/a5-effects-plan.md
+    depends_on: [a2-relay-design, a4-schemas]
+    base: a4-schemas
+  - id: a6-stage-gate
+    packet: internal/packet/testdata/a6-stage-gate.md
+    depends_on: [a2-relay-design, a5-effects-plan]
+    base: a5-effects-plan
+  - id: a7-spawn-stream
+    packet: internal/packet/testdata/a7-spawn-stream.md
+    depends_on: [a2-relay-design, a6-stage-gate]
+    base: a6-stage-gate
+  - id: a8-night
+    packet: internal/packet/testdata/a8-night.md
+    depends_on: [a2-relay-design, a7-spawn-stream]
+    base: a7-spawn-stream
+    model: claude-sonnet-5

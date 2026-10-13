@@ -1,0 +1,519 @@
+Error: Invariant NoNestedSpawn is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ mainSha = 0
+/\ cut = (r1 :> 0 @@ r2 :> 1)
+/\ load = 0
+/\ written = ( r1 :> [plan |-> FALSE, spawn |-> FALSE, exit |-> FALSE, sitting |-> FALSE] @@
+  r2 :> [plan |-> FALSE, spawn |-> FALSE, exit |-> FALSE, sitting |-> FALSE] )
+/\ breaker = "closed"
+/\ checks = ( r1 :>
+      [ base |-> "none",
+        gate |-> "none",
+        at |-> 0,
+        merged |-> 0,
+        main |-> 0,
+        onto |-> 0 ] @@
+  r2 :>
+      [ base |-> "none",
+        gate |-> "none",
+        at |-> 0,
+        merged |-> 0,
+        main |-> 0,
+        onto |-> 0 ] )
+/\ clock = (r1 :> 0 @@ r2 :> 0)
+/\ row = ( r1 :> [group |-> 0, st |-> "ready", reason |-> "none"] @@
+  r2 :> [group |-> 0, st |-> "ready", reason |-> "none"] )
+/\ mainMerges = {r2}
+/\ waited = 0
+/\ night = [st |-> "planning", valid |-> FALSE, reason |-> "none"]
+/\ anchorLoaded = (r1 :> FALSE @@ r2 :> FALSE)
+/\ measuring = 0
+/\ relaySt = "up"
+/\ stall = (r1 :> 0 @@ r2 :> 0)
+/\ procs = << [ row |-> "none",
+     kind |-> "relay",
+     parent |-> 0,
+     group |-> 1,
+     depth |-> 0,
+     alive |-> TRUE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ] >>
+/\ tip = (r1 :> 0 @@ r2 :> 2)
+/\ memo = (r1 :> FALSE @@ r2 :> FALSE)
+
+State 2: <NightStep line 577, col 3 to line 582, col 58 of module Night>
+/\ mainSha = 0
+/\ cut = (r1 :> 0 @@ r2 :> 1)
+/\ load = 0
+/\ written = ( r1 :> [plan |-> FALSE, spawn |-> FALSE, exit |-> FALSE, sitting |-> FALSE] @@
+  r2 :> [plan |-> FALSE, spawn |-> FALSE, exit |-> FALSE, sitting |-> FALSE] )
+/\ breaker = "closed"
+/\ checks = ( r1 :>
+      [ base |-> "none",
+        gate |-> "none",
+        at |-> 0,
+        merged |-> 0,
+        main |-> 0,
+        onto |-> 0 ] @@
+  r2 :>
+      [ base |-> "none",
+        gate |-> "none",
+        at |-> 0,
+        merged |-> 0,
+        main |-> 0,
+        onto |-> 0 ] )
+/\ clock = (r1 :> 0 @@ r2 :> 0)
+/\ row = ( r1 :> [group |-> 0, st |-> "ready", reason |-> "none"] @@
+  r2 :> [group |-> 0, st |-> "landed", reason |-> "landed"] )
+/\ mainMerges = {r2}
+/\ waited = 0
+/\ night = [st |-> "planning", valid |-> TRUE, reason |-> "none"]
+/\ anchorLoaded = (r1 :> FALSE @@ r2 :> FALSE)
+/\ measuring = 0
+/\ relaySt = "up"
+/\ stall = (r1 :> 0 @@ r2 :> 0)
+/\ procs = << [ row |-> "none",
+     kind |-> "relay",
+     parent |-> 0,
+     group |-> 1,
+     depth |-> 0,
+     alive |-> TRUE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ] >>
+/\ tip = (r1 :> 0 @@ r2 :> 2)
+/\ memo = (r1 :> FALSE @@ r2 :> FALSE)
+
+State 3: <NightStep line 577, col 3 to line 582, col 58 of module Night>
+/\ mainSha = 0
+/\ cut = (r1 :> 0 @@ r2 :> 1)
+/\ load = 0
+/\ written = ( r1 :> [plan |-> FALSE, spawn |-> FALSE, exit |-> FALSE, sitting |-> FALSE] @@
+  r2 :> [plan |-> FALSE, spawn |-> FALSE, exit |-> FALSE, sitting |-> FALSE] )
+/\ breaker = "closed"
+/\ checks = ( r1 :>
+      [ base |-> "none",
+        gate |-> "none",
+        at |-> 0,
+        merged |-> 0,
+        main |-> 0,
+        onto |-> 0 ] @@
+  r2 :>
+      [ base |-> "none",
+        gate |-> "none",
+        at |-> 0,
+        merged |-> 0,
+        main |-> 0,
+        onto |-> 0 ] )
+/\ clock = (r1 :> 0 @@ r2 :> 0)
+/\ row = ( r1 :> [group |-> 0, st |-> "ready", reason |-> "none"] @@
+  r2 :> [group |-> 0, st |-> "landed", reason |-> "landed"] )
+/\ mainMerges = {r2}
+/\ waited = 0
+/\ night = [st |-> "planning", valid |-> TRUE, reason |-> "none"]
+/\ anchorLoaded = (r1 :> FALSE @@ r2 :> FALSE)
+/\ measuring = 2
+/\ relaySt = "up"
+/\ stall = (r1 :> 0 @@ r2 :> 0)
+/\ procs = << [ row |-> "none",
+     kind |-> "relay",
+     parent |-> 0,
+     group |-> 1,
+     depth |-> 0,
+     alive |-> TRUE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> r1,
+     kind |-> "measure",
+     parent |-> 1,
+     group |-> 2,
+     depth |-> 1,
+     alive |-> TRUE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ] >>
+/\ tip = (r1 :> 0 @@ r2 :> 2)
+/\ memo = (r1 :> FALSE @@ r2 :> FALSE)
+
+State 4: <NightStep line 577, col 3 to line 582, col 58 of module Night>
+/\ mainSha = 0
+/\ cut = (r1 :> 0 @@ r2 :> 1)
+/\ load = 0
+/\ written = ( r1 :> [plan |-> TRUE, spawn |-> FALSE, exit |-> FALSE, sitting |-> FALSE] @@
+  r2 :> [plan |-> FALSE, spawn |-> FALSE, exit |-> FALSE, sitting |-> FALSE] )
+/\ breaker = "closed"
+/\ checks = ( r1 :>
+      [ base |-> "green",
+        gate |-> "none",
+        at |-> 0,
+        merged |-> 0,
+        main |-> 0,
+        onto |-> 0 ] @@
+  r2 :>
+      [ base |-> "none",
+        gate |-> "none",
+        at |-> 0,
+        merged |-> 0,
+        main |-> 0,
+        onto |-> 0 ] )
+/\ clock = (r1 :> 0 @@ r2 :> 0)
+/\ row = ( r1 :> [group |-> 0, st |-> "planned", reason |-> "none"] @@
+  r2 :> [group |-> 0, st |-> "landed", reason |-> "landed"] )
+/\ mainMerges = {r2}
+/\ waited = 0
+/\ night = [st |-> "planning", valid |-> TRUE, reason |-> "none"]
+/\ anchorLoaded = (r1 :> FALSE @@ r2 :> FALSE)
+/\ measuring = 0
+/\ relaySt = "up"
+/\ stall = (r1 :> 0 @@ r2 :> 0)
+/\ procs = << [ row |-> "none",
+     kind |-> "relay",
+     parent |-> 0,
+     group |-> 1,
+     depth |-> 0,
+     alive |-> TRUE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ] >>
+/\ tip = (r1 :> 0 @@ r2 :> 2)
+/\ memo = (r1 :> TRUE @@ r2 :> FALSE)
+
+State 5: <NightStep line 577, col 3 to line 582, col 58 of module Night>
+/\ mainSha = 0
+/\ cut = (r1 :> 0 @@ r2 :> 1)
+/\ load = 0
+/\ written = ( r1 :> [plan |-> TRUE, spawn |-> FALSE, exit |-> FALSE, sitting |-> FALSE] @@
+  r2 :> [plan |-> FALSE, spawn |-> FALSE, exit |-> FALSE, sitting |-> FALSE] )
+/\ breaker = "closed"
+/\ checks = ( r1 :>
+      [ base |-> "green",
+        gate |-> "none",
+        at |-> 0,
+        merged |-> 0,
+        main |-> 0,
+        onto |-> 0 ] @@
+  r2 :>
+      [ base |-> "none",
+        gate |-> "none",
+        at |-> 0,
+        merged |-> 0,
+        main |-> 0,
+        onto |-> 0 ] )
+/\ clock = (r1 :> 0 @@ r2 :> 0)
+/\ row = ( r1 :> [group |-> 0, st |-> "planned", reason |-> "none"] @@
+  r2 :> [group |-> 0, st |-> "landed", reason |-> "landed"] )
+/\ mainMerges = {r2}
+/\ waited = 0
+/\ night = [st |-> "running", valid |-> TRUE, reason |-> "none"]
+/\ anchorLoaded = (r1 :> FALSE @@ r2 :> FALSE)
+/\ measuring = 0
+/\ relaySt = "up"
+/\ stall = (r1 :> 0 @@ r2 :> 0)
+/\ procs = << [ row |-> "none",
+     kind |-> "relay",
+     parent |-> 0,
+     group |-> 1,
+     depth |-> 0,
+     alive |-> TRUE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ] >>
+/\ tip = (r1 :> 0 @@ r2 :> 2)
+/\ memo = (r1 :> TRUE @@ r2 :> FALSE)
+
+State 6: <NightStep line 577, col 3 to line 582, col 58 of module Night>
+/\ mainSha = 0
+/\ cut = (r1 :> 1 @@ r2 :> 1)
+/\ load = 0
+/\ written = ( r1 :> [plan |-> TRUE, spawn |-> TRUE, exit |-> FALSE, sitting |-> FALSE] @@
+  r2 :> [plan |-> FALSE, spawn |-> FALSE, exit |-> FALSE, sitting |-> FALSE] )
+/\ breaker = "closed"
+/\ checks = ( r1 :>
+      [ base |-> "green",
+        gate |-> "none",
+        at |-> 0,
+        merged |-> 0,
+        main |-> 0,
+        onto |-> 0 ] @@
+  r2 :>
+      [ base |-> "none",
+        gate |-> "none",
+        at |-> 0,
+        merged |-> 0,
+        main |-> 0,
+        onto |-> 0 ] )
+/\ clock = (r1 :> 0 @@ r2 :> 0)
+/\ row = ( r1 :> [group |-> 2, st |-> "running", reason |-> "none"] @@
+  r2 :> [group |-> 0, st |-> "landed", reason |-> "landed"] )
+/\ mainMerges = {r2}
+/\ waited = 0
+/\ night = [st |-> "running", valid |-> TRUE, reason |-> "none"]
+/\ anchorLoaded = (r1 :> FALSE @@ r2 :> FALSE)
+/\ measuring = 0
+/\ relaySt = "up"
+/\ stall = (r1 :> 0 @@ r2 :> 0)
+/\ procs = << [ row |-> "none",
+     kind |-> "relay",
+     parent |-> 0,
+     group |-> 1,
+     depth |-> 0,
+     alive |-> TRUE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> r1,
+     kind |-> "child",
+     parent |-> 1,
+     group |-> 2,
+     depth |-> 1,
+     alive |-> TRUE,
+     holdsStdout |-> TRUE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ] >>
+/\ tip = (r1 :> 1 @@ r2 :> 2)
+/\ memo = (r1 :> TRUE @@ r2 :> FALSE)
+
+State 7: <DetachedRun line 285, col 3 to line 294, col 62 of module Night>
+/\ mainSha = 0
+/\ cut = (r1 :> 1 @@ r2 :> 1)
+/\ load = 0
+/\ written = ( r1 :> [plan |-> TRUE, spawn |-> TRUE, exit |-> FALSE, sitting |-> FALSE] @@
+  r2 :> [plan |-> FALSE, spawn |-> FALSE, exit |-> FALSE, sitting |-> FALSE] )
+/\ breaker = "closed"
+/\ checks = ( r1 :>
+      [ base |-> "green",
+        gate |-> "none",
+        at |-> 0,
+        merged |-> 0,
+        main |-> 0,
+        onto |-> 0 ] @@
+  r2 :>
+      [ base |-> "none",
+        gate |-> "none",
+        at |-> 0,
+        merged |-> 0,
+        main |-> 0,
+        onto |-> 0 ] )
+/\ clock = (r1 :> 0 @@ r2 :> 0)
+/\ row = ( r1 :> [group |-> 2, st |-> "running", reason |-> "none"] @@
+  r2 :> [group |-> 0, st |-> "landed", reason |-> "landed"] )
+/\ mainMerges = {r2}
+/\ waited = 0
+/\ night = [st |-> "running", valid |-> TRUE, reason |-> "none"]
+/\ anchorLoaded = (r1 :> FALSE @@ r2 :> FALSE)
+/\ measuring = 0
+/\ relaySt = "up"
+/\ stall = (r1 :> 0 @@ r2 :> 0)
+/\ procs = << [ row |-> "none",
+     kind |-> "relay",
+     parent |-> 0,
+     group |-> 1,
+     depth |-> 0,
+     alive |-> TRUE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> r1,
+     kind |-> "child",
+     parent |-> 1,
+     group |-> 2,
+     depth |-> 1,
+     alive |-> TRUE,
+     holdsStdout |-> TRUE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> r1,
+     kind |-> "relay",
+     parent |-> 0,
+     group |-> 3,
+     depth |-> 1,
+     alive |-> TRUE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> r1,
+     kind |-> "child",
+     parent |-> 3,
+     group |-> 4,
+     depth |-> 1,
+     alive |-> TRUE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ],
+   [ row |-> "none",
+     kind |-> "free",
+     parent |-> 0,
+     group |-> 0,
+     depth |-> 0,
+     alive |-> FALSE,
+     holdsStdout |-> FALSE,
+     spawnedOpen |-> FALSE ] >>
+/\ tip = (r1 :> 1 @@ r2 :> 2)
+/\ memo = (r1 :> TRUE @@ r2 :> FALSE)

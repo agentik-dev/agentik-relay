@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="agent-relay: a relay baton">
+  <title>agent-relay</title>
+  <g fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+    <rect x="17" y="24" width="36" height="14" rx="7" transform="rotate(-30 35 31)" fill="#fff"/>
+    <path d="M23.7 29.4 L30.7 41.6 M39.3 20.4 L46.3 32.6"/>
+    <path d="M6 30 H16 M4 38 H14 M6 46 H16"/>
+  </g>
+</svg>

@@ -1,0 +1,3 @@
+[
+  {"id": "ar21-fixes-adv12", "repo": "agent-relay", "prompt": "design/packets/ar21-fixes-adv12.md", "depends_on": ["packets-39-relay"], "worktree": true, "model": "claude-opus-5-5", "max_turns": 100, "why": "the ADV12 fix packet: one root cause, program-valued git config read by the gate and the merge (the global config out of both runners, the digest bound once per root in memory and checked after the merged verify, program keys refused), plus one relay per account (any live holder refused under a lifetime flock); the shell reader's ANSI-C quote and arithmetic shift, a -run that matches every test and one package per line, and the ledger read as a claim; tests set HOME and XDG_CONFIG_HOME to temp dirs"}
+]

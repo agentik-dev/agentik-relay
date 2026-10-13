@@ -1,0 +1,37 @@
+# Packet UX1: the printed lines of `plan`, `run`, `status`, `report`, `doctor`, `resume` and `attach`
+
+| item | value |
+|---|---|
+| from | `design/relay-r1.md` §9 (what each verb prints; "the door must be obvious"; `report` as "the morning read in plain markdown"), §5 (the `sitting` line), §7 (the live line `turn N: ...; context 71k/130k; $1.20`), §10 (the plugin reads `--json`, so its shapes are frozen). The owner's three asks, quoted in §1. The builder reads THIS packet and those sections; never the brief |
+| pin | agent-relay branch `ar2-adversarial` at its head (merged or not: the relay cuts `ux1-review` off it); worktree `.claude/worktrees/ux1-review` |
+| wall | this repo only. No other repo is read or written; no push; no `--amend`; no rebase; no device; no network in tests; no real `claude` is spawned: every verb is run over the fake claude in a temp repo or with `--dry` |
+| may touch | `design/ux-review.md` (new), `internal/night/status.go`, `internal/night/report.go`, `internal/night/plan.go`, `internal/night/run.go`, `internal/stream/stream.go` (the `Print`, `Markdown`, `Line` and live-line functions only), `cmd/relay/main.go` (`usage` and the printed lines only), `internal/night/status_test.go`, `internal/night/report_test.go`, `internal/night/plan_test.go`, `internal/night/run_test.go`, `internal/stream/stream_test.go`, `cmd/relay/main_test.go`, `internal/night/testdata/`, `internal/stream/testdata/` (goldens), `.hygiene-allow` (rows for goldens only). Nothing else; no `--json` field, exit code, ledger line or scheduler rule changes |
+| acceptance | `make check; echo $?` reads 0; `go test -race ./... >/dev/null 2>&1; echo $?` reads 0; `test -f design/ux-review.md; echo $?` reads 0; `grep -c '^## ' design/ux-review.md` reads 7 or more; `go test ./internal/night ./cmd/relay -run 'TestJSONShapesFrozen\|TestPrintedLinesUnder100\|TestResumeLineOnItsOwn\|TestReportHeadingOrder' -v 2>&1 \| grep -c '^--- PASS'` reads 4; `go build -o bin/relay ./cmd/relay && bin/relay --help 2>&1 \| grep -c 'resume'` reads 1 or more; `bin/relay doctor 2>&1 \| awk 'length > 100' \| wc -l` reads 0; `bin/relay status 2>&1 \| head -1 \| grep -c 'night'` reads 1; `git status --short \| wc -l` reads 0 after the last commit |
+| budget | 80 turns, 110k context; commit per verb (plan, run and the live line, status, report, doctor, resume and attach, usage); checkpoint at 80%; never push, amend or rebase; the charter is `history/sittings/2026-09-22-13.md` when the date is 2026-09-22, else the first free number |
+
+## 1. What the source says (quoted)
+
+The owner's asks (A2's handover and the ruling of 2026-09-22 12:55): high visibility; "the claude-code plugin's resume door must be obvious"; a readable morning report. relay-r1 §9: `status` is "the dashboard once, from `status.json`; readable over ssh"; `resume` "prints and runs `claude --resume <session_id>` ... every red or failed row's ledger line, `status` and `report` print this exact line"; `report` is "the morning read in plain markdown: what merged with SHAs, what stopped and the verbatim line, burn per sitting (builders included), branches waiting on a hand merge, the resume lines, the charters' handover sections; plain only". §7: the live line reads "`turn N: <tool> "<summary>"; context 71k/130k; $1.20`". §9: "Every verb takes `--json` (R25-90 (1))."
+
+## 2. Rulings
+
+Wording and shape only: no behaviour changes, no new flag, no `--json` key added, renamed or removed (AP1's commands read them; `TestJSONShapesFrozen` pins the key sets against goldens taken before the first edit), exit codes as §9, ledger lines untouched. The checklist a printed surface must pass, in this order: the first line says what state the night is in; every red or failed row prints `relay resume <row>` on a line of its own, and `status` and `run` end with those lines; the report's headings come in the morning's order (merged, stopped, waiting on a hand merge, resume lines, burn, handovers); numbers align in columns; no home path, no JSON, no Go type name in a human line; every line under 100 columns; `usage` names `status` and `resume` first. What fails the checklist and cannot be met by wording (a missing field, a missing event, a scheduler rule) is a handover line with its consumer, never a fix. Colour and cursor movement are not used: `status` is read over ssh and in a tmux window (A9).
+
+## 3. Interfaces (signatures, not prose)
+
+- `design/ux-review.md`: `# UX1: the printed surface at <base sha>`, then one `## <verb>` for `plan`, `run` (with the live line), `status`, `report`, `doctor`, `resume`, `attach`: the output before (captured over the fake claude, home paths replaced by `$REPO`), the checklist verdict line by line, the output after, and what could not be fixed. A closing `## Handover` lists every item the packet leaves to A8's or A9's owner.
+- The captures: the end-to-end night test's temp repo (A8's `TestNightEndToEnd`) with one green and one red row, run once with `-v` and a `UX1_CAPTURE=<dir>` environment variable the tests honour to write each verb's output; `plan` and `run --dry` from the repo root over `relay/queue.yaml`; `doctor` and `--help` as they are on this machine.
+- Tests, beside the existing ones: `TestJSONShapesFrozen` (the sorted key set of `status --json`, `report --json`, `plan --json`, `doctor --json` equals a golden taken at the base sha); `TestPrintedLinesUnder100` (every human line of every `Print` under 100 columns for the end-to-end fixture); `TestResumeLineOnItsOwn` (a red row's `relay resume <row>` is a whole line in `status`, `report` and `run`'s tail); `TestReportHeadingOrder` (the `##` headings of `Markdown(Report)` in the order §2 names).
+- The functions in scope, by name on the base branch at build time: `night.Print` (plan), `night.PrintStatus` or the `Print(w, Status)` A8 named, `night.Markdown`, `stream.Tally.Line`, `main.usage`, and the `run` tail that prints the resume lines. Where a name differs, `grep -n '^func ' internal/night/*.go cmd/relay/main.go` on the base branch settles it.
+
+## 4. Findings that name this row
+
+Baseline on main at `e0a4d2a`, measured 2026-09-22: `make check` 0; `go test -race ./...` 0; `design/ux-review.md` absent (`test -f` 1, `grep -c` 0); the four tests absent (reads 0); `bin/relay --help` names `resume` once (reads 1); `doctor` prints no line over 100 columns (reads 0); `bin/relay status` on main is a stub whose first line does not say `night` (reads 0). On the base branch at build time `status` is A8's and prints the night; measure it and record the line in §1 of the review. `tmux` is absent on this Mac, so `attach` is captured with `--print` (A9). The ntfy notice bodies (A9) are out of scope: a notice is not a printed line.
+
+## 5. Forbidden reads
+
+Every other repo; `~/.claude/projects/`; any relay ledger outside `t.TempDir()`; the brief; `design/relay-r1.md` beyond the sections `from` names; `design/review-ar2.md` beyond its `## Totals`; any file over 8 KB whole.
+
+## 6. Report (capped: one table, at most five bullets, under 1,500 words)
+
+The table: each acceptance line, its exit and its last output line on the branch. Bullets: `status` before and after for the two-row fixture, the two first lines only; the report's headings before and after; the checklist items that failed at the base and pass now; every handover item with its consumer; what was left undone. The last line: the branch name and its head sha.

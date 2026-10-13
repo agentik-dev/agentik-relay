@@ -1,0 +1,1 @@
+Render contract: make one editorial pass over the whole document and write it to README.md; keep byte-identical and in their order the img line, every heading, every fenced block, every code span, every link, every number, every list item and every table row; tighten prose only; add no fact and drop no fact.
