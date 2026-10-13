@@ -195,7 +195,7 @@ func TestPublicR1_6_AllowAndBadLine(t *testing.T) {
 	}
 	bad := writeList(t, t.TempDir(), "invented zorblax-no-tab\n")
 	r := scan(t, map[string]string{"a.txt": "clean\n"}, map[string]string{"AGENTIK_HYGIENE_PRIVATE": bad})
-	if r.code != 1 || !strings.Contains(r.stderr, ":1: bad line") || strings.Contains(r.stderr, "zorblax") {
+	if r.code != 1 || !strings.Contains(r.stderr, ":1: bad entry") || strings.Contains(r.stderr, "zorblax") {
 		t.Errorf("bad line: exit %d, want 1 naming the line only; stderr %q", r.code, r.stderr)
 	}
 }

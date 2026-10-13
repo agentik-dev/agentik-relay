@@ -3,7 +3,7 @@ PY := $(shell pyenv which python3 2>/dev/null || command -v python3)
 # make through a variable: a literal $(MAKE) in check's line would run it under
 # `make -n check` (the relay's verify probe), taking the lock or waiting on load.
 UNLOCKED := $(MAKE)
-HYGIENE_SHA := b46edcf313751825a4e4a5bed7b1cc56b70ba5481fbb171fd7300b4f4182c9ea
+HYGIENE_SHA := acc3498d4ad3555b095f7f12b22c1c1257fc7d8f2f2f6055c34bd0a21ec34421
 DOCLINT_SHA := 3040666c1e9ad08faf1befe9c2efffaff0660f0464554d240f1d07437a03fcda
 
 JAVA ?= $(shell test -x /opt/homebrew/opt/openjdk/bin/java && echo /opt/homebrew/opt/openjdk/bin/java || command -v java)

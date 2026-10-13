@@ -2,13 +2,14 @@
 """hygiene: the public-hygiene scan (conventions section 6, overhaul-r1 section 5).
 
 Scans the working tree of a repo (`git ls-files -co --exclude-standard`: the
-tracked and untracked-not-ignored regular files and symlinks) for the generic
-pattern groups below and the private list's groups, and prints counts only,
-never a matched line nor a private pattern: an uncommitted file is
+tracked and untracked-not-ignored regular files and symlinks) for pattern groups
+and prints counts only, never a matched line: an uncommitted file is
 scanned before its commit, an ignored one never. Each file's path is a scanned
 line of that file, for every group; a symlink is its path and its target
-(`readlink`), never the target's content. A file over 4 MiB is scanned by its
-path only and counted as `oversize` (never read). A file starting with a UTF-16
+(`readlink`), never the target's content. A file over 4 MiB is streamed in 1 MiB
+chunks, cut at a line boundary (a longer line carried at most 64 KiB, then kept
+by a 4 KiB overlap), with the first chunk's codec, and counted as `oversize`
+(ADV11-3): every byte is scanned, memory stays bounded. A file starting with a UTF-16
 BOM, or whose first 8 KB have NULs on 90% or more of the odd or the even bytes
 (not both), is decoded as UTF-16 and scanned as text. Else a file whose first
 8 KB hold a NUL is binary: it is scanned for the `home`, `secret` and `email`
@@ -17,30 +18,32 @@ would), one line per run. `.hygiene-allow` lists
 exceptions, one per line: `<path-glob>: <group>[,<group>]`, `#` comments; a
 glob's `*` stays inside one path segment; a `secret` exception outside
 `tests/fixtures/` is a usage error. Under `history/sittings/` (charters are
-records) the `sibling` group is not evaluated; the rest, and every private
-group, still scan there. `secret` is matched case-sensitively, the others
-ignore case.
+records) the `sibling` group is not evaluated; the rest still scan there.
+`secret` is matched case-sensitively, the others ignore case.
 
-The private list: this file holds only generic patterns (a home path, a LAN
-address, a secret's shape, an email address) and the public sibling names.
-The patterns that name an owner, a private repo, a host, a device or a domain
-live outside the repo, in `$AGENTIK_HYGIENE_PRIVATE`, else in
-`${XDG_CONFIG_HOME:-$HOME/.config}/agentik/hygiene-private.tsv`: UTF-8, one
-`group<TAB>regex` per line, `#` comment lines and blank lines skipped; a group
-may be new or add to a generic one, and compiles like the generic ones. An
-absent list prints one stderr line and the scan runs on the generic groups;
-`--require-private` makes an absent or unreadable list exit 2. A malformed
-line is a usage error naming its line number, never its text. An allowlist
-entry may name a group the absent list would have defined.
+This file holds the generic groups only: patterns that name nobody. The terms
+private to one owner (a name, a host, a domain, a private repo) live outside the
+repo, in the private list: `$AGENTIK_HYGIENE_PRIVATE` when set and not empty,
+else `${XDG_CONFIG_HOME:-$HOME/.config}/agentik/hygiene-private.tsv`. It is UTF-8,
+one `group<TAB>regex` per line; `#` comments and blank lines are skipped. Its
+patterns are compiled case-insensitively and scanned as the in-file ones; a group
+it names that this file lacks is a new group, one this file has gains the
+patterns. A regex from the list is never printed, not even in an error: a bad
+line is reported by its number. An absent list prints one stderr line and the
+scan runs on the generic groups; `--require-private` makes an absent or
+unreadable list exit 2.
 
 Usage: hygiene [--json] [--allow FILE] [--repo DIR] [--require-private]
 Exit 0 when no hit lies outside the allowlist, 2 when one does (or when
-`--require-private` finds no list), 1 on usage or when git fails. Stdlib only;
-one file, copied byte-identical into each repo.
+`--require-private` finds no readable private list), 1 on usage, a bad line in
+the private list, or when git fails. Stdlib only; one file, copied
+byte-identical into each repo.
 
 The patterns below are written so that this file does not match itself.
 """
+import codecs
 import fnmatch
+import itertools
 import json
 import os
 import re
@@ -60,14 +63,20 @@ GROUPS = (
     ("email", (r"\b[A-Za-z0-9._%+-]+[@][A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b",)),
 )
 CASE_SENSITIVE = ("secret",)
-PRIVATE_VAR = "AGENTIK_HYGIENE_PRIVATE"
+COMPILED = [(name, re.compile("|".join(pats), 0 if name in CASE_SENSITIVE else re.IGNORECASE))
+            for name, pats in GROUPS]
+GROUP_NAMES = [name for name, _ in GROUPS]
+PRIVATE_ENV = "AGENTIK_HYGIENE_PRIVATE"
 PRIVATE_NAME = os.path.join("agentik", "hygiene-private.tsv")
-GROUP_NAME = re.compile(r"[a-z][a-z0-9_-]*\Z")
-COMPILED = []
-GROUP_NAMES = []
+GROUP_NAME = re.compile(r"[A-Za-z0-9_-]+\Z")
+ALL = None  # a text line is scanned for every group
 BINARY_PROBE = 8192
 UTF16_NUL = 0.9
 READ_CAP = 4 * 1024 * 1024
+CHUNK = 1024 * 1024
+LINE_CARRY = 64 * 1024
+OVERLAP = 4 * 1024
+LAST_BREAK = re.compile(rb"[^\x20-\x7e\t][\x20-\x7e\t]*\Z")
 RECORDS = ("history/sittings/",)
 RECORDS_SKIP = ("sibling",)
 BINARY_GROUPS = ("home", "secret", "email")
@@ -79,7 +88,7 @@ class UsageError(Exception):
     pass
 
 
-class NoPrivate(Exception):
+class NoPrivateList(Exception):
     pass
 
 
@@ -106,66 +115,49 @@ def parse_args(argv):
 
 
 def private_path():
-    """The private list's path: $AGENTIK_HYGIENE_PRIVATE, else the XDG config file."""
-    if os.environ.get(PRIVATE_VAR):
-        return os.environ[PRIVATE_VAR]
-    base = os.environ.get("XDG_CONFIG_HOME") or os.path.join(
-        os.path.expanduser("~"), ".config")
+    """The private list's path: the env's, else the XDG config home's (shell `:-` rules)."""
+    path = os.environ.get(PRIVATE_ENV)
+    if path:
+        return path
+    base = os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config")
     return os.path.join(base, PRIVATE_NAME)
 
 
 def load_private(path, required):
-    """[(group, [regex])] from the private list, or None when it is absent or
-    unreadable (NoPrivate when required). A bad line raises UsageError naming
-    its number only: a private pattern is never printed."""
+    """[(group, compiled)] from the private list, in its order; one stderr line and []
+    when it is absent (NoPrivateList when required or unreadable). Never prints a regex."""
     try:
-        with open(path, "rb") as fh:
-            data = fh.read()
-    except OSError as exc:
+        with open(path, encoding="utf-8") as fh:
+            raw = fh.read()
+    except FileNotFoundError:
         if required:
-            raise NoPrivate("hygiene: no private list at %s (%s)"
-                            % (path, exc.strerror or "unreadable"))
+            raise NoPrivateList("no private list at %s (--require-private)" % path)
         sys.stderr.write("hygiene: no private list at %s; generic groups only\n" % path)
-        return None
-    try:
-        text = data.decode("utf-8")
-    except UnicodeDecodeError:
-        raise UsageError("%s: not UTF-8" % path)
-    groups = []
-    for n, raw in enumerate(text.splitlines(), 1):
-        line = raw.strip()
-        if not line or line.startswith("#"):
+        return []
+    except (OSError, UnicodeDecodeError):
+        if required:
+            raise NoPrivateList("the private list at %s is unreadable (--require-private)" % path)
+        sys.stderr.write("hygiene: the private list at %s is unreadable; generic groups only\n"
+                         % path)
+        return []
+    entries = []
+    for n, line in enumerate(raw.splitlines(), 1):
+        if not line.strip() or line.lstrip().startswith("#"):
             continue
-        name, sep, pat = raw.partition("\t")
-        name, pat = name.strip(), pat.strip()
-        if not sep or not GROUP_NAME.match(name) or not pat:
-            raise UsageError("%s:%d: bad line (want group<TAB>regex)" % (path, n))
+        group, sep, regex = line.partition("\t")
+        group = group.strip()
         try:
-            re.compile(pat)
+            if not sep or not GROUP_NAME.match(group) or not regex:
+                raise re.error("bad entry")
+            entries.append((group, re.compile(regex, re.IGNORECASE)))
         except re.error:
-            raise UsageError("%s:%d: the regex does not compile" % (path, n))
-        groups.append((name, pat))
-    return groups
+            raise UsageError("%s:%d: bad entry (group<TAB>regex)" % (path, n)) from None
+    return entries
 
 
-def build_groups(private):
-    """Set COMPILED and GROUP_NAMES from GROUPS and the private list's groups
-    (each private pattern wrapped, so its alternation stays its own)."""
-    pats = [(name, list(p)) for name, p in GROUPS]
-    for name, pat in private or ():
-        for known, have in pats:
-            if known == name:
-                have.append("(?:%s)" % pat)
-                break
-        else:
-            pats.append((name, ["(?:%s)" % pat]))
-    COMPILED[:] = [(name, re.compile("|".join(p), 0 if name in CASE_SENSITIVE
-                                     else re.IGNORECASE)) for name, p in pats]
-    GROUP_NAMES[:] = [name for name, _ in pats]
-
-
-def load_allow(path, required, strict=True):
-    """Return [(glob, {groups})]; a missing default file is an empty list."""
+def load_allow(path, required, known, strict):
+    """Return [(glob, {groups})]; a missing default file is an empty list. A group not in
+    `known` is a bad entry when `strict` (the private list loaded), else tolerated."""
     if not os.path.exists(path):
         if required:
             raise UsageError("allow file not found: %s" % path)
@@ -179,10 +171,8 @@ def load_allow(path, required, strict=True):
             glob, sep, groups = line.rpartition(":")
             names = {g.strip() for g in groups.split(",") if g.strip()}
             glob = glob.strip()
-            unknown = names - set(GROUP_NAMES)
-            if not strict:
-                unknown = {g for g in unknown if not GROUP_NAME.match(g)}
-            if not sep or not glob or not names or unknown:
+            if not sep or not glob or not names or (strict and names - set(known)) or any(
+                    not GROUP_NAME.match(g) for g in names):
                 raise UsageError("%s:%d: bad entry" % (path, n))
             parts = glob.split("/")
             if "secret" in names and (parts[:2] != SECRET_ALLOW_ROOT or len(parts) < 3):
@@ -231,47 +221,83 @@ def utf16(data):
     return None
 
 
+def pieces(buf, binary):
+    """The scanned lines of a whole buffer: a text's lines, or a binary's printable runs."""
+    if binary:
+        return [(m.group().decode("ascii"), BINARY_GROUPS) for m in PRINTABLE_RUN.finditer(buf)]
+    return [(line, ALL) for line in buf.splitlines()]
+
+
+def stream(full):
+    """An oversize file's lines, CHUNK at a time: each buffer is cut after its last line
+    break (a text's newline, a binary's non-printable byte), so no line or run is split;
+    a carry past LINE_CARRY is scanned and only its last OVERLAP kept."""
+    with open(full, "rb") as fh:
+        chunk = fh.read(CHUNK)
+        codec = utf16(chunk)
+        binary = not codec and b"\0" in chunk[:BINARY_PROBE]
+        decoder = None if binary else codecs.getincrementaldecoder(codec or "utf-8")("replace")
+        carry = b"" if binary else ""
+        while chunk:
+            buf = carry + (chunk if binary else decoder.decode(chunk))
+            if binary:
+                m = LAST_BREAK.search(buf)
+                cut = m.start() + 1 if m else 0
+            else:
+                cut = buf.rfind("\n") + 1
+            yield from pieces(buf[:cut], binary)
+            carry = buf[cut:]
+            if len(carry) > LINE_CARRY:
+                yield from pieces(carry, binary)
+                carry = carry[-OVERLAP:]
+            chunk = fh.read(CHUNK)
+        if not binary:
+            carry += decoder.decode(b"", final=True)
+        yield from pieces(carry, binary)
+
+
 def read_lines(path, full):
     """([(line, groups)], oversize) for one entry: its path, then a symlink's
     target, a text file's lines (UTF-16 decoded), or a binary's printable runs
-    (for BINARY_GROUPS only); a file over READ_CAP is its path only."""
-    rows = [(path, GROUP_NAMES)]
+    (for BINARY_GROUPS only); a file over READ_CAP is streamed."""
+    rows = [(path, ALL)]
     if os.path.islink(full):
         target = os.readlink(full)
-        return rows + [(target, GROUP_NAMES)], False
+        return rows + [(target, ALL)], False
     with open(full, "rb") as fh:
-        if os.fstat(fh.fileno()).st_size > READ_CAP:
-            return rows, True
         data = fh.read(READ_CAP + 1)
     if len(data) > READ_CAP:
-        return rows, True
+        return itertools.chain(rows, stream(full)), True
     codec = utf16(data)
     if codec:
-        text = data.decode(codec, "replace")
-    elif b"\0" in data[:BINARY_PROBE]:
-        return rows + [(m.group().decode("ascii"), BINARY_GROUPS)
-                       for m in PRINTABLE_RUN.finditer(data)], False
-    else:
-        text = data.decode("utf-8", "replace")
-    return rows + [(line, GROUP_NAMES) for line in text.splitlines()], False
+        return rows + pieces(data.decode(codec, "replace"), False), False
+    if b"\0" in data[:BINARY_PROBE]:
+        return rows + pieces(data, True), False
+    return rows + pieces(data.decode("utf-8", "replace"), False), False
 
 
-def scan(repo, entries):
-    groups = {name: {"lines": 0, "files": 0} for name in GROUP_NAMES}
+def scan(repo, entries, compiled):
+    """Counts per group over `compiled` ([(group, regex)], a group may hold several);
+    a line counts once per group it matches."""
+    order = list(dict.fromkeys(name for name, _ in compiled))
+    groups = {name: {"lines": 0, "files": 0} for name in order}
     outside, oversize = [], 0
     for path in files(repo):
-        counts = dict.fromkeys(GROUP_NAMES, 0)
+        counts = dict.fromkeys(order, 0)
+        live = [(name, rx) for name, rx in compiled
+                if not (name in RECORDS_SKIP and path.startswith(RECORDS))]
         lines, big = read_lines(path, os.path.join(repo, path))
         oversize += big
         for line, names in lines:
-            for name, rx in COMPILED:
-                if name not in names:
-                    continue
-                if name in RECORDS_SKIP and path.startswith(RECORDS):
+            hit = set()
+            for name, rx in live:
+                if name in hit or (names is not ALL and name not in names):
                     continue
                 if rx.search(line):
-                    counts[name] += 1
-        for name in GROUP_NAMES:
+                    hit.add(name)
+            for name in hit:
+                counts[name] += 1
+        for name in order:
             if not counts[name]:
                 continue
             groups[name]["lines"] += counts[name]
@@ -285,7 +311,7 @@ def scan(repo, entries):
 
 def render(result):
     rows = ["%-8s %6s %6s" % ("group", "lines", "files")]
-    for name in GROUP_NAMES:
+    for name in result["groups"]:
         g = result["groups"][name]
         rows.append("%-8s %6d %6d" % (name, g["lines"], g["files"]))
     if result["files"]:
@@ -294,7 +320,7 @@ def render(result):
         for f in result["files"]:
             rows.append("%s  %s  %d" % (f["path"], f["group"], f["lines"]))
     if result["oversize"]:
-        rows.append("oversize (scanned by path only): %d" % result["oversize"])
+        rows.append("oversize (streamed): %d" % result["oversize"])
     rows.append("hits outside allowlist: %d" % result["hits_outside_allowlist"])
     return "\n".join(rows)
 
@@ -307,17 +333,17 @@ def main(argv):
         if not os.path.isabs(allow):
             allow = os.path.join(repo, allow)
         private = load_private(private_path(), opts["require_private"])
-        build_groups(private)
-        entries = load_allow(allow, opts["allow"] is not None, private is not None)
-        result = scan(repo, entries)
-    except NoPrivate as exc:
-        sys.stderr.write("%s\n" % exc.args[0])
+        compiled = COMPILED + private
+        known = [name for name, _ in compiled]
+        entries = load_allow(allow, opts["allow"] is not None, known, bool(private))
+        result = scan(repo, entries, compiled)
+    except NoPrivateList as exc:
+        sys.stderr.write("hygiene: %s\n" % exc.args[0])
         return 2
     except UsageError as exc:
         if exc.args and exc.args[0]:
             sys.stderr.write("hygiene: %s\n" % exc.args[0])
-        sys.stderr.write("usage: hygiene [--json] [--allow FILE] [--repo DIR]"
-                         " [--require-private]\n")
+        sys.stderr.write("usage: hygiene [--json] [--allow FILE] [--repo DIR] [--require-private]\n")
         return 1
     if opts["json"]:
         print(json.dumps(result, indent=1, sort_keys=True))
