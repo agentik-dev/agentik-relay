@@ -76,8 +76,8 @@ var UserHome = func() (string, error) {
 }
 
 // PidDir is the pid file's fixed directory, effects.StateIn of
-// <home>/.local/state (agentik-relay, else the old agentik-relay when only it
-// exists) with home from UserHome; an error when that home is not absolute. A
+// <home>/.local/state (agentik-relay, else the old name's folder, effects' oldStateName, when
+// only it exists) with home from UserHome; an error when that home is not absolute. A
 // binary linked with LockPortLink and without PidHomeLink refuses (AR36
 // ruling 2): its port is its own, and the account's real pid dir, read
 // from the user database whatever HOME says, may name a live relay.

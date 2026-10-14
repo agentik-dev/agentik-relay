@@ -190,7 +190,7 @@ func StateDir(env func(string) string) string {
 }
 
 // StateIn is the relay's state dir under base: base/agentik-relay, else
-// the old base/agentik-relay when only it exists (agentik-r1 §6.3 c2).
+// the old name's folder (oldStateName) when only it exists (agentik-r1 §6.3 c2).
 func StateIn(base string) string {
 	return NewElseOld(osExists, filepath.Join(base, stateName), filepath.Join(base, oldStateName))
 }
