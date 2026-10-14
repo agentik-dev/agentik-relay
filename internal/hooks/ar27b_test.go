@@ -73,7 +73,7 @@ func TestAR27B_1_HelperIsRow(t *testing.T) {
 			{"claude -p hi &", "helper"},
 			{"git push origin HEAD", "push"},
 			{"relay run --rows x", "nested-run"},
-			{"claude-session start", "claude-session"},
+			{"claude-session start", "nested-session"},
 			{"CLAUDE_SESSION_DEPTH=2 CLAUDE_SESSION_HELPER=1 claude -p hi --max-turns 1 --max-budget-usd 1", "helper"},
 			{"CLAUDE_SESSION_DEPTH=3 CLAUDE_SESSION_HELPER=1 claude -p hi --max-turns 1 --max-budget-usd 1", "helper"},
 			{"tmux new -d claude -p hi", "detached-server"},

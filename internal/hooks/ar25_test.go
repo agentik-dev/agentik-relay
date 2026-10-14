@@ -65,7 +65,7 @@ func TestAR25_0_MarkersKept(t *testing.T) {
 		{"CLAUDE_SESSION_DEPTH=3 true", "markers"}, // AR27B act 1: a marker's name is only read
 		{"tmux new-window -d claude", "detached-server"},
 		{"screen -dm x", "detached-server"},
-		{"claude-session start", "claude-session"},
+		{"claude-session start", "nested-session"},
 		{"command tmux ls", "detached-server"},
 		{"git push origin HEAD &", "push"},
 	} {
