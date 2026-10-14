@@ -27,7 +27,7 @@ With the layer fresh, every value is what it is today. With it skipped, the rela
 
 ## 4. The proof
 
-**P1, the incident, 2026-10-14 05:50.** The stale session's `resolved.json` lists the consumer's `config.yaml` at sha256 `59865fd0…`; the file on main now hashes `f62b042b…` and holds `verify_seconds: 3600`. Under §2 the layer is skipped and the repo's layer gives 3600.
+**P1, the incident, 2026-10-14 05:40.** The stale session's `resolved.json` lists the consumer's `config.yaml` at sha256 `59865fd0…`; the file on main now hashes `f62b042b…` and holds `verify_seconds: 3600`. Under §2 the layer is skipped and the repo's layer gives 3600.
 
 **P2, the census, the same minute.** Of the 779 `resolved.json` files in the session plugin's state dir, all list `provider.inputs`. 154 are fresh and 625 are stale. In 428 of the stale ones, a repo's `config.yaml` changed: these §2 skips. Of the other 197, 190 changed only through a shipped `profiles.yaml` (whose path names the plugin's install tree, which an install replaces), three only through the overlay and four through both: §2 reads these, as it checks neither. 103 fresh ones list a repo file other than the one the relay reads, from a worktree's sitting: §2 skips these. Most are ended sessions, and any of them is the layer of a night its sitting starts.
 
@@ -42,6 +42,6 @@ With the layer fresh, every value is what it is today. With it skipped, the rela
 - **Cost.** Each `LoadConfig` hashes two small files, on every verb and every `status --watch` tick. Not measured; small.
 - **The other plugins.** decisions and respeak read the session layer under the same §3 and freeze the same way. One sentence in conventions §3 would bind them too. It is filed with the session plugin, not taken here.
 
-## 7. The refuter round (2026-10-14, 05:56 to 06:04)
+## 7. The refuter round (2026-10-14, 05:43 to 05:51)
 
 One adversary (opus), read-only, at e260952: PASS, 0 blocking, 9 notes. No contradiction with the relay's entries 1 to 12, portfolio entries 25 and 26, or GUIDE §3. P1 and P2 re-ran to the same numbers. Taken in the revision: note 2 (P2's "the rest" was 190 of 197), note 3 (a worktree's sitting is fresh against its own files while the relay reads the root's: §2.1 requires the relay's paths), note 4 (a sitting's first prompt writes `_prompts_since_checkpoint` to the overlay, an input, so r1 skipped every live layer: §2.1 checks the relay's files only), note 5 (the relay picked the local file per file, the plugin per folder: §2.2), note 6 (`$XDG_STATE_HOME` with `~`: §2.4). Notes 1, 7, 8 and 9 confirm the record; note 7 (the YAML reader reads every real file's inputs, null as `null`) is in §3, and note 8's three tests are in §5.
