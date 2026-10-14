@@ -847,12 +847,14 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 	// no window, no pick and no count. Limited again, it pauses again. Its
 	// stdin is resumeStdin's: the row's, a blank line, then the RESUME
 	// block (AR68 ruling 1), so the child reads the part's ceilings, not
-	// only CONTEXT's.
+	// only CONTEXT's. The part is the row's sitting (AR77 ruling 1): no
+	// reason until its verdict, and status's counts its own.
 	continueRow := func(id string) {
 		s := n.Sittings[id]
 		if s.State, bug = stepSitting(s.State, relay.Spawn, bug); bug != nil {
 			return
 		}
+		s.Reason = ""
 		delete(accountBy, id)
 		delete(killedBy, id)
 		k := kits[id]
@@ -872,6 +874,10 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 		views[id] = viewOf(st)
 		lg.mu.Lock()
 		delete(lg.ended, id) // running again: status counts its elapsed on from part 1's start (the fix round's F1)
+		// The part's own lines fill its counts; the spend (usd, held) keeps every part's.
+		if rs := lg.rows[id]; rs != nil {
+			rs.Turns, rs.Context, rs.CostUSD, rs.Unread, rs.LastTool, rs.Builders, rs.Cause = 0, 0, 0, false, "", 0, ""
+		}
 		lg.mu.Unlock()
 		launch(id, &cp, st, stdin, ro, false)
 	}

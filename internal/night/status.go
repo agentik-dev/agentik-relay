@@ -139,10 +139,14 @@ const inFlight = string(relay.Running)
 // A pick that never spawned (it could not stage) is no sitting. The rows
 // come back in the order their `sitting` lines were written, then the ones
 // in flight in spawn order; total sums them (its context is the largest).
-// night "" takes every line.
+// night "" takes every line. A `sitting` line the night paused on (`limit:
+// paused`) is its part's history, `paused` (AR77 ruling 4); the night's
+// `stop` line turns one whose row spawned no part after it `failed`, the
+// halt.
 func nightBurn(lines []map[string]any, night string) (rows []Burn, total Burn) {
 	rows = []Burn{}
 	open := map[string]*Burn{}
+	paused := map[string]int{} // each row's paused entry in rows, until its next part
 	var order []string
 	for _, l := range lines {
 		if night != "" && l["night"] != night {
@@ -156,6 +160,12 @@ func nightBurn(lines []map[string]any, night string) (rows []Burn, total Burn) {
 				order = append(order, row)
 			}
 			open[row] = &Burn{Row: row, State: inFlight, Sittings: 1}
+			delete(paused, row)
+		case "stop":
+			for _, i := range paused {
+				rows[i].State = string(relay.Failed)
+			}
+			clear(paused)
 		case "turn":
 			if b != nil {
 				b.Turns, b.Context = int(number(l["turns"])), int(number(l["context"]))
@@ -190,6 +200,10 @@ func nightBurn(lines []map[string]any, night string) (rows []Burn, total Burn) {
 					b.Builders++
 					b.BuilderOutput += int(number(m["output_tokens"]))
 				}
+			}
+			delete(paused, row)
+			if lim, _ := l["limit"].(string); lim == "paused" {
+				b.State, paused[row] = string(relay.Paused), len(rows)
 			}
 			rows = append(rows, b)
 		}
@@ -232,8 +246,8 @@ func buildStatus(n *Night, ids []string, rows map[string]*RowStatus, burn Burn, 
 	if !until.IsZero() {
 		next = append(next, "until-reached at "+until.Format("15:04"))
 	}
-	if o.MaxSittings > 0 {
-		next = append(next, fmt.Sprintf("count-reached after %d sittings (%d so far)", o.MaxSittings, count))
+	if o.MaxSittings > 0 { // rows staged, while the burn counts parts (AR77 ruling 2)
+		next = append(next, fmt.Sprintf("count-reached after %d rows staged (%d so far)", o.MaxSittings, count))
 	}
 	if o.MaxUSD > 0 {
 		next = append(next, fmt.Sprintf("budget-reached at $%.2f ($%.2f so far)", o.MaxUSD, usd+held))
