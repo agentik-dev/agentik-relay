@@ -69,12 +69,12 @@ func TestAR59_4_DoctorSuggests(t *testing.T) {
 	}
 	code, out, _ := do()
 	if code != exitOK || !strings.Contains(out, "; limit: 900 s (unset); ") ||
-		!strings.Contains(out, "suggest: verify_seconds: 900 in "+effects.RepoConfigFile+", section agent-relay\n") {
+		!strings.Contains(out, "suggest: verify_seconds: 900 in "+effects.RepoConfigFile+", section relay\n") {
 		t.Fatalf("plain = %d %q", code, out)
 	}
 	cfg := filepath.Join(repo, effects.RepoConfigFile)
 	os.MkdirAll(filepath.Dir(cfg), 0o755)
-	if err := os.WriteFile(cfg, []byte("agent-relay:\n  verify_seconds: 1800\n"), 0o644); err != nil {
+	if err := os.WriteFile(cfg, []byte("relay:\n  verify_seconds: 1800\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if rep := report(); rep.Limit != 1800 || rep.Suggest != 900 {
@@ -99,7 +99,7 @@ func TestAR59_4_DoctorSuggests(t *testing.T) {
 	if code, out, _ = do("--line", "echo probe"); code != exitOK || !strings.Contains(out, "suggest: none: --line is not the verify line\n") {
 		t.Fatalf("--line = %d %q, want no suggestion", code, out)
 	}
-	if err := os.WriteFile(cfg, []byte("agent-relay:\n  caffeinate: maybe\n"), 0o644); err != nil {
+	if err := os.WriteFile(cfg, []byte("relay:\n  caffeinate: maybe\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	code, out, _ = do("--json")

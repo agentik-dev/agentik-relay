@@ -83,7 +83,7 @@ func fixture(t *testing.T) *fx {
 	f := &fx{Root: filepath.Join(tmp, "repo"), State: filepath.Join(tmp, "state"), Home: filepath.Join(tmp, "home"),
 		Bin: filepath.Join(tmp, "bin"), Fakes: filepath.Join(tmp, "fakes"), Load: filepath.Join(tmp, "load"),
 		Rec: filepath.Join(tmp, "rec"), words: "e2e words " + filepath.Base(tmp)}
-	for _, d := range []string{f.Root, f.State, filepath.Join(f.Home, ".config", "agent-relay"), f.Bin, f.Fakes, f.Rec} {
+	for _, d := range []string{f.Root, f.State, filepath.Join(f.Home, ".config", "agentik", "relay"), f.Bin, f.Fakes, f.Rec} {
 		must(t, os.MkdirAll(d, 0o755))
 	}
 	build(t, filepath.Join(f.Bin, "relay"), ".")
@@ -94,7 +94,7 @@ func fixture(t *testing.T) *fx {
 	must(t, os.WriteFile(filepath.Join(f.Home, ".gitconfig"), []byte("[user]\n\tname = E2E\n\temail = e2e@example.invalid\n"), 0o644))
 	// The fake must be the relay's direct child: caffeinate turns a signal
 	// into exit 137 (the charter's choice 1).
-	must(t, os.WriteFile(filepath.Join(f.Home, ".config", "agent-relay", "config.yaml"), []byte("caffeinate: false\n"), 0o644))
+	must(t, os.WriteFile(filepath.Join(f.Home, ".config", "agentik", "relay", "config.yaml"), []byte("caffeinate: false\n"), 0o644))
 	f.git(t, "init", "-q", "-b", "main")
 	must(t, os.WriteFile(filepath.Join(f.Root, "Makefile"), []byte("check: ; @test ! -e history/sessions/NEXT\n"), 0o644))
 	must(t, os.WriteFile(filepath.Join(f.Root, ".gitignore"), []byte(".claude/\n"), 0o644))
@@ -240,7 +240,7 @@ func (f *fx) run(t *testing.T, args ...string) (int, string) {
 // ledger is every line of the state's ledger, the day files in order.
 func (f *fx) ledger(t *testing.T) []map[string]any {
 	t.Helper()
-	files, _ := filepath.Glob(filepath.Join(f.State, "agent-relay", "ledger", "*"))
+	files, _ := filepath.Glob(filepath.Join(f.State, "agentik-relay", "ledger", "*"))
 	sort.Strings(files)
 	var lines []map[string]any
 	for _, p := range files {
@@ -516,7 +516,7 @@ func rowStates(st map[string]any) string {
 // (root-<sha1>, AR13 act 4) is a flock anchor that outlives its holder.
 func (f *fx) noLocks(t *testing.T) {
 	t.Helper()
-	locks, _ := filepath.Glob(filepath.Join(f.State, "agent-relay", "locks", "*"))
+	locks, _ := filepath.Glob(filepath.Join(f.State, "agentik-relay", "locks", "*"))
 	var left []string
 	for _, l := range locks {
 		if !strings.HasPrefix(filepath.Base(l), "root-") {
@@ -794,7 +794,7 @@ func TestE2E_7_Soak(t *testing.T) {
 			t.Errorf("%s: no env dump", r)
 		}
 	}
-	if sj, _ := filepath.Glob(filepath.Join(f.State, "agent-relay", "*", "*", "status.json")); len(sj) == 0 {
+	if sj, _ := filepath.Glob(filepath.Join(f.State, "agentik-relay", "*", "*", "status.json")); len(sj) == 0 {
 		t.Errorf("no status.json under the state")
 	}
 	f.noLocks(t)

@@ -14,8 +14,8 @@
 | act | what | state |
 |---|---|---|
 | 1 | guards on every spelling (c12); the session guard `nested-session`; `charter` exempt | done `dccd8a9` |
-| 2 | vendor `scripts/{agentik,hygiene,bounded}` + `vendored.sha256`; `make hygiene` checks it | done |
-| 3 | paths new, else old (c1-c4, c6); `Config.Warnings` | |
+| 2 | vendor `scripts/{agentik,hygiene,bounded}` + `vendored.sha256`; `make hygiene` checks it | done `e62cd14` |
+| 3 | paths new, else old (c1-c4, c6); `Config.Warnings` | done |
 | 4 | one resume line (`relay.ResumeLine`, `ResumeRow`); the alias note | |
 | 5 | `cmd/agentik-relay`, the Makefile, the plugin (c11, c14, D2, D3) | |
 | 6 | the sweep to `renamed` 0 | |
@@ -30,6 +30,9 @@ Rulings beyond the packet, one line each:
   `scripts/agentik` takes its tool as its first argument.
 - Act 2: `internal/hygiene`'s hit exits read 1 (four checks), its bad-line exit 2 (one);
   `--require-private` stays 2.
+- Act 3: c4 warns whenever the repo's old file exists (read or not); an old `agent-relay` section
+  alone is read without a warning (c6 warns only with both); the pid door checks PidDir's path
+  and both spellings beside it; tests that used an old path as the default take the new one.
 
 ## Handover
 
@@ -37,7 +40,7 @@ Rulings beyond the packet, one line each:
 
 ## Next act
 
-Act 3: the paths, new else old.
+Act 4: one resume line; the alias note.
 
 ## Exit
 

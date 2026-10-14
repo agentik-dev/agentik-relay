@@ -1185,8 +1185,9 @@ var PidDir func() (string, error)
 // `~/` read under HOME, resolved against cwd when relative and Cleaned, is
 // denied when an element is .git (a worktree's .git file, a root's .git
 // dir; any case, as the Mac's file system folds it), or it lies in the
-// state root (stateRoot, as the relay resolves it) or the account's pid
-// dir (PidDir), or it names a .claude element (claudeIn, AR27B act 3).
+// state root (either spelling under stateBase, agentik-r1 §6.3 c2) or the
+// account's pid dir (PidDir's, either spelling), or it names a .claude
+// element (claudeIn, AR27B act 3).
 // Roots and path are compared as spelled and again with
 // their existing prefixes' symlinks resolved (a /tmp root written through
 // /private/tmp); a symlink made after the call still walks past it: the
@@ -1217,12 +1218,23 @@ func fileDoor(path, cwd string, env func(string) string) (Guard, bool) {
 		}
 		return within(root, path) || within(resolved(root), real)
 	}
-	if under(stateRoot(env)) {
-		return StateRoot, true
+	if base := stateBase(env); base != "" {
+		for _, n := range stateNames { // both spellings, whichever exists (§6.3 c2)
+			if under(filepath.Join(base, n)) {
+				return StateRoot, true
+			}
+		}
 	}
 	if PidDir != nil {
-		if dir, err := PidDir(); err == nil && under(dir) {
-			return PidLock, true
+		if dir, err := PidDir(); err == nil {
+			if under(dir) {
+				return PidLock, true
+			}
+			for _, n := range stateNames {
+				if under(filepath.Join(filepath.Dir(dir), n)) {
+					return PidLock, true
+				}
+			}
 		}
 	}
 	return Guard{}, false

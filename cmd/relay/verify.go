@@ -69,7 +69,7 @@ func doctorVerify(dir, line string, asJSON bool, stdout, stderr io.Writer) int {
 			// a red line's text keeps its four lines, `log:` the fourth.
 			suggest := "none: " + why
 			if rep.Suggest > 0 {
-				suggest = fmt.Sprintf("verify_seconds: %d in %s, section agent-relay", rep.Suggest, effects.RepoConfigFile)
+				suggest = fmt.Sprintf("verify_seconds: %d in %s, section relay", rep.Suggest, effects.RepoConfigFile)
 			}
 			limit := fmt.Sprintf("%d s (%s)", rep.Limit, from)
 			if rep.Limit == 0 {

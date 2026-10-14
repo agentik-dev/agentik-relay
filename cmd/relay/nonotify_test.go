@@ -22,7 +22,7 @@ func TestNoNotify_OrchestrateNeedsNoTopic(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(top, "relay", "queue.yaml"), []byte(queue), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	os.Remove(filepath.Join(getenv("HOME"), ".config", "agent-relay", "config.yaml"))
+	os.Remove(filepath.Join(getenv("HOME"), ".config", "agentik", "relay", "config.yaml"))
 	l.Prior = l.Prior[:1]
 
 	if why := orchestrateRefusalFor(false); !strings.Contains(why, "no ntfy url and topic") {

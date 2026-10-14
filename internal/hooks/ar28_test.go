@@ -18,7 +18,7 @@ func TestAR28_2_PostToolUseAsksStop(t *testing.T) {
 	const session = "5f0c1a2b-0000-4000-8000-000000000001"
 	row := map[string]string{"XDG_STATE_HOME": state, "RELAY_ROW": "a1"}
 	path := SoftPath(func(k string) string { return row[k] }, session)
-	if path != filepath.Join(state, "agent-relay", "sessions", session, "soft.json") {
+	if path != filepath.Join(state, "agentik-relay", "sessions", session, "soft.json") {
 		t.Fatalf("SoftPath %q is not beside start.json", path)
 	}
 	good := []byte(`{"ceiling":130000,"context":118000,"soft":117000,"turns":2}` + "\n")

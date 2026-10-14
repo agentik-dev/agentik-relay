@@ -158,9 +158,14 @@ func SoftPath(env func(string) string, session string) string {
 	return filepath.Join(filepath.Dir(p), "soft.json")
 }
 
-// stateRoot is ${XDG_STATE_HOME:-~/.local/state}/agent-relay, the relay's
-// state root as effects.StateDir resolves it; "" when no base is known.
-func stateRoot(env func(string) string) string {
+// stateNames are the state root's names under its base, the new first
+// (agentik-r1 §6.3 c2): the folder moves only in the cold window, so the
+// root is the new one when it exists, else the old when it exists, else
+// the new; the file door denies both.
+var stateNames = [2]string{"agentik-relay", "agent-relay"}
+
+// stateBase is ${XDG_STATE_HOME:-~/.local/state}; "" when no base is known.
+func stateBase(env func(string) string) string {
 	base := env("XDG_STATE_HOME")
 	if base == "" {
 		home := env("HOME")
@@ -169,7 +174,28 @@ func stateRoot(env func(string) string) string {
 		}
 		base = filepath.Join(home, ".local", "state")
 	}
-	return filepath.Join(base, "agent-relay")
+	return base
+}
+
+// stateRoot is <stateBase>/agentik-relay, else the old agent-relay when
+// only it exists: the relay's state root as effects.StateDir resolves it;
+// "" when no base is known.
+func stateRoot(env func(string) string) string {
+	base := stateBase(env)
+	if base == "" {
+		return ""
+	}
+	return newElseOld(filepath.Join(base, stateNames[0]), filepath.Join(base, stateNames[1]))
+}
+
+// newElseOld is §6.3's rule for a renamed path, as effects.NewElseOld
+// reads it on the real file system (hooks imports nothing of the relay).
+func newElseOld(nw, old string) string {
+	exists := func(p string) bool { _, err := os.Stat(p); return err == nil }
+	if !exists(nw) && exists(old) {
+		return old
+	}
+	return nw
 }
 
 // loadState reads start.json; ok is false when it is absent or unreadable.

@@ -42,8 +42,8 @@ func TestAR66_2_PausedSittingParksNothing(t *testing.T) {
 	const q = "version: 1\ndefaults: {model: m, turns: 10, context: 20000, usd: 5, wall: 1h, merge: merge-on-green, device: never}\nwords: \"\"\nrows:\n" +
 		"  - id: o\n    kind: orchestrator\n    prompt: brief.md\n    sections: [How this runs]\n"
 	for p, text := range map[string]string{
-		filepath.Join(home, ".config", "agent-relay", "config.yaml"): "ntfy:\n  url: https://ntfy.invalid\n  topic: relay-test\n",
-		filepath.Join(top, "relay", "queue.yaml"):                    q,
+		filepath.Join(home, ".config", "agentik", "relay", "config.yaml"): "ntfy:\n  url: https://ntfy.invalid\n  topic: relay-test\n",
+		filepath.Join(top, "relay", "queue.yaml"):                         q,
 	} {
 		os.MkdirAll(filepath.Dir(p), 0o755)
 		if err := os.WriteFile(p, []byte(text), 0o644); err != nil {

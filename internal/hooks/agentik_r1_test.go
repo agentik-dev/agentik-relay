@@ -1,6 +1,8 @@
 package hooks
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -62,5 +64,57 @@ func TestAgentikR1_1_HelperDeniesEverySpelling(t *testing.T) {
 				t.Errorf("helper %q (row %v) = %q; want allowed", cmd, row, got)
 			}
 		}
+	}
+}
+
+// TestAgentikR1_3_StateRootNewElseOld (agentik-r1 §6.3 c2; ruling 3): the
+// hooks' state root is agentik-relay when it exists, else agent-relay when
+// it exists, else agentik-relay; in a row the file door denies both
+// spellings of the state root and of the pid dir, whichever exists.
+func TestAgentikR1_3_StateRootNewElseOld(t *testing.T) {
+	base := t.TempDir()
+	env := func(k string) string {
+		switch k {
+		case "XDG_STATE_HOME":
+			return base
+		case "RELAY_ROW":
+			return "agentik-r1-relay"
+		}
+		return ""
+	}
+	nw, old := filepath.Join(base, "agentik-relay"), filepath.Join(base, "agent-relay")
+	if got := stateRoot(env); got != nw {
+		t.Errorf("neither: stateRoot = %q, want %q", got, nw)
+	}
+	if err := os.Mkdir(old, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if got := stateRoot(env); got != old {
+		t.Errorf("the old only: stateRoot = %q, want %q", got, old)
+	}
+	if got, want := SoftPath(env, "s1"), filepath.Join(old, "sessions", "s1", "soft.json"); got != want {
+		t.Errorf("the old only: SoftPath = %q, want %q", got, want)
+	}
+	if err := os.Mkdir(nw, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if got := stateRoot(env); got != nw {
+		t.Errorf("both: stateRoot = %q, want %q", got, nw)
+	}
+	home := t.TempDir()
+	was := PidDir
+	t.Cleanup(func() { PidDir = was })
+	PidDir = func() (string, error) { return filepath.Join(home, ".local", "state", "agentik-relay"), nil }
+	for _, p := range []string{
+		filepath.Join(nw, "x"), filepath.Join(old, "ledger", "x"),
+		filepath.Join(home, ".local", "state", "agent-relay", "relay.pid"),
+		filepath.Join(home, ".local", "state", "agentik-relay", "relay.pid"),
+	} {
+		if g, ok := fileDoor(p, base, env); !ok || g.Name != StateRoot.Name && g.Name != PidLock.Name {
+			t.Errorf("fileDoor(%q) = %q, %v; want the state root or the pid lock", p, g.Name, ok)
+		}
+	}
+	if g, ok := fileDoor(filepath.Join(base, "agentik-relayx", "y"), base, env); ok {
+		t.Errorf("a sibling of the state root is denied by %s", g.Name)
 	}
 }

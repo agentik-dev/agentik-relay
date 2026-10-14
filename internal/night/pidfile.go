@@ -75,8 +75,9 @@ var UserHome = func() (string, error) {
 	return u.HomeDir, nil
 }
 
-// PidDir is the pid file's fixed directory, <home>/.local/state/agent-relay
-// with home from UserHome; an error when that home is not absolute. A
+// PidDir is the pid file's fixed directory, effects.StateIn of
+// <home>/.local/state (agentik-relay, else the old agent-relay when only it
+// exists) with home from UserHome; an error when that home is not absolute. A
 // binary linked with LockPortLink and without PidHomeLink refuses (AR36
 // ruling 2): its port is its own, and the account's real pid dir, read
 // from the user database whatever HOME says, may name a live relay.
@@ -91,7 +92,7 @@ func PidDir() (string, error) {
 	if !filepath.IsAbs(home) {
 		return "", fmt.Errorf("the account's home %q is not absolute", home)
 	}
-	return filepath.Join(home, ".local", "state", "agent-relay"), nil
+	return effects.StateIn(filepath.Join(home, ".local", "state")), nil
 }
 
 // The Write door denies the pid dir wherever XDG_STATE_HOME points

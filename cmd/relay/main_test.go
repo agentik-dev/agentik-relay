@@ -354,7 +354,7 @@ func TestGateVerb(t *testing.T) {
 	for _, c := range sh.Calls() {
 		// verify: auto is probed on main, once (ADV6-10); every line runs in
 		// a fresh tree under the state root's gate/ (AR17A act 1).
-		if !strings.Contains(c, "/agent-relay/gate/fresh-") && c != top+": make -n check >/dev/null 2>&1" {
+		if !strings.Contains(c, "/agentik-relay/gate/fresh-") && c != top+": make -n check >/dev/null 2>&1" {
 			t.Fatalf("an acceptance line ran outside the row's worktree: %s", c)
 		}
 	}
@@ -1061,7 +1061,7 @@ func TestNested(t *testing.T) {
 	if b, _ := os.ReadFile(count); string(b) != "x\n" {
 		t.Fatalf("the line ran %d times; want once", strings.Count(string(b), "x"))
 	}
-	days, _ := filepath.Glob(filepath.Join(effects.LedgerDir(filepath.Join(inner, "agent-relay")), "*.jsonl"))
+	days, _ := filepath.Glob(filepath.Join(effects.LedgerDir(filepath.Join(inner, "agentik-relay")), "*.jsonl"))
 	plans := 0
 	for _, d := range days {
 		b, _ := os.ReadFile(d)

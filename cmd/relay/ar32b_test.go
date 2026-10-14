@@ -40,7 +40,7 @@ func TestAR32B_4_OrchestrateAcceptsBranchOnly(t *testing.T) {
 	}
 	const head = "version: 1\ndefaults: {model: m, turns: 10, context: 20000, usd: 5, wall: 1h, merge: branch-only, device: never}\nwords: \"\"\nrows:\n"
 	const orch = "  - id: o\n    kind: orchestrator\n    prompt: brief.md\n    sections: [How this runs]\n"
-	put(filepath.Join(getenv("HOME"), ".config", "agent-relay", "config.yaml"), "ntfy:\n  url: https://ntfy.invalid\n  topic: relay-test\n")
+	put(filepath.Join(getenv("HOME"), ".config", "agentik", "relay", "config.yaml"), "ntfy:\n  url: https://ntfy.invalid\n  topic: relay-test\n")
 	put(filepath.Join(top, "relay", "queue.yaml"), head+orch)
 	l.Prior = l.Prior[:1]
 	if why := orchestrateRefusal(); why != "" {

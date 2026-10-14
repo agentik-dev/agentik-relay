@@ -27,7 +27,7 @@ func TestAR20_4_NestedByEnv(t *testing.T) {
 	// binary is linked to this binary's lock port), an ancestor of every
 	// binary it starts.
 	self := os.Getpid()
-	release, err := night.PidFile(filepath.Join(pidHome, ".local", "state", "agent-relay"))
+	release, err := night.PidFile(filepath.Join(pidHome, ".local", "state", "agentik-relay"))
 	if err != nil {
 		t.Fatal(err)
 	}

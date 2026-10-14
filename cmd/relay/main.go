@@ -279,7 +279,9 @@ func doctor(asJSON bool, stdout io.Writer) int {
 		if modeErr != nil {
 			unknown = append(unknown, modeErr.Error())
 		}
-		add("config", true, true, "unknown keys or values: %s", strings.Join(unknown, "; "))
+		add("config", true, true, "unknown keys or values: %s", strings.Join(append(unknown, cfg.Warnings...), "; "))
+	case len(cfg.Warnings) > 0: // agentik-r1 §6.3 c4, c6: an old name warns, never fails
+		add("config", true, true, "%d files read, old names: %s", len(cfg.Sources), strings.Join(cfg.Warnings, "; "))
 	default:
 		add("config", true, false, "%d files read, no unknown keys", len(cfg.Sources))
 	}

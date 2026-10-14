@@ -92,7 +92,7 @@ func TestAR32A_5_OrchestrateRefusals(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	cfg := filepath.Join(home, ".config", "agent-relay", "config.yaml")
+	cfg := filepath.Join(home, ".config", "agentik", "relay", "config.yaml")
 	good := func() {
 		write(cfg, "ntfy:\n  url: https://ntfy.invalid\n  topic: relay-test\n")
 		write(filepath.Join(top, "relay", "queue.yaml"), fmt.Sprintf(head, "merge-on-green")+orch)

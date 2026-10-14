@@ -18,7 +18,10 @@ import (
 // an error, unset compares nothing. Queue is the queue's clean path under
 // the repo (ar32a review round 2): LoadConfig makes it so once, an absolute
 // path under the repo relative to it, and a path that leaves the repo an
-// error, so every reader of the queue sees the one spelling.
+// error, so every reader of the queue sees the one spelling. Warnings are
+// the old names a layer still uses (agentik-r1 §6.3 c4, c6): the repo's old
+// file whenever it exists, and a file holding both sections; doctor's
+// config check warns on them, never fails.
 // VerifySeconds is the repo's verify limit (key `verify_seconds`, AR59 act
 // 1, the settled entry 10): an integer from 1 to MaxVerifySeconds; 0 is
 // unset, and VerifyLimit is then Timeout.
@@ -32,6 +35,7 @@ type Config struct {
 	VerifySeconds int
 	Unknown       []string
 	Sources       []string
+	Warnings      []string
 }
 
 // The shipped defaults (§7's tools, §3's queue path).
@@ -40,31 +44,46 @@ const (
 	DefaultQueue        = "relay/queue.yaml"
 )
 
-// The layer files. The repo's is the session plugin's config, whose
-// `agent-relay` section the relay reads; the session's resolved file is
-// named by $CLAUDE_CODE_SESSION_ID (R25-91 (3)).
+// The layer files, each new name beside its old (agentik-r1 §6.3 c1, c3,
+// c4, c6). The repo's is the session plugin's config, whose `relay`
+// section (else the old `agent-relay`) the relay reads; the session's
+// resolved file is named by $CLAUDE_CODE_SESSION_ID (R25-91 (3)). The state
+// dir's two names are StateIn's.
 const (
-	userConfig    = ".config/agent-relay/config.yaml"
-	repoConfig    = ".claude/claude-code-session/config.yaml"
-	sessionConfig = "claude-code-session/sessions/%s/resolved.yaml"
-	section       = "agent-relay"
+	userConfig       = ".config/agentik/relay/config.yaml"
+	oldUserConfig    = ".config/agent-relay/config.yaml"
+	repoConfig       = ".claude/agentik/config.yaml"
+	oldRepoConfig    = ".claude/claude-code-session/config.yaml"
+	sessionConfig    = "agentik-session/sessions/%s/resolved.yaml"
+	oldSessionConfig = "claude-code-session/sessions/%s/resolved.yaml"
+	section          = "relay"
+	oldSection       = "agent-relay"
+	stateName        = "agentik-relay"
+	oldStateName     = "agent-relay"
 )
 
-// RepoConfigFile is the repo's layer, relative to its root, whose
-// `agent-relay` section the relay reads; `doctor --verify` names it in its
-// suggestion (AR59 act 4).
+// RepoConfigFile is the repo's layer, relative to its root, whose `relay`
+// section the relay reads; `doctor --verify` names it in its suggestion
+// (AR59 act 4).
 const RepoConfigFile = repoConfig
 
-// ConfigPaths returns the layer files LoadConfig reads, lowest first; the session's
-// only when env names a session.
-func ConfigPaths(env func(string) string, repo string) []string {
-	paths := []string{filepath.Join(env("HOME"), userConfig), filepath.Join(repo, repoConfig)}
+// ConfigPaths returns the layer files LoadConfig reads, lowest first, each
+// the new file when it exists in fs, else the old when it exists, else the
+// new (NewElseOld); the session's only when env names a session.
+func ConfigPaths(fs FS, env func(string) string, repo string) []string {
+	home := env("HOME")
+	paths := []string{
+		NewElseOld(fs.Exists, filepath.Join(home, userConfig), filepath.Join(home, oldUserConfig)),
+		NewElseOld(fs.Exists, filepath.Join(repo, repoConfig), filepath.Join(repo, oldRepoConfig)),
+	}
 	if id := env("CLAUDE_CODE_SESSION_ID"); id != "" {
 		state := env("XDG_STATE_HOME")
 		if state == "" {
-			state = filepath.Join(env("HOME"), ".local", "state")
+			state = filepath.Join(home, ".local", "state")
 		}
-		paths = append(paths, filepath.Join(state, fmt.Sprintf(sessionConfig, filepath.Base(id))))
+		id = filepath.Base(id)
+		paths = append(paths, NewElseOld(fs.Exists, filepath.Join(state, fmt.Sprintf(sessionConfig, id)),
+			filepath.Join(state, fmt.Sprintf(oldSessionConfig, id))))
 	}
 	return paths
 }
@@ -74,7 +93,11 @@ func ConfigPaths(env func(string) string, repo string) []string {
 func LoadConfig(fs FS, env func(string) string, repo string) (Config, error) {
 	c := Config{Tmux: "auto", AllowedTools: DefaultAllowedTools, Caffeinate: true, Queue: DefaultQueue}
 	from := "defaults" // the layer that set the queue path
-	for i, p := range ConfigPaths(env, repo) {
+	// c4: doctor flags the old repo file whenever it exists.
+	if old := filepath.Join(repo, oldRepoConfig); fs.Exists(old) {
+		c.Warnings = append(c.Warnings, fmt.Sprintf("%s: the old path; move it to %s", old, RepoConfigFile))
+	}
+	for i, p := range ConfigPaths(fs, env, repo) {
 		if !fs.Exists(p) {
 			continue
 		}
@@ -91,6 +114,13 @@ func LoadConfig(fs FS, env func(string) string, repo string) (Config, error) {
 		node := root
 		if i > 0 { // the repo's and the session's files hold a section
 			sec, ok := root.Get(section)
+			old, oldOK := root.Get(oldSection)
+			switch { // c6: with both present, relay wins with a warning
+			case ok && oldOK:
+				c.Warnings = append(c.Warnings, fmt.Sprintf("%s: sections %s and %s; %s wins", p, section, oldSection, section))
+			case oldOK:
+				sec, ok = old, true
+			}
 			if !ok {
 				continue
 			}

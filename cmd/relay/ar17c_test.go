@@ -40,17 +40,17 @@ func newSignalWorld(t *testing.T, branch bool) signalWorld {
 	if err := syscall.Mkfifo(fifo, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	for _, d := range []string{filepath.Join(w.root, "relay"), filepath.Join(w.root, "design", "packets"), w.state, filepath.Join(home, ".config", "agent-relay")} {
+	for _, d := range []string{filepath.Join(w.root, "relay"), filepath.Join(w.root, "design", "packets"), w.state, filepath.Join(home, ".config", "agentik", "relay")} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}
 	files := map[string]string{
-		filepath.Join(home, ".gitconfig"):                            "[user]\n\tname = relay\n\temail = \n",
-		filepath.Join(home, ".config", "agent-relay", "config.yaml"): "caffeinate: false\n",
-		filepath.Join(w.root, "Makefile"):                            "check: ; @sleep 45\n",
-		filepath.Join(w.root, ".gitignore"):                          ".claude/\n",
-		filepath.Join(w.root, "design", "packets", "r.md"):           fmt.Sprintf(ar17cPacket, fifo),
+		filepath.Join(home, ".gitconfig"):                                 "[user]\n\tname = relay\n\temail = \n",
+		filepath.Join(home, ".config", "agentik", "relay", "config.yaml"): "caffeinate: false\n",
+		filepath.Join(w.root, "Makefile"):                                 "check: ; @sleep 45\n",
+		filepath.Join(w.root, ".gitignore"):                               ".claude/\n",
+		filepath.Join(w.root, "design", "packets", "r.md"):                fmt.Sprintf(ar17cPacket, fifo),
 		filepath.Join(w.root, "relay", "queue.yaml"): "version: 1\n" +
 			"defaults: {model: claude-opus-5-5, turns: 100, context: 130000, usd: 15, wall: 2m,\n" +
 			"           merge: merge-on-green, device: never, verify: auto}\n" +
@@ -107,7 +107,7 @@ func signalMid(t *testing.T, args ...string) {
 		if time.Now().After(end) {
 			t.Fatalf("no groups.json recorded a line in 30 s; output:\n%s", out.String())
 		}
-		files, _ := filepath.Glob(filepath.Join(w.state, "agent-relay", "nights", "*", "groups.json"))
+		files, _ := filepath.Glob(filepath.Join(w.state, "agentik-relay", "nights", "*", "groups.json"))
 		for _, f := range files {
 			var doc struct {
 				Groups []struct {

@@ -33,7 +33,7 @@ func TestAR22_1_UnpinnedToolExit2(t *testing.T) {
 			t.Errorf("relay %v = %d %q, want 2 unpinned-tool", args, code, errb.String())
 		}
 	}
-	if _, err := os.Stat(filepath.Join(state, "agent-relay", "home")); err == nil {
+	if _, err := os.Stat(filepath.Join(state, "agentik-relay", "home")); err == nil {
 		t.Errorf("a refused start made a relay home")
 	}
 	var out, errb bytes.Buffer
