@@ -600,3 +600,8 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 - `OSBand.Reset` reads `resetsAt` at the top level of band.json, as band-pacing-r1 §2.4 and the packet quote it; the relay reads none of the plugin's code, so a key moved inside the file reads `unchecked` and spawns, loud in the ledger but silent in `doctor` until AR81. (S4)
 - A hold the owner cut after an ask keeps its last verdict in `sitting.band.verdict`, and a row cut before its first ask has no band key (the fix round's finding 5): AR81's report counts these as holds that ended unspawned, not as spawns. (S4)
 - `OSBand.Ask` reads the tool's stdout and stderr into buffers with no size cap (`band.go`, the `cmd.Run` call): a tool that floods either holds it all in memory until the 10 s timeout. A cap (`io.LimitReader`-style writer) would bound it. (S4; the fix round's adversaries)
+
+## AR80's verify round (2026-10-14, the observer; S4)
+- Fix 1 (a stopped night cancels its unspawned rows) reaches band-less nights too: at 2a52536 a row waiting on its spawn spacing spawned 30 s after a sibling's no-commit; it now ends `skipped owner-stop`, a label that also names stops the owner never made, and the band-less case has no test.
+- `e2eConfig` sits between `TestMain`'s doc comment and `TestMain` (`cmd/agentik-relay/main_test.go`), so the comment no longer documents it; `TestAR80_12` checks `e2e_test.go` by matching its source text, which breaks easily.
+- The fix round touched files outside the packet's may-touch list (the review accepted them).
