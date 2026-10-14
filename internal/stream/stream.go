@@ -26,6 +26,7 @@ const (
 )
 
 // Event is one stream line, the fields §7 names lifted out; Raw is the line.
+// A Tally's Result is an Event too: every result event folded (AR83).
 type Event struct {
 	Type, Subtype    string
 	SessionID, Model string
@@ -68,7 +69,8 @@ type ToolUse struct{ Name, Summary string }
 // not seen before: one message streamed as several events is fresh once.
 // Usage totals every assistant message's tokens, the builders' too, each
 // message id once at its last usage (AR28): what the sitting burned when
-// no result event reads its cost.
+// no result event reads its cost. Result is every result event folded into
+// the first (AR83; Event.fold), CostUSD its cost.
 type Tally struct {
 	Turns, Context int
 	CostUSD        float64
@@ -230,8 +232,32 @@ func (t *Tally) Add(ev Event) {
 	case "result":
 		r := ev
 		r.Raw = nil
-		t.ResultSeen, t.Result, t.CostUSD = true, &r, ev.CostUSD
+		if t.Result != nil { // a later query's result (AR83): fold it into the first
+			f := *t.Result
+			f.fold(r)
+			r = f
+		}
+		t.ResultSeen, t.Result, t.CostUSD = true, &r, r.CostUSD
 	}
+}
+
+// fold folds ev, a later result event, into r (AR83): a child that takes
+// one more turn after a background command ends writes a result per query.
+// num_turns, duration_ms and the denials are per query and sum; the cost is
+// the process's running total, so the highest any result read, never a sum.
+// The end is the last result's (its tail and session), an error kept:
+// IsError when any result erred, Subtype the last erring result's, else the
+// last's.
+func (r *Event) fold(ev Event) {
+	r.NumTurns += ev.NumTurns
+	r.DurationMS += ev.DurationMS
+	r.Denials += ev.Denials
+	r.CostUSD = max(r.CostUSD, ev.CostUSD)
+	if ev.IsError || !r.IsError {
+		r.Subtype = ev.Subtype
+	}
+	r.IsError = r.IsError || ev.IsError
+	r.ResultTail, r.SessionID = ev.ResultTail, ev.SessionID
 }
 
 // MaxLine is the longest stream line Parse holds, in bytes (AR17C,
