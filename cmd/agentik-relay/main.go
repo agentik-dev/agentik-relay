@@ -412,6 +412,14 @@ var effectsFor = func(state, night string) effects.Effects {
 		Groups: groups}
 }
 
+// bandFor is the night's session band under the config's `band` key and
+// what the night-open line says of it (band-pacing-r1 §2.1; AR80 ruling
+// 2): resolved at the run verb's open, outside PinTools; a variable so a
+// test never runs the account's tool.
+var bandFor = func(mode string, env func(string) string) (effects.Band, string) {
+	return effects.ResolveBand(mode, env)
+}
+
 // plan validates the queue and every packet, resolves dependencies,
 // snapshots origin, measures the baseline on main in the root, and prints
 // each row's spawn line and the stop conditions (§9); it spawns nothing.
@@ -1344,6 +1352,7 @@ func runVerb(args []string, stdout, stderr io.Writer) int {
 	no.Merge = func(r queue.Row, g relay.Gate) (string, error) {
 		return gate.MergeIfGreen(fx, p.Root, g, r.ID, pd.q.Defaults.Verify, p.Verify)
 	}
+	fx.Band, no.Band = bandFor(pd.cfg.Band, getenv) // the night's only: effectsFor stays bandless (AR80 ruling 2)
 	n, err := night.Run(fx, spawner(pd.cfg), pd.q, no)
 	if n == nil {
 		return finish(exitUsage, err)

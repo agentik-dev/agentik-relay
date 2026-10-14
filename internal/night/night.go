@@ -85,6 +85,10 @@ type NightOptions struct {
 	// empty).
 	Orchestrate bool
 	QueuePath   string
+	// Band is what the night's open resolved the session band to: its
+	// file, `absent` or `off` (band-pacing-r1 §3; AR80 ruling 2; "" reads
+	// absent), on the night-open line; the band itself is fx.Band.
+	Band string
 }
 
 // ErrBug wraps a Step or NightStep error: the loop asked the machine for a
@@ -216,6 +220,18 @@ func (h *held) Start(sp effects.Spawn) (effects.Process, io.ReadCloser, error) {
 }
 
 func (h *held) kill() { h.killFor(ErrOwnerKill) }
+
+// unspawned ends the wait of a row not yet spawned (AR80 fix round,
+// finding 1): its context cancelled with cause, so a band hold, a queued
+// place, the breaker or the spacing ends within one poll; a spawned or
+// killed row is left alone.
+func (h *held) unspawned(cause error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.proc == nil && !h.killed && h.cancel != nil {
+		h.cancel(cause)
+	}
+}
 
 // stopFor is another row's account stop (run 10 ruling 1): this row killed
 // the owner's way, its context's cause the reason.
@@ -589,10 +605,14 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 		register(&p.Rows[i])
 	}
 	put := func(event string, m map[string]any) { lg.Append(event, m) }
+	band := opts.Band
+	if band == "" {
+		band = "absent"
+	}
 	put("night-open", map[string]any{"rows": ids, "parallel": opts.Parallel, "until": opts.Until,
 		"max_sittings": opts.MaxSittings, "max_usd": opts.MaxUSD, "root": p.Root,
 		"template_hash": p.TemplateHash, "queue_hash": p.QueueHash, "no_tmux": opts.NoTmux,
-		"tmux": win.Mode, "session": win.Session, "revision": Revision()})
+		"tmux": win.Mode, "session": win.Session, "revision": Revision(), "band": band})
 	// skipRefused writes each registered refused row's skip line, as skip
 	// writes a stage refusal's: after night-open, and at a re-read's
 	// registration (AR58 hardening round).
@@ -614,6 +634,15 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 	}
 
 	var bug error
+	// endWaits ends every unspawned row's wait once the night leaves
+	// running or paused (AR80 fix round, finding 1): no held or queued row
+	// asks or spawns in a stopping night. Set once the rows are.
+	var endWaits func()
+	leaving := func() {
+		if n.State != relay.NightRunning && n.State != relay.NightPaused && endWaits != nil {
+			endWaits()
+		}
+	}
 	step := func(e relay.NightEvent, r relay.StopReason) {
 		next, err := relay.NightStep(n.State, e, r)
 		if err != nil {
@@ -626,8 +655,9 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 		if reason, ok := relay.StopReasonOf(next); ok {
 			n.Reason = reason
 		}
+		leaving()
 	}
-	stopWith := func(r relay.StopReason) { n.State, n.Reason = relay.Stopped(r), r }
+	stopWith := func(r relay.StopReason) { n.State, n.Reason = relay.Stopped(r), r; leaving() }
 	stopDetail := "" // the stop line's detail: why the night stopped, past its reason
 	stalls := 0      // the night's stalled rows (R6 §2)
 	step(relay.OnPlanned, "")
@@ -681,9 +711,18 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 	// spacing ends within one poll.
 	nightCtx, stopAll := context.WithCancelCause(context.Background())
 	defer stopAll(nil)
+	endWaits = func() {
+		for _, h := range running {
+			h.unspawned(ErrOwnerStop)
+		}
+	}
 	var space *spacer // spawns SpawnSpacing apart, when the breaker reads a load (ADV6-13)
 	if fx.Load != nil {
 		space = &spacer{clock: fx.Clock}
+	}
+	var asking *bandQueue // the rows asking the band, in launch order (AR80 ruling 6)
+	if fx.Band != nil {
+		asking = &bandQueue{clock: fx.Clock}
 	}
 	views := map[string]*actView{} // the running rows' acts (AR30 act 3)
 	readActs := func(id string) {
@@ -760,6 +799,10 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 		}
 		rctx, cancel := context.WithCancelCause(nightCtx)
 		ro.Ctx, ro.space, ro.hold = rctx, space, &heldLine{}
+		ro.Night, ro.Until, ro.band = n.ID, until, asking
+		if asking != nil && ro.Part < 2 { // a first part asks: its place in launch order (AR80 ruling 6)
+			asking.join(id)
+		}
 		h := &held{Spawner: sp, groups: groups, procs: fx.Procs, row: id, cancel: cancel}
 		running[id] = h
 		fresh[id] = true

@@ -769,6 +769,11 @@ func TestAR4_JSONKeysSnake(t *testing.T) {
 // TestMain points XDG_STATE_HOME, the one state root (§5), at a temp
 // directory before any test, so no test reads or writes the machine's
 // ledger, locks or nights.
+// e2eConfig is the e2e fixture's relay config: caffeinate off (the fake
+// must be the relay's direct child) and the band off, so the built binary
+// never asks the account's agentik-session (AR80 fix round, finding 2).
+const e2eConfig = "caffeinate: false\nband: off\n"
+
 func TestMain(m *testing.M) {
 	// AR22 act 2: the account lock is a free port of this binary's (or its
 	// parent test binary's), never the account's.
@@ -781,6 +786,8 @@ func TestMain(m *testing.M) {
 	}
 	// The tests push only into t.TempDir() remotes; the deny is advisory (relay-r1 §10; ADV11-8 deferred).
 	effects.DropEnvConfig()
+	// No test asks the account's session band (AR80 ruling 2).
+	bandFor = func(string, func(string) string) (effects.Band, string) { return nil, "absent" }
 	state, err := os.MkdirTemp("", "relay-state-")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

@@ -594,3 +594,14 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 - AR75: `doctor` finds the root with its own `toplevel()` while the verbs use `Git.Root`, so in a worktree the two can name different roots; and an unreadable `config.local.yaml` stops every verb, where a missing one is skipped.
 - AR76: a quoted `"null"`, `''` or `'~'` reads as `no provider.inputs`, since the YAML reader drops the quotes; an empty HOME gives StateDir a relative dir (Pin refuses it); `~user/x` and relative values guard nothing (Pin refuses them); the comment at `guards.go:1187` says the hooks import nothing of the relay, which `internal/xdg` now makes untrue.
 - AR77: `stringsOf` (`internal/night/report.go:425`) lies outside the packet's may-touch list; an orchestrator halted at the wake reads `failed` in status but `paused` in the burn until the stop line; a night that closes with an error and no stop line leaves a held row with no entry.
+
+## AR80's build (2026-10-14): what it leaves (S4)
+- The clock seam has no absolute timer: the band hold (`askBand`) re-reads the clock after it sets its timer, so a step clock moved to the deadline first wakes it at once. An `AfterAt(t)` on `effects.Clock` would let the breaker, the spacer and the hold each name a deadline and drop the re-read. (S4)
+- `OSBand.Reset` reads `resetsAt` at the top level of band.json, as band-pacing-r1 §2.4 and the packet quote it; the relay reads none of the plugin's code, so a key moved inside the file reads `unchecked` and spawns, loud in the ledger but silent in `doctor` until AR81. (S4)
+- A hold the owner cut after an ask keeps its last verdict in `sitting.band.verdict`, and a row cut before its first ask has no band key (the fix round's finding 5): AR81's report counts these as holds that ended unspawned, not as spawns. (S4)
+- `OSBand.Ask` reads the tool's stdout and stderr into buffers with no size cap (`band.go`, the `cmd.Run` call): a tool that floods either holds it all in memory until the 10 s timeout. A cap (`io.LimitReader`-style writer) would bound it. (S4; the fix round's adversaries)
+
+## AR80's verify round (2026-10-14, the observer; S4)
+- Fix 1 (a stopped night cancels its unspawned rows) reaches band-less nights too: at 2a52536 a row waiting on its spawn spacing spawned 30 s after a sibling's no-commit; it now ends `skipped owner-stop`, a label that also names stops the owner never made, and the band-less case has no test.
+- `e2eConfig` sits between `TestMain`'s doc comment and `TestMain` (`cmd/agentik-relay/main_test.go`), so the comment no longer documents it; `TestAR80_12` checks `e2e_test.go` by matching its source text, which breaks easily.
+- The fix round touched files outside the packet's may-touch list (the review accepted them).
