@@ -558,3 +558,6 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 
 ## The queue file only grows (2026-10-13, the observer, the owner's question; S4)
 - The busiest consumer's `relay/queue.yaml` holds 237 rows in 40 KB (Load and Order 17 ms at 18:4x), and finished rows never leave it. Fix: move finished rows to `relay/queue-archive.yaml`, loaded only to resolve `depends_on` and `base`, so the live file stays the night's open work.
+
+## After a usage-limit wake, status and report show the dead sitting (2026-10-14, the observer; S4)
+- Night 2026-10-13-7 (syrvis): at 23:26 all three rows hit the five-hour limit (po1bfix exit 143, "You've hit your session limit · resets 12:30am"; the others "usage-limit before the spawn"); the night paused and woke at 00:32, re-spawning po1bfix, po2fix and us3afix. At 00:33 the row logs advance (po1bfix turn 9, 69k; po2fix turn 11, 64k; us3afix turn 4, 52k), yet `agentik relay status --json` keeps each row's `reason: usage-limit` with the first sitting's turns and context (1/0k, 0/0k, 10/61k), and `agentik relay report` lists all three as `failed`. Also `next` reads "count-reached after 5 sittings (3 so far)" while `burn.sittings` reads 6: two counts, both called sittings; the cap's excludes the dead ones. (the observer's attendant, confirmed from status, report and the row logs)
