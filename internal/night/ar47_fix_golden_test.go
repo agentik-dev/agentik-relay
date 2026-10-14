@@ -11,7 +11,7 @@ import (
 
 // TestAR47Fix_GoldenFreezesBreakerKeys (AR47 ruling 4, corrected):
 // testdata/json-keys.golden freezes the --json key sets by the types'
-// json tags. cmd/relay's TestJSONShapesFrozen walks night.Plan by
+// json tags. cmd/agentik-relay's TestJSONShapesFrozen walks night.Plan by
 // reflection; it builds no plan, reads no load and no idle share. So a
 // key BreakerStats gains is a key the golden gains, whatever `omitempty`
 // leaves out of a line: `unconfirmed` is frozen beside `opens`, `wait_s`

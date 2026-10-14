@@ -303,7 +303,7 @@ var (
 	ErrIllegal = errors.New("illegal transition")
 	// ErrTerminal is returned for any event on a terminal state.
 	ErrTerminal = errors.New("terminal state")
-	// ErrNotImplemented is returned by the verbs cmd/relay still stubs.
+	// ErrNotImplemented is returned by the verbs cmd/agentik-relay still stubs.
 	ErrNotImplemented = errors.New("not implemented")
 )
 

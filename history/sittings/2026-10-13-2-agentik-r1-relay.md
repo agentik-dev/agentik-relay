@@ -16,8 +16,8 @@
 | 1 | guards on every spelling (c12); the session guard `nested-session`; `charter` exempt | done `dccd8a9` |
 | 2 | vendor `scripts/{agentik,hygiene,bounded}` + `vendored.sha256`; `make hygiene` checks it | done `e62cd14` |
 | 3 | paths new, else old (c1-c4, c6); `Config.Warnings` | done `5f3ebb5` |
-| 4 | one resume line (`relay.ResumeLine`, `ResumeRow`); the alias note | done |
-| 5 | `cmd/agentik-relay`, the Makefile, the plugin (c11, c14, D2, D3) | |
+| 4 | one resume line (`relay.ResumeLine`, `ResumeRow`); the alias note | done `1bd305c` |
+| 5 | `cmd/agentik-relay`, the Makefile, the plugin (c11, c14, D2, D3) | done |
 | 6 | the sweep to `renamed` 0 | |
 
 Rulings beyond the packet, one line each:
@@ -40,7 +40,7 @@ Rulings beyond the packet, one line each:
 
 ## Next act
 
-Act 5: `cmd/agentik-relay`, the Makefile, the plugin.
+Act 6: the sweep to `renamed` 0.
 
 ## Exit
 

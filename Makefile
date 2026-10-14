@@ -4,6 +4,7 @@ PY := $(shell pyenv which python3 2>/dev/null || command -v python3)
 # `make -n check` (the relay's verify probe), taking the lock or waiting on load.
 UNLOCKED := $(MAKE)
 DOCLINT_SHA := 3040666c1e9ad08faf1befe9c2efffaff0660f0464554d240f1d07437a03fcda
+BINDIR ?= $(HOME)/.local/bin
 
 JAVA ?= $(shell test -x /opt/homebrew/opt/openjdk/bin/java && echo /opt/homebrew/opt/openjdk/bin/java || command -v java)
 TLA_JAR = design/tla/.tools/tla2tools.jar
@@ -32,12 +33,16 @@ hygiene:  ## the public-hygiene scan (conventions §6); scripts/{agentik,hygiene
 	$(PY) -B scripts/hygiene
 validate:  ## claude plugin validate plugin/ (doclint's plugin rule runs in check's doclint step)
 	$(PY) -B scripts/bounded --wall 60 -- claude plugin validate plugin/
-build:  ## bin/relay
-	go build -o bin/relay ./cmd/relay
-install:  ## put relay on PATH (GOBIN or GOPATH/bin)
-	go install ./cmd/relay
+build:  ## bin/agentik-relay
+	go build -o bin/agentik-relay ./cmd/agentik-relay
+install:  ## agentik-relay into BINDIR, relay a link to it (until 2026-12-31), the agentik front door beside it; GOPATH's relay relinked when it exists (agentik-r1 §4.1, D3)
+	mkdir -p $(BINDIR)
+	go build -o $(BINDIR)/agentik-relay ./cmd/agentik-relay
+	ln -sf agentik-relay $(BINDIR)/relay
+	install -m 0755 scripts/agentik $(BINDIR)/agentik
+	g="$$(go env GOPATH)/bin/relay"; if [ -e "$$g" ] || [ -L "$$g" ]; then ln -sf $(BINDIR)/agentik-relay "$$g"; fi
 doctor:  ## claude, git, tmux on PATH
-	go run ./cmd/relay doctor
+	go run ./cmd/agentik-relay doctor
 readme-status:  ## rewrite the source's one Status: line (plugin version, today, the Go test count); idempotent
 	@v=$$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' plugin/.claude-plugin/plugin.json); \
 	n=$$(grep -rhc '^func Test' internal cmd | paste -sd+ - | bc); d=$$(date +%F); \
@@ -51,7 +56,7 @@ readme: readme-status  ## render README.md from the source through respeak under
 tla:  ## TLC over design/tla (relay-r1 §16): the night clean, the two storms found; never fetches, never in check
 	@JAVA="$(JAVA)" TLA_JAR="$(TLA_JAR)" design/tla/check.sh
 e2e:  ## the night end to end (relay-r1 §11): nine cases over a fixture repo and the fake claude, about 3 minutes; never in check
-	go test -tags e2e ./cmd/relay -run 'TestE2E_' -count=1 -v -timeout 12m
+	go test -tags e2e ./cmd/agentik-relay -run 'TestE2E_' -count=1 -v -timeout 12m
 tla-tools: $(TLA_JAR)  ## fetch tla2tools.jar once into the gitignored design/tla/.tools/ (the network)
 $(TLA_JAR):
 	mkdir -p $(dir $(TLA_JAR))

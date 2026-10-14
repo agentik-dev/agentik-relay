@@ -1,7 +1,11 @@
 package main
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -38,5 +42,34 @@ func TestAgentikR1_4_OldNameNote(t *testing.T) {
 		if got := aliasNote(tc.argv0, tc.verb, tc.tty); got != tc.want {
 			t.Errorf("aliasNote(%q, %q, %v) = %q, want %q", tc.argv0, tc.verb, tc.tty, got, tc.want)
 		}
+	}
+}
+
+// TestAgentikR1_5_InstallTarget (agentik-r1 §4.1, D3): `make -n install
+// BINDIR=D` builds agentik-relay into D, links relay to it, installs the
+// agentik front door, then relinks GOPATH's relay only when it exists.
+// make -n runs no recipe: nothing is built or installed.
+func TestAgentikR1_5_InstallTarget(t *testing.T) {
+	d := t.TempDir()
+	cmd := exec.Command("make", "--no-print-directory", "-n", "install", "BINDIR="+d)
+	cmd.Dir = filepath.Join("..", "..")
+	for _, kv := range os.Environ() {
+		if !strings.HasPrefix(kv, "MAKE") && !strings.HasPrefix(kv, "MFLAGS=") {
+			cmd.Env = append(cmd.Env, kv)
+		}
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("make -n install: %v\n%s", err, out)
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	want := []string{"mkdir -p " + d, "go build -o " + d + "/agentik-relay ./cmd/agentik-relay",
+		"ln -sf agentik-relay " + d + "/relay", "install -m 0755 scripts/agentik " + d + "/agentik"}
+	if len(lines) != 5 || !reflect.DeepEqual(lines[:4], want) {
+		t.Fatalf("make -n install printed:\n%s\nwant first:\n%s", out, strings.Join(want, "\n"))
+	}
+	if l := lines[4]; !strings.Contains(l, "$(go env GOPATH)/bin/relay") || !strings.Contains(l, "ln -sf "+d+"/agentik-relay") ||
+		!strings.Contains(l, "-e ") {
+		t.Errorf("the GOPATH relink: %q", l)
 	}
 }
