@@ -164,7 +164,7 @@ A red main never merges (AR13 act 1; ADV6-5, R6 §4): the merge's verify passes 
 
 ## §7 The spawn
 
-Headless and streamed (D1), from the worktree, with every `CLAUDE*` variable stripped from the environment (the stand-in's proven rule: a nested spawn is its own session with its own hooks) and `RELAY_ROW=<id>` added:
+Headless and streamed (D1), from the worktree, with every `CLAUDE*` variable stripped from the environment and `RELAY_ROW=<id>` added. The strip is the relay's choice, not a Claude Code rule (the stand-in's reason: a nested spawn is its own session with its own hooks, so no parent's marks may reach it). The "Environment variables" page (code.claude.com, as of 2026-10-14) says Claude Code sets `CLAUDECODE=1` and `CLAUDE_CODE_CHILD_SESSION=1` in the subprocesses it spawns (Bash, hooks, status line) and neither recommends nor forbids stripping them; with `CLAUDE_CODE_CHILD_SESSION` set a nested interactive session is left out of `--resume`, which a sitting's resume door needs. So the child sees the host's other variables, `RELAY_DEVICE_VERBS`, and only what `effects.ChildEnv` adds back: `RELAY_ROW`, `RELAY_MEASURE_DEPTH=1`, `RELAY_BIN`, `CLAUDE_SESSION_DEPTH=1`, `CLAUDE_SESSION_MAX_TURNS`, `CLAUDE_SESSION_PROFILE`, `CLAUDE_SESSION_MODEL` (the session plugin's budget, below) and the push-deny `GIT_CONFIG_*` entries:
 
 ```
 caffeinate -i claude -p --permission-mode auto --allowedTools "Bash Edit Write MultiEdit NotebookEdit" \
