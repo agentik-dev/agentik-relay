@@ -552,3 +552,6 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 - (agentik-r1-relay fix round) `relay.ResumeRow` rejects a trailing space or newline and accepts `r1;rm`, `../x` and `-x` as rows; a row-id check belongs to it or to its callers.
 - (agentik-r1-relay fix round) `cmd/agentik-relay/e2e_test.go` still builds its binary as `relay`, so e2e walks the old-name path; rename it when e2e next runs.
 - (agentik-r1-relay fix round) The relay reads agentik-session's resolved file new-else-old (`agentik-session/sessions/<id>/`, else the old folder) until the cold window moves it.
+
+## The queue file only grows (2026-10-13, the observer, the owner's question; S4)
+- syrvis's `relay/queue.yaml` holds 237 rows in 40 KB (Load and Order 17 ms at 18:4x), and finished rows never leave it. Fix: move finished rows to `relay/queue-archive.yaml`, loaded only to resolve `depends_on` and `base`, so the live file stays the night's open work.
