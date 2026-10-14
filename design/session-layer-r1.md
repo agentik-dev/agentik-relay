@@ -1,6 +1,6 @@
 # agent-relay design: the session layer is read only while fresh (r1)
 
-**Status:** design r1, 2026-10-14, written before code and revised once after its one refuter round (§7), which passed with nine notes; the revision takes four of them. AR75 built §5 item 1. It amends relay-r1 §9 (configuration). The settled entry 10 (the repo's verify limit) is what this record makes reach a night; no entry of `DECISIONS.md` covers the session layer, and GUIDE §3 (agentik-commons; portfolio entry 26) puts it above the repo's files and leaves room for a further condition. The finding is `NICE_TO_HAVE.md`'s "A night takes a frozen session layer through tmux".
+**Status:** design r1, 2026-10-14, written before code and revised once after its one refuter round (§7), which passed with nine notes; the revision takes four of them. AR75 built §5 item 1; AR76 took three notes of its review (§2.4 for the relay's own state dir and the hooks', a moved config folder's reason, a null `inputs`). It amends relay-r1 §9 (configuration). The settled entry 10 (the repo's verify limit) is what this record makes reach a night; no entry of `DECISIONS.md` covers the session layer, and GUIDE §3 (agentik-commons; portfolio entry 26) puts it above the repo's files and leaves room for a further condition. The finding is `NICE_TO_HAVE.md`'s "A night takes a frozen session layer through tmux".
 
 ## 1. The problem
 
@@ -39,7 +39,7 @@ With the layer fresh, every value is what it is today. With it skipped, the rela
 
 - **A profile edited during a session.** Its `relay` keys stay as the session resolved them, as the session's own keys do, until the next SessionStart or `set`. No profile carries relay keys beyond the relay's defaults today.
 - **A running relay keeps what it loaded.** A night started before an edit runs on its start values, as it does for the repo's layer. Unchanged here.
-- **Cost.** Each `LoadConfig` hashes two small files, on every verb and every `status --watch` tick. Not measured; small.
+- **Cost.** Each `LoadConfig` hashes two small files, once per verb that loads the configuration; `status --watch` never calls it (`cmd/agentik-relay/main.go:1418` goes to `night.Watch`). One `LoadConfig` with a fresh layer measured about 57 µs (AR75's review).
 - **The other plugins.** decisions and respeak read the session layer under the same §3 and freeze the same way. One sentence in conventions §3 would bind them too. It is filed with the session plugin, not taken here.
 
 ## 7. The refuter round (2026-10-14, 05:56 to 06:04)
