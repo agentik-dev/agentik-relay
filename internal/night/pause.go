@@ -73,7 +73,8 @@ func ofModel(model, scope string) bool {
 // pauseFor decides at the hit (usage-limit-resume r1 §2; AR65 ruling 1),
 // pure. The wake: with no reset, Now plus FallbackWait, source fallback;
 // else the reset plus WakeSlack, the Limit's source. It stops, naming why,
-// while draining; on a weekly limit; on a model's limit with no reset;
+// while draining; on a weekly limit; on an overage limit, the account's
+// own (AR82 ruling 3); on a model's limit with no reset;
 // then the guards (AR69 ruling 2): after a pause, with no Waited, no
 // reset and the probe not passed (the probe refused again); with a Named
 // reset not after Waited;
@@ -96,6 +97,8 @@ func pauseFor(in pauseIn) pause {
 		return stop("the night is draining")
 	case l.Kind == stream.KindWeekly:
 		return stop("a weekly limit")
+	case l.Kind == stream.KindOverage:
+		return stop("the overage limit")
 	case l.Kind == stream.KindModel && l.Reset.IsZero():
 		p.Wake, p.Source = time.Time{}, ""
 		return stop(fmt.Sprintf("the %s limit names no reset", l.Scope))
