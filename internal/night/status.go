@@ -63,6 +63,20 @@ type RowStatus struct {
 	// Cause is the gate's cause when the row ended red or failed (AR62
 	// act 2), gate.Cause through RedCause; "" else.
 	Cause string `json:"cause"`
+	// Band is the row's band hold while it holds (band-pacing-r1 §3; AR81
+	// ruling 1): State reads `held` and Reason the band's text then; nil
+	// when the row is not held.
+	Band *RowBand `json:"band"`
+}
+
+// RowBand is a held row's band: the last verdict and its peak (null for
+// `queued`), the hold's start (RFC 3339, the clock's zone) and the asks in
+// it, 0 while queued (AR81 rulings 1, 2).
+type RowBand struct {
+	Verdict string   `json:"verdict"`
+	Peak    *float64 `json:"peak"`
+	Since   string   `json:"since"`
+	Asks    int      `json:"asks"`
 }
 
 // Burn is what sittings spent: one row's (Row set) or the night's (Sittings
@@ -243,6 +257,9 @@ func buildStatus(n *Night, ids []string, rows map[string]*RowStatus, burn Burn, 
 	}
 	st.Burn = burn
 	var next []string
+	if c := bandClause(st.Rows); c != "" { // AR81 ruling 3: the band's hold leads
+		next = append(next, c)
+	}
 	if !until.IsZero() {
 		next = append(next, "until-reached at "+until.Format("15:04"))
 	}
@@ -260,6 +277,30 @@ func buildStatus(n *Night, ids []string, rows map[string]*RowStatus, burn Burn, 
 	}
 	st.Next = strings.Join(next, "; ")
 	return st
+}
+
+// bandClause is `the band holds <rows> since HH:MM`: the held rows in
+// order, the earliest since; "" when none is held (AR81 ruling 3).
+func bandClause(rows []RowStatus) string {
+	var held []string
+	var since time.Time
+	for _, r := range rows {
+		if r.Band == nil {
+			continue
+		}
+		held = append(held, r.ID)
+		if t, err := time.Parse(time.RFC3339, r.Band.Since); err == nil && (since.IsZero() || t.Before(since)) {
+			since = t
+		}
+	}
+	if len(held) == 0 {
+		return ""
+	}
+	c := "the band holds " + strings.Join(held, " ")
+	if !since.IsZero() {
+		c += " since " + since.Format("15:04")
+	}
+	return c
 }
 
 // PrintStatus is the dashboard once (§9's `Print(w, Status)`; the name
@@ -303,6 +344,20 @@ func PrintStatus(w io.Writer, s Status) {
 		}
 		cells = append(cells, []string{r.ID, state, strconv.Itoa(r.Turns), ctx, costOf(r.CostUSD, unreadOne(r.Unread), true),
 			dash(r.Elapsed), dash(clip(r.LastTool, 12)), strconv.Itoa(r.Builders), strconv.Itoa(len(r.Acts)), dash(short(r.MergeSHA))})
+	}
+	// AR81 ruling 4: a held row's state cell, the band's text with it, is
+	// clipped so its line stays under 100 columns.
+	for i, r := range s.Rows {
+		if r.Band == nil {
+			continue
+		}
+		room := 99
+		for j := range cells[i+1] {
+			if j != 1 {
+				room -= colWidth(cells, j) + 2
+			}
+		}
+		cells[i+1][1] = clip(cells[i+1][1], max(room, len("held")+3))
 	}
 	table(w, "", cells, 2, 3, 4, 5, 7, 8)
 	for _, r := range s.Rows {
@@ -392,6 +447,17 @@ func table(w io.Writer, indent string, cells [][]string, right ...int) {
 		}
 		fmt.Fprintln(w, strings.TrimRight(b.String(), " "))
 	}
+}
+
+// colWidth is column j's width in cells, in runes.
+func colWidth(cells [][]string, j int) int {
+	n := 0
+	for _, row := range cells {
+		if j < len(row) {
+			n = max(n, len([]rune(row[j])))
+		}
+	}
+	return n
 }
 
 func dash(s string) string {

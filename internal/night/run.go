@@ -95,6 +95,9 @@ type RunOptions struct {
 	space *spacer    // the night's: spawns SpawnSpacing apart (ADV6-13)
 	hold  *heldLine  // the night's: a usage-limit part's held line (AR65; nil: written here)
 	band  *bandQueue // the night's: the rows asking the band, in launch order (AR80 ruling 6; nil: none)
+	// asked is the night's: called after each re-ask in a hold with its
+	// verdict, which writes no line (AR81 ruling 2; nil: none).
+	asked func(effects.BandVerdict)
 }
 
 // The causes the night cancels a row's Ctx with (R6 §4): a stop leaves a
@@ -396,6 +399,9 @@ func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptio
 			}
 			fmt.Fprintf(log, "relay %s: the band holds it: %s\n", rp.ID, v.Verdict)
 			continue
+		}
+		if opts.asked != nil { // status counts the ask (AR81 ruling 2)
+			opts.asked(v)
 		}
 		if v.Verdict == "denied" && !denied {
 			denied = true

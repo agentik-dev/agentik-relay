@@ -166,6 +166,11 @@ status rows
 status rows.[]acts
 status rows.[]acts.[]sha
 status rows.[]acts.[]subject
+status rows.[]band
+status rows.[]band.asks
+status rows.[]band.peak
+status rows.[]band.since
+status rows.[]band.verdict
 status rows.[]builders
 status rows.[]cause
 status rows.[]ceiling
