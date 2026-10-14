@@ -721,7 +721,7 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 		rs.State, rs.Reason, rs.MergeSHA = string(s.State), string(s.Reason), s.MergeSHA
 		rs.Resume = ""
 		if (s.State == relay.Red || s.State == relay.Failed) && !n.Woken[id] { // a woken sitting is recovered (AR68)
-			rs.Resume = "relay resume " + id
+			rs.Resume = relay.ResumeLine(id)
 		}
 	}
 	skip := func(id, why string) {
@@ -1220,7 +1220,7 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 					o.st.Unlock()
 					setRow(o.id, s)
 					fmt.Fprintf(out, "relay %s: %s %s\n", o.id, s.State, s.Reason)
-					fmt.Fprintln(out, "relay resume "+o.id)
+					fmt.Fprintln(out, relay.ResumeLine(o.id))
 					if !relay.NightTerminal(n.State) {
 						step(relay.OnSittingFailed, s.Reason)
 					}
@@ -1348,7 +1348,7 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 			fmt.Fprintf(out, "relay %s: log: %s\n", o.id, l)
 		}
 		if s.State != relay.Green {
-			fmt.Fprintln(out, "relay resume "+o.id)
+			fmt.Fprintln(out, relay.ResumeLine(o.id))
 		}
 		// AR62 act 2: a red or failed row's cause, after its resume line
 		// (the state, log and resume lines stay adjacent).
@@ -1736,11 +1736,11 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 		}
 		setRow(id, s)
 		fmt.Fprintf(out, "relay %s: %s %s\n", id, s.State, s.Reason)
-		fmt.Fprintln(out, "relay resume "+id)
+		fmt.Fprintln(out, relay.ResumeLine(id))
 	}
 	for _, id := range ids { // a sitting the wake halted, the night stopped before its next cut (the fix round's F1)
 		if halted[id] {
-			fmt.Fprintln(out, "relay resume "+id)
+			fmt.Fprintln(out, relay.ResumeLine(id))
 		}
 	}
 	var resume []string
@@ -1753,7 +1753,7 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 		}
 		if (s.State == relay.Red || s.State == relay.Failed) && !n.Woken[id] { // a woken sitting is recovered (AR68)
 			red++
-			resume = append(resume, "relay resume "+id)
+			resume = append(resume, relay.ResumeLine(id))
 		}
 		if s.State == relay.Green && s.MergeSHA == "" && !orc.is(id) {
 			unmerged = append(unmerged, id)

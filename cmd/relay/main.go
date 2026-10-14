@@ -58,7 +58,30 @@ var toplevel = func() (string, error) {
 }
 
 func main() {
+	verb := ""
+	if len(os.Args) > 1 {
+		verb = os.Args[1]
+	}
+	if note := aliasNote(os.Args[0], verb, stderrTerminal()); note != "" {
+		fmt.Fprintln(os.Stderr, note)
+	}
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
+}
+
+// aliasNote is the one stderr note of the old name (agentik-r1 §4.1;
+// ruling 6): when argv0's base is relay, stderr is a terminal and the verb
+// is not hook; "" otherwise, so hooks, pipes and gates see nothing.
+func aliasNote(argv0, verb string, tty bool) string {
+	if filepath.Base(argv0) != "relay" || !tty || verb == "hook" {
+		return ""
+	}
+	return "relay: renamed; use 'agentik relay …' (ends 2026-12-31)"
+}
+
+// stderrTerminal reports stderr a character device (a terminal).
+func stderrTerminal() bool {
+	fi, err := os.Stderr.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -614,7 +637,7 @@ func orchestrateRefusalFor(noNotify bool) string {
 		}
 		for _, red := range redSittings(l) {
 			if id := red[0]; strings.HasPrefix(id, r.ID+".") {
-				return fmt.Sprintf("the row %s is parked for today: %s was %s (relay resume %s)", r.ID, id, red[1], id)
+				return fmt.Sprintf("the row %s is parked for today: %s was %s (%s)", r.ID, id, red[1], relay.ResumeLine(id))
 			}
 		}
 	}
@@ -669,7 +692,7 @@ func redSittings(l map[string]any) [][2]string {
 		}
 		var out [][2]string
 		for _, s := range lines {
-			if id, ok := strings.CutPrefix(s, "relay resume "); ok {
+			if id, ok := relay.ResumeRow(s); ok {
 				out = append(out, [2]string{id, "red or failed at the night's stop"})
 			}
 		}
@@ -1333,7 +1356,7 @@ func runVerb(args []string, stdout, stderr io.Writer) int {
 			r.State, r.Reason = s.State, s.Reason
 			r.Log = filepath.Join(night.NightDir(pd.state, n.ID), r.Row+".log")
 			if s.State == relay.Red || s.State == relay.Failed {
-				r.Resume = "relay resume " + r.Row
+				r.Resume = relay.ResumeLine(r.Row)
 				out.Resume = append(out.Resume, r.Resume)
 			}
 		}

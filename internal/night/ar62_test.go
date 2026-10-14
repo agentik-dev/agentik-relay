@@ -61,7 +61,7 @@ func TestAR62_4_StatusAndReport(t *testing.T) {
 			t.Errorf("%d columns: %s", len([]rune(l)), l)
 		}
 	}
-	if !strings.Contains(out.String(), "relay resume r1\nrelay r1: cause: acceptance 1:") {
+	if !strings.Contains(out.String(), "agentik relay resume r1\nrelay r1: cause: acceptance 1:") {
 		t.Fatalf("out:\n%s", out.String())
 	}
 	r := night.BuildReport(w.ledger.Written(), n.ID)

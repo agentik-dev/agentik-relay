@@ -517,9 +517,12 @@ func (s *Status) TakeMerges(m map[string]string) {
 		if !ok || sha == "" || r.MergeSHA != "" {
 			continue
 		}
-		gone := []string{"relay resume " + r.ID, r.Resume}
+		was := r.Resume
 		r.MergeSHA, r.Resume = sha, ""
-		s.Resume = slices.DeleteFunc(s.Resume, func(l string) bool { return l != "" && slices.Contains(gone, l) })
+		s.Resume = slices.DeleteFunc(s.Resume, func(l string) bool { // either spelling (relay.ResumeRow)
+			row, ok := relay.ResumeRow(l)
+			return l != "" && (ok && row == r.ID || l == was)
+		})
 	}
 }
 

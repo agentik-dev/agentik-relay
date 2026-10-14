@@ -51,7 +51,7 @@ func TestAR66_2_PausedSittingParksNothing(t *testing.T) {
 		}
 	}
 	prior := l.Prior[:1]
-	stop := map[string]any{"event": "stop", "reason": "owner-stop", "resume": []any{"relay resume o.1"}, "ts": "2026-09-22T03:00:02Z"}
+	stop := map[string]any{"event": "stop", "reason": "owner-stop", "resume": []any{"agentik relay resume o.1"}, "ts": "2026-09-22T03:00:02Z"}
 	for _, c := range []struct {
 		name  string
 		lines []map[string]any

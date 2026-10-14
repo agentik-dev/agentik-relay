@@ -501,7 +501,7 @@ func TestNightVerbs(t *testing.T) {
 	root := filepath.Join(home, "repo")
 	os.MkdirAll(night.NightDir(state, id), 0o700)
 	os.WriteFile(filepath.Join(night.NightDir(state, id), "status.json"),
-		[]byte(`{"night":"`+id+`","state":"running","rows":[{"id":"r1","state":"red","resume":"relay resume r1"}],"resume":["relay resume r1"]}`), 0o600)
+		[]byte(`{"night":"`+id+`","state":"running","rows":[{"id":"r1","state":"red","resume":"agentik relay resume r1"}],"resume":["agentik relay resume r1"]}`), 0o600)
 	l := effects.NewLedger(state, effects.FakeClock{T: time.Date(2026, 9, 22, 1, 0, 0, 0, time.UTC)}, id)
 	l.Append("night-open", map[string]any{"root": root})
 	l.Append("stage", map[string]any{"row": "r1", "worktree": filepath.Join(root, ".claude", "worktrees", "r1"), "branch": "r1", "base": "main"})
@@ -516,7 +516,7 @@ func TestNightVerbs(t *testing.T) {
 	if code, out, _ := do("status", "--json"); code != exitOK || !strings.Contains(out, `"night":"`+id+`"`) {
 		t.Fatalf("status = %d %s", code, out)
 	}
-	if code, out, _ := do("status"); code != exitOK || !strings.HasSuffix(out, "\nrelay resume r1\n") {
+	if code, out, _ := do("status"); code != exitOK || !strings.HasSuffix(out, "\nagentik relay resume r1\n") {
 		t.Fatalf("status = %d %s", code, out)
 	}
 	if code, _, e := do("stop"); code != exitOK {
@@ -541,7 +541,7 @@ func TestNightVerbs(t *testing.T) {
 	capture(t, "resume-r1", strings.ReplaceAll(rout, home, "$HOME"))
 	_, rout, _ = do("resume")
 	capture(t, "resume", rout)
-	if code, out, _ := do("resume"); code != exitOK || out != "night "+id+": 1 red or failed row(s) to resume\nrelay resume r1\n" {
+	if code, out, _ := do("resume"); code != exitOK || out != "night "+id+": 1 red or failed row(s) to resume\nagentik relay resume r1\n" {
 		t.Fatalf("resume = %d %q", code, out)
 	}
 	code, out, _ := do("report", "--json")
@@ -549,7 +549,7 @@ func TestNightVerbs(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &r); code != exitOK || err != nil || len(r.Sittings) != 1 || r.Stopped.Reason != "queue-empty" {
 		t.Fatalf("report = %d %s", code, out)
 	}
-	if code, out, _ := do("report"); code != exitOK || strings.Contains(out, home) || !strings.Contains(out, "\nrelay resume r1\n") {
+	if code, out, _ := do("report"); code != exitOK || strings.Contains(out, home) || !strings.Contains(out, "\nagentik relay resume r1\n") {
 		t.Fatalf("report = %d %s", code, out)
 	}
 	fakeTop(t, root)

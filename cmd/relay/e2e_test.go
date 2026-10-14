@@ -544,8 +544,8 @@ func TestE2E_2_Red(t *testing.T) {
 	if code != 1 {
 		t.Errorf("exit %d, want 1", code)
 	}
-	if !strings.Contains(out, "relay resume r1") {
-		t.Errorf("no `relay resume r1` printed")
+	if !strings.Contains(out, "agentik relay resume r1") {
+		t.Errorf("no `agentik relay resume r1` printed")
 	}
 	touch := false
 	for _, g := range lines(all, "gate", "r1") {
@@ -591,8 +591,8 @@ func TestE2E_8_Next(t *testing.T) {
 			dump(t, all)
 		}
 	}()
-	if code != 1 || !strings.Contains(out, "relay resume r1") {
-		t.Errorf("exit %d, want 1 and `relay resume r1`", code)
+	if code != 1 || !strings.Contains(out, "agentik relay resume r1") {
+		t.Errorf("exit %d, want 1 and `agentik relay resume r1`", code)
 	}
 	st := lines(all, "sitting", "r1")
 	if len(st) != 1 {

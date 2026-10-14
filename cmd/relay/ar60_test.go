@@ -139,7 +139,7 @@ func TestAR60Fix_3_FailedRunKeepsLatest(t *testing.T) {
 	lg.Append("stop", map[string]any{"state": "stopped:queue-empty", "reason": "queue-empty"})
 	os.MkdirAll(night.NightDir(state, prev), 0o700)
 	b, _ := json.Marshal(night.Status{Night: prev, State: "stopped:queue-empty", Reason: "queue-empty",
-		Rows: []night.RowStatus{{ID: "a3-machine", State: "red", Resume: "relay resume a3-machine"}}, Resume: []string{"relay resume a3-machine"}})
+		Rows: []night.RowStatus{{ID: "a3-machine", State: "red", Resume: "agentik relay resume a3-machine"}}, Resume: []string{"agentik relay resume a3-machine"}})
 	os.WriteFile(filepath.Join(night.NightDir(state, prev), "status.json"), b, 0o600)
 	do := func(args ...string) (int, string) {
 		var out, errb bytes.Buffer

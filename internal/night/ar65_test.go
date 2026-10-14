@@ -303,7 +303,7 @@ func TestAR65_5_WakeHalts(t *testing.T) {
 		if n.State != relay.Stopped(c.want) || n.Sittings["r1"].State != relay.Failed || n.Sittings["r1"].Reason != relay.UsageLimit || sp.spawns() != 1 {
 			t.Fatalf("%s: night %s, r1 %s %s, %d spawns; want stopped:%s, r1 failed usage-limit, one spawn", c.name, n.State, n.Sittings["r1"].State, n.Sittings["r1"].Reason, sp.spawns(), c.want)
 		}
-		if night.Locked(wt) || len(rowLines(all, "sitting", "r1")) != 1 || fmt.Sprint(stop["resume"]) != "[relay resume r1]" {
+		if night.Locked(wt) || len(rowLines(all, "sitting", "r1")) != 1 || fmt.Sprint(stop["resume"]) != "[agentik relay resume r1]" {
 			t.Fatalf("%s: locked %v, sitting lines %d, the stop line's resume %v", c.name, night.Locked(wt), len(rowLines(all, "sitting", "r1")), stop["resume"])
 		}
 		if _, err := os.Stat(wt); err != nil {

@@ -56,7 +56,7 @@ func TestAR20_4_NestedByEnv(t *testing.T) {
 		"go run ./cmd/./relay run", "go run ./cmd//relay/ resume", "cd cmd && go run ./relay run",
 		"go build -o r ./cmd/relay && ./r run", "go build -o r ./cmd/./relay", "go install ./cmd/relay",
 		"go run cmd/relay/main.go resume r1", "go build github.com/agentik-dev/agentik-relay/cmd/relay",
-		"relay resume r1", "./bin/relay resume",
+		"agentik relay resume r1", "./bin/relay resume",
 	} {
 		if deny, _ := hooks.Verdict(cmd, true); !deny {
 			t.Errorf("the hook allows %q in a sitting", cmd)

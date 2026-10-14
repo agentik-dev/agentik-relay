@@ -17,7 +17,7 @@ import (
 // TestAR56_4 (AR56 ruling 2): a night's red row r1 the owner merged by hand
 // --no-ff after it, with no `merge` line: `status --json` (its status.json
 // as the night wrote it) and `report --json` (the ledger) both read r1
-// merged at git's sha, and neither prints `relay resume r1`.
+// merged at git's sha, and neither prints `agentik relay resume r1`.
 func TestAR56_4(t *testing.T) {
 	for k, v := range map[string]string{"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
 		"GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t", "GIT_CONFIG_GLOBAL": os.DevNull,
@@ -54,8 +54,8 @@ func TestAR56_4(t *testing.T) {
 		b, _ := json.Marshal(l)
 		day.Write(append(b, '\n'))
 	}
-	st := night.Status{Night: n, State: "stopped", Reason: "queue-empty", Root: root, Resume: []string{"relay resume r1"},
-		Rows: []night.RowStatus{{ID: "r1", State: "red", Reason: "acceptance", Resume: "relay resume r1", Acts: []night.Act{}}}}
+	st := night.Status{Night: n, State: "stopped", Reason: "queue-empty", Root: root, Resume: []string{"agentik relay resume r1"},
+		Rows: []night.RowStatus{{ID: "r1", State: "red", Reason: "acceptance", Resume: "agentik relay resume r1", Acts: []night.Act{}}}}
 	sj, _ := json.Marshal(st)
 	for path, body := range map[string][]byte{
 		filepath.Join(effects.LedgerDir(state), "2026-10-03.jsonl"): day.Bytes(),
@@ -75,8 +75,8 @@ func TestAR56_4(t *testing.T) {
 		if code := run([]string{verb, "--json", "--night", n}, strings.NewReader(""), &out, &errb); code != exitOK {
 			t.Fatalf("%s --json = %d: %s", verb, code, errb.String())
 		}
-		if strings.Contains(out.String(), "relay resume r1") {
-			t.Fatalf("%s --json names relay resume r1: %s", verb, out.String())
+		if strings.Contains(out.String(), "agentik relay resume r1") {
+			t.Fatalf("%s --json names agentik relay resume r1: %s", verb, out.String())
 		}
 		return out.String()
 	}

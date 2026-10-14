@@ -49,7 +49,7 @@ func TestNoticesRefuseAndCap(t *testing.T) {
 	long := strings.Repeat("x", 500)
 	n, _ := Notices("sitting", map[string]any{"row": "a", "state": "red", "reason": long, "gate": long,
 		"prompt": "SECRET", "session_id": "S"})
-	if len(n.Body) > NoticeCap || !strings.HasSuffix(n.Body, "relay resume a") ||
+	if len(n.Body) > NoticeCap || !strings.HasSuffix(n.Body, "agentik relay resume a") ||
 		strings.Contains(n.Body, "SECRET") || strings.Contains(n.Body, "session_id") || n.Priority != 3 {
 		t.Fatalf("sitting notice = %+v", n)
 	}

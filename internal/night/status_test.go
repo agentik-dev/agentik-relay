@@ -62,18 +62,18 @@ func TestCaptureSurfaces(t *testing.T) {
 	}
 }
 
-// TestResumeLineOnItsOwn (UX1): the red row's `relay resume r1` is a whole
+// TestResumeLineOnItsOwn (UX1): the red row's `agentik relay resume r1` is a whole
 // line in `status`, in the report, and the last line of `run`'s tail.
 func TestResumeLineOnItsOwn(t *testing.T) {
 	got := surfaces(t)
 	for _, k := range []string{"status", "report", "run"} {
-		if !strings.Contains("\n"+got[k], "\nrelay resume r1\n") {
-			t.Errorf("%s has no line `relay resume r1`:\n%s", k, got[k])
+		if !strings.Contains("\n"+got[k], "\nagentik relay resume r1\n") {
+			t.Errorf("%s has no line `agentik relay resume r1`:\n%s", k, got[k])
 		}
 	}
 	for _, k := range []string{"status", "run"} {
 		lines := strings.Split(strings.TrimRight(got[k], "\n"), "\n")
-		if lines[len(lines)-1] != "relay resume r1" {
+		if lines[len(lines)-1] != "agentik relay resume r1" {
 			t.Errorf("%s does not end with the resume line:\n%s", k, got[k])
 		}
 	}

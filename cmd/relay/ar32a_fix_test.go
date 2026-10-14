@@ -46,13 +46,13 @@ func TestAR32AFix_MergeRefusedParksTheDay(t *testing.T) {
 	}{
 		{"git-state-moved", []map[string]any{sitting, merge("o.1", "git-state-moved", "2026-09-22T03:00:01Z")}, "parked for today: o.1 was red"},
 		{"merge-tree-differs", []map[string]any{sitting, merge("o.1", "merge-tree-differs", "2026-09-22T03:00:01Z")}, "parked for today: o.1 was red"},
-		{"stop resume", []map[string]any{sitting, {"event": "stop", "reason": "orchestrator-red", "resume": []any{"relay resume o.1"},
+		{"stop resume", []map[string]any{sitting, {"event": "stop", "reason": "orchestrator-red", "resume": []any{"agentik relay resume o.1"},
 			"ts": "2026-09-22T03:00:02Z"}}, "parked for today: o.1 was red"},
 		{"merged", []map[string]any{sitting, merge("o.1", "merged", "2026-09-22T03:00:01Z")}, ""},
 		{"yesterday", []map[string]any{sitting, merge("o.1", "git-state-moved", "2026-09-21T03:00:01Z"),
-			{"event": "stop", "resume": []any{"relay resume o.1"}, "ts": "2026-09-21T03:00:02Z"}}, ""},
+			{"event": "stop", "resume": []any{"agentik relay resume o.1"}, "ts": "2026-09-21T03:00:02Z"}}, ""},
 		{"another row", []map[string]any{merge("b1", "merge-tree-differs", "2026-09-22T03:00:01Z"),
-			{"event": "stop", "resume": []any{"relay resume b1"}, "ts": "2026-09-22T03:00:02Z"}}, ""},
+			{"event": "stop", "resume": []any{"agentik relay resume b1"}, "ts": "2026-09-22T03:00:02Z"}}, ""},
 		{"plain error", []map[string]any{sitting, merge("o.1", "branch-only", "2026-09-22T03:00:01Z")}, ""},
 	} {
 		l.Prior = append(append([]map[string]any{}, prior...), c.lines...)
@@ -149,7 +149,7 @@ func TestAR32AFix_RefusalIsThisRepos(t *testing.T) {
 		return map[string]any{"event": "night-open", "root": root, "ts": "2026-09-22T02:59:00Z", "night": "2026-09-22-1"}
 	}
 	stop := func(root string) map[string]any {
-		m := map[string]any{"event": "stop", "reason": "orchestrator-red", "resume": []any{"relay resume o.1"}, "ts": "2026-09-22T03:00:02Z", "night": "2026-09-22-1"}
+		m := map[string]any{"event": "stop", "reason": "orchestrator-red", "resume": []any{"agentik relay resume o.1"}, "ts": "2026-09-22T03:00:02Z", "night": "2026-09-22-1"}
 		if root != "" {
 			m["root"] = root
 		}
