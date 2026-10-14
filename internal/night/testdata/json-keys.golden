@@ -98,6 +98,9 @@ plan verify.main_exit
 plan verify.main_last
 plan verify.name
 plan verify.status
+report band
+report band.holds
+report band.wait_s
 report handovers
 report handovers.[]path
 report handovers.[]row

@@ -2,6 +2,7 @@ package night_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -114,5 +115,54 @@ func TestAR81_1_StatusHeld(t *testing.T) {
 	st, by = ar81Rows(t, o, "the night's end", func(st night.Status, _ map[string]night.RowStatus) bool { return st.State != "running" })
 	if by["r1"].Band != nil || by["r2"].Band != nil || strings.Contains(st.Next, "the band holds") {
 		t.Fatalf("at the end: r1 %s, r2 %s, next %q", ar81Band(by["r1"].Band), ar81Band(by["r2"].Band), st.Next)
+	}
+}
+
+// TestAR81_2_ReportHolds (ruling 5): r1 held 120 s, then admitted; r2 held
+// queued, then skipped by a stop, its sitting's band.wait_s 30; r3
+// `unchecked` at its first ask, no hold; r4 held (and denied) and open.
+// The report's band reads {3, 150} and its markdown `band: 3 holds, 2m30s
+// waited`; a night with no band line reads {0, 0} and no band line.
+func TestAR81_2_ReportHolds(t *testing.T) {
+	const n = "2026-10-14-1"
+	l := func(event, row string, kv ...any) map[string]any {
+		m := map[string]any{"event": event, "night": n, "row": row}
+		for i := 0; i+1 < len(kv); i += 2 {
+			m[kv[i].(string)] = kv[i+1]
+		}
+		return m
+	}
+	band := func(asks, wait int, verdict string) map[string]any {
+		return map[string]any{"asks": asks, "wait_s": wait, "verdict": verdict}
+	}
+	open := map[string]any{"event": "night-open", "night": n, "root": "/r"}
+	lines := []map[string]any{open,
+		l("band", "r1", "part", 1, "state", "held", "verdict", "not-started", "peak", 115.0, "text", "no room"),
+		l("band", "r2", "part", 1, "state", "held", "verdict", "queued", "peak", nil, "text", "behind r1"),
+		l("band", "r1", "part", 1, "state", "admitted", "asks", 3, "wait_s", 120),
+		l("spawn", "r1", "band", map[string]any{"verdict": "admitted", "peak": nil}),
+		l("band", "r3", "part", 1, "state", "unchecked", "error", "exit 3"),
+		l("spawn", "r3", "band", map[string]any{"verdict": "unchecked", "peak": nil}),
+		l("band", "r4", "part", 1, "state", "held", "verdict", "not-started", "peak", 90.0, "text", "no room"),
+		l("band", "r4", "part", 1, "state", "held", "verdict", "denied", "peak", 130.0, "text", "denied"),
+		l("sitting", "r1", "state", "green", "band", band(3, 120, "admitted")),
+		l("sitting", "r2", "state", "skipped", "reason", "owner-stop", "band", band(0, 30, "queued")),
+		l("sitting", "r3", "state", "green", "band", band(1, 0, "unchecked")),
+	}
+	r := night.BuildReport(lines, n)
+	if b, _ := json.Marshal(r.Band); string(b) != `{"holds":3,"wait_s":150}` {
+		t.Fatalf("the report's band %s", b)
+	}
+	md := string(night.Markdown(r, "/r", "/h"))
+	if !strings.Contains(md, "\nband: 3 holds, 2m30s waited\n") {
+		t.Fatalf("markdown:\n%s", md)
+	}
+	if i, j := strings.Index(md, "## Burn"), strings.Index(md, "band: 3 holds"); i < 0 || j < i || j > strings.Index(md, "## Handovers") {
+		t.Fatalf("the band line not after the sittings' burn:\n%s", md)
+	}
+
+	none := night.BuildReport([]map[string]any{open, l("sitting", "r1", "state", "green")}, n)
+	if b, _ := json.Marshal(none.Band); string(b) != `{"holds":0,"wait_s":0}` || strings.Contains(string(night.Markdown(none, "/r", "/h")), "band:") {
+		t.Fatalf("a night with no band line: %s\n%s", b, night.Markdown(none, "/r", "/h"))
 	}
 }

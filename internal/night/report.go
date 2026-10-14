@@ -9,6 +9,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/agentik-dev/agentik-relay/internal/effects"
 	"github.com/agentik-dev/agentik-relay/internal/relay"
@@ -29,6 +30,16 @@ type Report struct {
 	Waiting   []string   `json:"waiting"`
 	Resume    []string   `json:"resume"`
 	Handovers []Handover `json:"handovers"`
+	Band      BandHolds  `json:"band"`
+}
+
+// BandHolds is the night's band holds and their wait (AR81 ruling 5): a
+// hold is a row's part with a `held` line; its wait is the first of its
+// end line's, its `unchecked` line's or its `sitting` line's band wait_s,
+// and an open hold counts with no wait yet.
+type BandHolds struct {
+	Holds int `json:"holds"`
+	WaitS int `json:"wait_s"`
 }
 
 // NotStopped is a report's State when the night's lines hold a
@@ -150,15 +161,36 @@ func BuildReport(lines []map[string]any, night string, g ...effects.Git) Report 
 		stops = slices.DeleteFunc(stops, func(s stop) bool { return s.sitting && s.Row == row })
 		held = slices.DeleteFunc(held, func(id string) bool { return id == row })
 	}
+	type part struct {
+		row string
+		n   int
+	}
+	holding := map[part]bool{} // the open band holds (AR81 ruling 5)
+	waited := func(k part, wait any) {
+		if holding[k] {
+			r.Band.WaitS += int(number(wait))
+			delete(holding, k)
+		}
+	}
 	for _, l := range lines {
 		if l["night"] != night {
 			continue
 		}
 		row, _ := l["row"].(string)
 		str := func(k string) string { s, _ := l[k].(string); return s }
+		k := part{row, max(int(number(l["part"])), 1)}
 		switch l["event"] {
 		case "night-open":
 			root, opened = str("root"), true
+		case "band":
+			if str("state") == "held" {
+				if !holding[k] {
+					holding[k] = true
+					r.Band.Holds++
+				}
+			} else { // admitted, reset or unchecked
+				waited(k, l["wait_s"])
+			}
 		case "stage":
 			stages[row] = staged{str("branch"), str("base")}
 		case "spawn": // a row's next part in flight; a row with no sitting has nothing to take back
@@ -169,6 +201,9 @@ func BuildReport(lines []map[string]any, night string, g ...effects.Git) Report 
 				merged[row] = true
 			}
 		case "sitting": // its burn is nightBurn's, below
+			if b, ok := l["band"].(map[string]any); ok { // a hold a stop, a kill or a limit ended
+				waited(k, b["wait_s"])
+			}
 			if !slices.Contains(sat, row) {
 				sat = append(sat, row)
 			}
@@ -545,6 +580,9 @@ func Markdown(r Report, root, home string) []byte {
 	}
 	cells = append(cells, []string{"total", "", fmt.Sprint(turns), "", costOf(total, unread, false), fmt.Sprint(builders), fmt.Sprint(output)})
 	mdTable(&b, cells, 2, 3, 4, 5, 6)
+	if r.Band.Holds > 0 { // AR81 ruling 5: after the sittings
+		fmt.Fprintf(&b, "\nband: %s, %s waited\n", plural(r.Band.Holds, "hold"), time.Duration(r.Band.WaitS)*time.Second)
+	}
 	b.WriteString("\n## Handovers\n")
 	for _, h := range r.Handovers {
 		fmt.Fprintf(&b, "\n### %s: %s\n\n%s\n", h.Row, h.Path, h.Text)
