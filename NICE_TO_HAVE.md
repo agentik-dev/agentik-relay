@@ -597,3 +597,8 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 
 ## AR83's build (2026-10-14): what it leaves (S4)
 - No recorded stream holds two result events with a denial, so AR83's sum of `permission_denials` (ruling 3, the conservative reading) is unproven on a real child: a later result may repeat the earlier's list. And no ledger line counts a sitting's result events, so a night's record cannot tell a background-wait turn from the rest. Re-test both beside relay-r1 §15's background-work bullet.
+
+## AR83's review (2026-10-14, the observer; two adversaries PASS, 0 findings)
+- S3: ruling 4 (`is_error` if any result erred) fails a row `stream-error`, which stops the night (`night.go:28`), so a transient non-account API error followed by a successful second result now stops the night where `main` went green; the packet rules it but does not name the stop, and no night-level test covers an erring first result then a success.
+- S4: unproven on a real stream: the ledger keeps only the last result, so ws4y's first `num_turns` and denials cannot be read back; and Claude Code 2.1.300 may merge results itself (turns, time, denials, one cost): if its second result already holds the first query, the fold counts it twice. Re-test on a real child.
+- S4: after an empty CLI error result ($0, no text) the tail is blank (ruling 4) and the cost stays at the highest read, where `main` read $0.
