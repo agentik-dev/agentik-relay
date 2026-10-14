@@ -150,12 +150,12 @@ var (
 // head, one BandPoll after a held one, however it left. moved closes at
 // every change.
 type bandQueue struct {
-	clock effects.Clock
-	mu    sync.Mutex
-	rows  []string
-	held  bool      // the head holds
-	after time.Time // the head asks no sooner
-	moved chan struct{}
+	clock   effects.Clock
+	mu      sync.Mutex
+	rows    []string
+	holding map[string]bool // the rows whose hold is open, a queued one's too (the fix round's finding 3)
+	after   time.Time       // the head asks no sooner
+	moved   chan struct{}
 }
 
 // join takes row's place at the back; launch calls it, so places keep the
@@ -178,7 +178,7 @@ func (q *bandQueue) place(row string) (head, held bool, first string, after time
 	if len(q.rows) == 0 || !slices.Contains(q.rows, row) {
 		return true, false, row, time.Time{}, q.moved
 	}
-	return q.rows[0] == row, q.held, q.rows[0], q.after, q.moved
+	return q.rows[0] == row, q.holding[q.rows[0]], q.rows[0], q.after, q.moved
 }
 
 // changed wakes every waiter; under mu.
@@ -189,12 +189,17 @@ func (q *bandQueue) changed() {
 	q.moved = make(chan struct{})
 }
 
-// hold marks the head row held.
+// hold marks row's hold open, after its line is written (the fix
+// round's finding 4): a head whose hold is open, a queued row's that came
+// to the head included, makes the rows behind it queue.
 func (q *bandQueue) hold(row string) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	if len(q.rows) > 0 && q.rows[0] == row && !q.held {
-		q.held = true
+	if q.holding == nil {
+		q.holding = map[string]bool{}
+	}
+	if !q.holding[row] {
+		q.holding[row] = true
 		q.changed()
 	}
 }
@@ -209,11 +214,12 @@ func (q *bandQueue) leave(row string, held bool) {
 			continue
 		}
 		if i == 0 {
-			q.held, q.after = false, time.Time{}
+			q.after = time.Time{}
 			if held {
 				q.after = q.clock.Now().Add(BandPoll)
 			}
 		}
+		delete(q.holding, row)
 		q.rows = append(q.rows[:i], q.rows[i+1:]...)
 		q.changed()
 		return
@@ -325,6 +331,7 @@ func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptio
 			}
 			r.verdict = "queued"
 			line(map[string]any{"state": "held", "verdict": "queued", "peak": nil, "text": "behind " + first})
+			q.hold(rp.ID)
 			fmt.Fprintf(log, "relay %s: the band holds it behind %s\n", rp.ID, first)
 			continue
 		}
@@ -383,15 +390,12 @@ func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptio
 				return unchecked(why)
 			}
 			denied = v.Verdict == "denied"
+			line(held) // the line, then the rows behind wake (the fix round's finding 4)
 			if q != nil {
 				q.hold(rp.ID)
 			}
-			line(held)
 			fmt.Fprintf(log, "relay %s: the band holds it: %s\n", rp.ID, v.Verdict)
 			continue
-		}
-		if q != nil {
-			q.hold(rp.ID) // a queued hold now heads the queue
 		}
 		if v.Verdict == "denied" && !denied {
 			denied = true
