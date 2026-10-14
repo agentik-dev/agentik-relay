@@ -34,6 +34,9 @@ Rulings beyond the packet, one line each:
   alone is read without a warning (c6 warns only with both); the pid door checks PidDir's path
   and both spellings beside it; tests that used an old path as the default take the new one.
 
+- Fix round: F1 holds the word after `agentik` to literal (`831f7c6`); resume's usage line
+  prints the new form, its error prefix stays; three comments name the old spelling again.
+
 ## Handover
 
 - NICE_TO_HAVE, owner: relay's maintainer: `cmd/agentik-relay/e2e_test.go` still builds its
