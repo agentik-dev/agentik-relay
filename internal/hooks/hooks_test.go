@@ -14,7 +14,7 @@ import (
 
 var update = flag.Bool("update", false, "rewrite testdata/<event>/<case>.out")
 
-const statePathT = "/state/agent-relay/sessions/t/start.json"
+const statePathT = "/state/agentik-relay/sessions/t/start.json"
 
 var clock = time.Date(2026, 9, 22, 12, 0, 0, 0, time.UTC)
 

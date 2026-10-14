@@ -1,4 +1,4 @@
-// Package relay is the core of the agent-relay driver: two pure state
+// Package relay is the core of the agentik-relay driver: two pure state
 // machines, one for a sitting and one for the night over a queue of
 // sittings. Every transition is a function of (state, event); effects (git,
 // claude, tmux, notify, the clock, the filesystem) live behind interfaces
@@ -303,7 +303,7 @@ var (
 	ErrIllegal = errors.New("illegal transition")
 	// ErrTerminal is returned for any event on a terminal state.
 	ErrTerminal = errors.New("terminal state")
-	// ErrNotImplemented is returned by the verbs cmd/relay still stubs.
+	// ErrNotImplemented is returned by the verbs cmd/agentik-relay still stubs.
 	ErrNotImplemented = errors.New("not implemented")
 )
 

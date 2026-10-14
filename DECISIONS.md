@@ -2,7 +2,7 @@
 status: current
 updated: 2026-09-28
 ---
-# agent-relay: what is settled
+# agentik-relay: what is settled
 
 The closed choices of this repository: one numbered entry each, one paragraph, in plain English, with the date and the source it condenses. An entry here is closed unless new information breaks it. A review may block only on unmet acceptance criteria, bugs or failing tests, or a conflict with an entry here; everything else goes to NICE_TO_HAVE.md and does not block. (The owner's word, 2026-09-25.)
 
@@ -20,7 +20,7 @@ The closed choices of this repository: one numbered entry each, one paragraph, i
 
 4. **Who pushes after a night.** After an orchestrated night's merges, the relay runs the repo's full check in a linked worktree of the root and, when the row says `push: main`, pushes main through the repo's pre-push gate. A relay child still never pushes. (2026-09-29; the owner's answer to decision 4, given in the selector, example-mac sitting 2026-09-28-6; design/relay-orchestrator-r1.md)
 
-5. **The owner's answers during a night.** While a night runs, the owner answers with `relay words "<text>"`, which only the owner's terminal may run: a row and a helper are refused. The next orchestrator sitting receives the text and records it with `decisions answer`. Stopping the night, answering in the file, committing and starting again always works too. (2026-09-29; the owner's answer to decision 5, given in the selector, example-mac sitting 2026-09-28-6; design/relay-orchestrator-r1.md)
+5. **The owner's answers during a night.** While a night runs, the owner answers with `agentik relay words "<text>"`, which only the owner's terminal may run: a row and a helper are refused. The next orchestrator sitting receives the text and records it with `agentik decisions answer`. Stopping the night, answering in the file, committing and starting again always works too. (2026-09-29; the owner's answer to decision 5, given in the selector, example-mac sitting 2026-09-28-6; design/relay-orchestrator-r1.md)
 
 6. **Writes to other repos.** An orchestrator row writes only its own repo. It reads a sibling repo as plain files and files a cross-repo ask as an intake file in its own `history/sessions/`. Work that writes several repos, such as example-ops's cross-repo moves, stays in an attended sitting. (2026-09-29; the owner's answer to decision 6, given in the selector, example-mac sitting 2026-09-28-6; design/relay-orchestrator-r1.md)
 
@@ -28,13 +28,13 @@ The closed choices of this repository: one numbered entry each, one paragraph, i
 
 ### The guards
 
-8. **The guard's shell reader.** Inside a relay row, the guard parses each Bash command with the mvdan.cc/sh Go library and judges every command in the syntax tree. A line the parser rejects is denied inside a row, and so is a zsh-only spelling the parser does not know. agent-relay takes mvdan.cc/sh as its first outside dependency. The hand-written reader in internal/hooks/guards.go is replaced by packets that follow a design record with one refuter round; until they land, the reader stays as AR44 left it and takes no further patch. (2026-09-30; the owner's answer to decision 8, the owner's word in the observer session, 2026-09-30 21:00)
+8. **The guard's shell reader.** Inside a relay row, the guard parses each Bash command with the mvdan.cc/sh Go library and judges every command in the syntax tree. A line the parser rejects is denied inside a row, and so is a zsh-only spelling the parser does not know. agentik-relay takes mvdan.cc/sh as its first outside dependency. The hand-written reader in internal/hooks/guards.go is replaced by packets that follow a design record with one refuter round; until they land, the reader stays as AR44 left it and takes no further patch. (2026-09-30; the owner's answer to decision 8, the owner's word in the observer session, 2026-09-30 21:00)
 
 9. **The guard's zsh test table.** The owner writes the table of about twenty zsh-only spellings, each shown read or denied, in one test file and at a time of the owner's choosing; no helper writes it, because Claude Code's safety check stops a helper that composes those lines. The tree reader (AR46, merged at 98f488c) stays live meanwhile, and the table stays an open risk in design/guard-parser-r1.md. Packet 3, which deletes the hand-written reader, waits for the table. (2026-10-10; the owner's answer to decision 9, the owner's word in the observer session, 2026-10-10 15:37)
 
 ### The gate
 
-10. **The gate's verify time limit.** A repo's relay config may carry its own verify limit; when it is unset, the limit stays 900 s. `relay doctor --verify` measures the repo's verify line and suggests a limit. A verify line cut at its limit reads red with a reason that says the line was cut, never with an empty reason. (2026-10-10; the owner's answer to decision 10, the owner's word in the observer session, 2026-10-10 15:37)
+10. **The gate's verify time limit.** A repo's relay config may carry its own verify limit; when it is unset, the limit stays 900 s. `agentik relay doctor --verify` measures the repo's verify line and suggests a limit. A verify line cut at its limit reads red with a reason that says the line was cut, never with an empty reason. (2026-10-10; the owner's answer to decision 10, the owner's word in the observer session, 2026-10-10 15:37)
 
 ### Usage limits
 

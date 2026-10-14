@@ -1,17 +1,17 @@
 ---
 description: Dry-run the queue: rows, their states, the problems, and the spawn line each row would run
-allowed-tools: Bash(relay:*)
+allowed-tools: Bash(agentik-relay *)
 argument-hint: "[--queue PATH] [--rows a,b] [--until HH:MM]"
 ---
 
-Run `relay plan --json $ARGUMENTS` and print it. If the exit is 3 or `relay` is not found,
-say `relay is not on PATH: make install` and stop. Exit 2 means the plan is invalid: print it
+Run `agentik-relay plan --json $ARGUMENTS` and print it. If the exit is 3 or `agentik-relay` is not found,
+say `agentik-relay is not on PATH: make install` and stop. Exit 2 means the plan is invalid: print it
 anyway.
 
 From the JSON print, in plain lines:
 
 1. `night <night>, root <root>, valid <valid>`, and `until` and `stops` when set. `run_stop`
-   names the stop the measure's budget makes: non-empty, `relay run` on this plan stops at
+   names the stop the measure's budget makes: non-empty, `agentik-relay run` on this plan stops at
    once, so print it and raise the measure (`measure_seconds` in the queue, or
    `--measure-seconds`) before the run; `""` means the budget cut nothing, not that the run
    will start.
@@ -22,4 +22,4 @@ From the JSON print, in plain lines:
 3. `verify` when set: `verify <name> on main: <status>, exit <main_exit> last "<main_last>"`
    (the merge takes the verify green or failing exactly so).
 4. Every top-level `problems[]` entry as `<row>: <msg>`.
-5. Nothing is started: `plan` never spawns. The night starts with `relay run` in a terminal.
+5. Nothing is started: `plan` never spawns. The night starts with `agentik-relay run` in a terminal.

@@ -12,7 +12,7 @@ import (
 )
 
 // TestAR32BFix_StopDuringMergingSitting is ar32b review round 1 (F1): the
-// owner's `relay stop` arrives while o.2, which merges b, runs. The night
+// owner's `agentik-relay stop` arrives while o.2, which merges b, runs. The night
 // drains, o.2 lands, and b, on main through o.2's merge, takes that merge
 // as its MergeSHA before the stop's early return, so the stop line names
 // no row unmerged.

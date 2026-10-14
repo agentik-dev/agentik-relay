@@ -5,6 +5,7 @@ package effects
 
 import (
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -179,13 +180,35 @@ func SuggestVerifySeconds(took time.Duration) int {
 	return min(max(s, int(Timeout/time.Second)), MaxVerifySeconds)
 }
 
-// StateDir is ${XDG_STATE_HOME:-~/.local/state}/agent-relay (D9's shape).
+// StateDir is StateIn(${XDG_STATE_HOME:-~/.local/state}) (D9's shape).
 func StateDir(env func(string) string) string {
 	base := env("XDG_STATE_HOME")
 	if base == "" {
 		base = filepath.Join(env("HOME"), ".local", "state")
 	}
-	return filepath.Join(base, "agent-relay")
+	return StateIn(base)
+}
+
+// StateIn is the relay's state dir under base: base/agentik-relay, else
+// the old name's folder (oldStateName) when only it exists (agentik-r1 §6.3 c2).
+func StateIn(base string) string {
+	return NewElseOld(osExists, filepath.Join(base, stateName), filepath.Join(base, oldStateName))
+}
+
+// NewElseOld is agentik-r1 §6.3's rule for a renamed path: the new one when
+// it exists, else the old one when it exists, else the new. Folders move
+// only in the cold window; until then readers take the new, else the old.
+func NewElseOld(exists func(string) bool, nw, old string) string {
+	if !exists(nw) && exists(old) {
+		return old
+	}
+	return nw
+}
+
+// osExists reports a path on the real file system, a symlink followed.
+func osExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
 }
 
 // LedgerDir is where the ledger's day files live, under the state directory

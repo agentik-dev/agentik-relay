@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/agentik-dev/agentik-relay/internal/effects"
+	"github.com/agentik-dev/agentik-relay/internal/relay"
 )
 
 // Report is the morning read (§9 `report`), built from the night's ledger
@@ -135,9 +136,8 @@ func BuildReport(lines []map[string]any, night string, g ...effects.Git) Report 
 	}
 	var stops []stop
 	takeBack := func(row string) { // an earlier sitting's verdict, its row's next line here (AR74)
-		resume := "relay resume " + row
 		green = slices.DeleteFunc(green, func(id string) bool { return id == row })
-		r.Resume = slices.DeleteFunc(r.Resume, func(x string) bool { return x == resume })
+		r.Resume = slices.DeleteFunc(r.Resume, func(x string) bool { id, ok := relay.ResumeRow(x); return ok && id == row })
 		stops = slices.DeleteFunc(stops, func(s stop) bool { return s.sitting && s.Row == row })
 	}
 	for _, l := range lines {
@@ -165,7 +165,7 @@ func BuildReport(lines []map[string]any, night string, g ...effects.Git) Report 
 			gate, _ := l["gate"].(map[string]any)
 			cause, _ := gate["cause"].(string)
 			takeBack(row)
-			resume := "relay resume " + row
+			resume := relay.ResumeLine(row)
 			switch state, reason := str("state"), str("reason"); state {
 			case "green":
 				green = append(green, row)
@@ -199,8 +199,7 @@ func BuildReport(lines []map[string]any, night string, g ...effects.Git) Report 
 			}
 			r.Merged = append(r.Merged, Merged{id, sha})
 			merged[id] = true
-			resume := "relay resume " + id
-			r.Resume = slices.DeleteFunc(r.Resume, func(l string) bool { return l == resume })
+			r.Resume = slices.DeleteFunc(r.Resume, func(l string) bool { row, ok := relay.ResumeRow(l); return ok && row == id })
 			for i := range r.Stopped.Rows {
 				if r.Stopped.Rows[i].Row == id {
 					r.Stopped.Rows[i].Resume = ""

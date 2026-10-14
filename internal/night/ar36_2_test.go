@@ -29,7 +29,7 @@ func TestAR36_2_LinkedPortNeedsLinkedHome(t *testing.T) {
 	home := t.TempDir()
 	night.PidHomeLink = home
 	dir, err = night.PidDir()
-	if err != nil || dir != filepath.Join(home, ".local", "state", "agent-relay") {
+	if err != nil || dir != filepath.Join(home, ".local", "state", "agentik-relay") {
 		t.Errorf("PidDir with both links = %q, %v; want under %s", dir, err, home)
 	}
 }

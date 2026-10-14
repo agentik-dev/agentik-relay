@@ -109,7 +109,7 @@ func TestAR59_5_MergeCutRow(t *testing.T) {
 	if m := lastOf(w.ledger.Written(), "merge"); m["result"] != string(relay.VerifyCut) || !strings.Contains(m["detail"].(string), "verify cut at 1 s") {
 		t.Fatalf("the merge line %v, want result verify-cut naming the cut", m)
 	}
-	if got := out.String(); !strings.Contains(got, "relay r1: red verify-cut\n") || !strings.Contains(got, "relay resume r1") {
+	if got := out.String(); !strings.Contains(got, "relay r1: red verify-cut\n") || !strings.Contains(got, "agentik relay resume r1") {
 		t.Errorf("no red verify-cut line and resume line in:\n%s", got)
 	}
 }

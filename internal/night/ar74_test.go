@@ -85,10 +85,10 @@ func TestAR74_2_LastSitting(t *testing.T) {
 	for _, s := range r.Stopped.Rows {
 		stopped = append(stopped, s.Row+" "+s.State+" "+s.Resume)
 	}
-	if want := []string{"r2 red relay resume r2", "r3 red relay resume r3"}; !reflect.DeepEqual(stopped, want) {
+	if want := []string{"r2 red agentik relay resume r2", "r3 red agentik relay resume r3"}; !reflect.DeepEqual(stopped, want) {
 		t.Fatalf("stopped %q; want %q", stopped, want)
 	}
-	if want := []string{"relay resume r2", "relay resume r3"}; !reflect.DeepEqual(r.Resume, want) {
+	if want := []string{"agentik relay resume r2", "agentik relay resume r3"}; !reflect.DeepEqual(r.Resume, want) {
 		t.Fatalf("resume %q; want %q", r.Resume, want)
 	}
 	if want := []string{"r1 (off main)"}; !reflect.DeepEqual(r.Waiting, want) {
@@ -99,7 +99,7 @@ func TestAR74_2_LastSitting(t *testing.T) {
 	}
 	md := string(night.Markdown(r, "", ""))
 	block := md[strings.Index(md, "## Resume"):strings.Index(md, "## Burn")]
-	for line, want := range map[string]int{"relay resume r1": 0, "relay resume r2": 1, "relay resume r3": 1} {
+	for line, want := range map[string]int{"agentik relay resume r1": 0, "agentik relay resume r2": 1, "agentik relay resume r3": 1} {
 		if got := strings.Count(block, line); got != want {
 			t.Fatalf("%q %d times in the Resume block; want %d:\n%s", line, got, want, block)
 		}

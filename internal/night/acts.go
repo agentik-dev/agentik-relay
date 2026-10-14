@@ -67,7 +67,7 @@ func (v *actView) read(g effects.Git, root string) ([]Act, bool) {
 	return acts, true
 }
 
-// actsLine is one act as `relay status` prints it: two spaces, the sha's
+// actsLine is one act as `agentik-relay status` prints it: two spaces, the sha's
 // twelve, two spaces, the subject with control bytes as spaces, clipped so
 // the line stays under 100 columns.
 func actsLine(a Act) string {

@@ -54,7 +54,7 @@ var PinTools = []string{"go", "gofmt", "python3", "claude", "staticcheck"}
 
 // ErrUnpinnedTool is Pin's error when git, make, sh or ps is in no dir
 // the account cannot write, or the temp root is refused (AR31 act 1):
-// cmd/relay exits 2, unpinned-tool.
+// cmd/agentik-relay exits 2, unpinned-tool.
 var ErrUnpinnedTool = errors.New("unpinned-tool")
 
 // pycacheOff is the pinned env's PYTHONPYCACHEPREFIX (AR49 act 1,
@@ -155,7 +155,7 @@ func Current() (Pinned, bool) {
 // its package's pin with it).
 func Use(p Pinned) { pinned.Store(&p) }
 
-// Pin is the pin at start (cmd/relay, before any spawn): PinAt under the
+// Pin is the pin at start (cmd/agentik-relay, before any spawn): PinAt under the
 // state root and the account's home, then the merge's committer read
 // once (Identity), while ~/.gitconfig is still the owner's.
 func Pin() (Pinned, error) {

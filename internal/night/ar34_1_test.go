@@ -15,7 +15,7 @@ import (
 
 // saidDuringPlan builds r1's plan, then writes line to the night's control
 // file with its modification time at the plan's start plus age (the owner's
-// `relay stop` or `relay kill` during the measure, AR34 act 1), and returns
+// `agentik-relay stop` or `agentik-relay kill` during the measure, AR34 act 1), and returns
 // the night's options holding the plan and the control file's path.
 func saidDuringPlan(t *testing.T, line string, age time.Duration) (*world, *queue.Queue, night.NightOptions, string) {
 	t.Helper()

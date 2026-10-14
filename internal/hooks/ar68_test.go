@@ -23,7 +23,7 @@ func ar68Hook(t *testing.T, event, source string, env map[string]string, fx *Fak
 func ar68Head(t *testing.T, fx *Fake) string {
 	t.Helper()
 	var st state
-	b, ok := fx.Files["/state/agent-relay/sessions/s68/start.json"]
+	b, ok := fx.Files["/state/agentik-relay/sessions/s68/start.json"]
 	if !ok {
 		return ""
 	}
@@ -65,7 +65,7 @@ func TestAR68_2_StartHookCut(t *testing.T) {
 	}
 
 	fx = world()
-	fx.Files = map[string][]byte{"/state/agent-relay/sessions/s68/start.json": []byte(`{"head":"old","cwd":"/repo","started":"2026-09-22T11:00:00Z","packet":"","blocks":1}`)}
+	fx.Files = map[string][]byte{"/state/agentik-relay/sessions/s68/start.json": []byte(`{"head":"old","cwd":"/repo","started":"2026-09-22T11:00:00Z","packet":"","blocks":1}`)}
 	ar68Hook(t, "SessionStart", "resume", row, fx)
 	if h := ar68Head(t, fx); h != "old" {
 		t.Fatalf("resume over an old head recorded %q, want old", h)

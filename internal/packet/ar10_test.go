@@ -8,7 +8,7 @@ import (
 )
 
 // TestAR10_0_ParseRefusesUnboundedLines: an acceptance line is targeted
-// (§15): `relay plan|run` without --rows, `relay gate` without a row, `go
+// (§15): `agentik-relay plan|run` without --rows, `agentik-relay gate` without a row, `go
 // test` without a package and -run, `go test ./...`, and `make check` (the
 // verify line is the gate, never an acceptance line) make the packet
 // invalid; the bounded forms and the pre-AR10 records parse.

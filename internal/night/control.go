@@ -9,7 +9,7 @@ import (
 	"github.com/agentik-dev/agentik-relay/internal/effects"
 )
 
-// ControlPath is the night's control file (§9): `relay stop` and `relay
+// ControlPath is the night's control file (§9): `agentik-relay stop` and `relay
 // kill` append to it, the night's loop reads it after every event.
 func ControlPath(state, night string) string {
 	return filepath.Join(state, "nights", night, "control")

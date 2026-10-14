@@ -67,7 +67,7 @@ func TestAR38_1_MeasureSecondsOrder(t *testing.T) {
 // whose measure outlasts its budget on the clock stops
 // `stopped:measure-timeout`, its stop line's detail naming the time, its
 // source and both ways to raise it; nothing spawns, and the night is not
-// clean (`relay run` exits 1, as it did under `budget`). An old status
+// clean (`agentik-relay run` exits 1, as it did under `budget`). An old status
 // that says `budget` still prints as it is.
 func TestAR38_2_MeasureTimeoutNamed(t *testing.T) {
 	repo, q := fixture(t)

@@ -219,7 +219,7 @@ func TestControlKill(t *testing.T) {
 		t.Fatalf("the child was not terminated: %v", exit)
 	}
 	st := night.ReadStatus(effects.OSFS{}, o.State, n.ID)
-	if len(st.Resume) != 1 || st.Resume[0] != "relay resume r1" {
+	if len(st.Resume) != 1 || st.Resume[0] != "agentik relay resume r1" {
 		t.Fatalf("resume %v", st.Resume)
 	}
 }
@@ -399,12 +399,12 @@ func TestAR4_UnrunGateIsRed(t *testing.T) {
 	if n.State != relay.Stopped(relay.QueueEmpty) || states(n) != "r1=red r2=green" || n.Sittings["r1"].Reason != relay.GateUnrunReason {
 		t.Fatalf("night %s: %s; r1 %+v", n.State, states(n), n.Sittings["r1"])
 	}
-	if !strings.Contains(out.String(), "relay r1: red gate-unrun\nrelay resume r1\n") {
+	if !strings.Contains(out.String(), "relay r1: red gate-unrun\nagentik relay resume r1\n") {
 		t.Fatalf("out:\n%s", out.String())
 	}
 	var b bytes.Buffer
 	night.PrintStatus(&b, night.ReadStatus(effects.OSFS{}, o.State, n.ID))
-	if !strings.Contains(b.String(), "red: gate-unrun") || !strings.Contains(b.String(), "relay resume r1") {
+	if !strings.Contains(b.String(), "red: gate-unrun") || !strings.Contains(b.String(), "agentik relay resume r1") {
 		t.Fatalf("status:\n%s", b.String())
 	}
 }
@@ -448,12 +448,12 @@ func TestAR5_NightLinesResumeAndTilde(t *testing.T) {
 	got = strings.Join(rest, "")
 	tilde := "~/" + filepath.Base(w.root) + "/.claude/worktrees/"
 	for _, want := range []string{"relay r1: running in " + tilde + "r1\n", "relay r2: running in " + tilde + "r2\n",
-		"relay r1: red\nrelay resume r1\n", "relay r2: green\n"} {
+		"relay r1: red\nagentik relay resume r1\n", "relay r2: green\n"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("no %q in:\n%s", want, got)
 		}
 	}
-	if strings.Contains(got, "; relay resume") || strings.Contains(got, "relay resume r2") {
+	if strings.Contains(got, "; relay resume") || strings.Contains(got, "agentik relay resume r2") {
 		t.Fatalf("out:\n%s", got)
 	}
 }

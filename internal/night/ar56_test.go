@@ -88,11 +88,11 @@ func TestAR56_1(t *testing.T) {
 	if !reflect.DeepEqual(r.Waiting, []string{"g2 (off main)"}) {
 		t.Fatalf("Waiting = %v, want g2 alone", r.Waiting)
 	}
-	if !reflect.DeepEqual(r.Resume, []string{"relay resume r2"}) {
-		t.Fatalf("Resume = %v, want relay resume r2 alone", r.Resume)
+	if !reflect.DeepEqual(r.Resume, []string{"agentik relay resume r2"}) {
+		t.Fatalf("Resume = %v, want agentik relay resume r2 alone", r.Resume)
 	}
 	stopped := []night.StoppedRow{{Row: "r1", State: "red", Reason: "acceptance"},
-		{Row: "r2", State: "red", Reason: "acceptance", Resume: "relay resume r2"}}
+		{Row: "r2", State: "red", Reason: "acceptance", Resume: "agentik relay resume r2"}}
 	if !reflect.DeepEqual(r.Stopped.Rows, stopped) {
 		t.Fatalf("Stopped.Rows = %+v, want %+v", r.Stopped.Rows, stopped)
 	}
@@ -100,7 +100,7 @@ func TestAR56_1(t *testing.T) {
 	// Without a git, as before AR56.
 	r = night.BuildReport(lines, ar56Night)
 	if len(r.Merged) != 0 || !reflect.DeepEqual(r.Waiting, []string{"g1 (off main)", "g2 (off main)"}) ||
-		!reflect.DeepEqual(r.Resume, []string{"relay resume r1", "relay resume r2"}) {
+		!reflect.DeepEqual(r.Resume, []string{"agentik relay resume r1", "agentik relay resume r2"}) {
 		t.Fatalf("no git: merged %v waiting %v resume %v", r.Merged, r.Waiting, r.Resume)
 	}
 	// A git error (the root gone) leaves every row as it is.
@@ -120,10 +120,10 @@ func TestAR56_1(t *testing.T) {
 func TestAR56_2(t *testing.T) {
 	st := night.Status{Night: ar56Night, State: "stopped", Reason: "queue-empty", Rows: []night.RowStatus{
 		{ID: "g1", State: "green"},
-		{ID: "r1", State: "red", Reason: "acceptance", Resume: "relay resume r1"},
-		{ID: "r2", State: "red", Reason: "acceptance", Resume: "relay resume r2"},
+		{ID: "r1", State: "red", Reason: "acceptance", Resume: "agentik relay resume r1"},
+		{ID: "r2", State: "red", Reason: "acceptance", Resume: "agentik relay resume r2"},
 		{ID: "g3", State: "green", MergeSHA: "c0ffee"},
-	}, Resume: []string{"relay resume r1", "relay resume r2"}}
+	}, Resume: []string{"agentik relay resume r1", "agentik relay resume r2"}}
 	st.TakeMerges(map[string]string{"g1": "a11ce5", "r1": "b0b0b0", "g3": "d00d00"})
 	got := map[string]night.RowStatus{}
 	for _, r := range st.Rows {
@@ -133,15 +133,15 @@ func TestAR56_2(t *testing.T) {
 		r1.State != "red" || r1.Reason != "acceptance" || g1.State != "green" {
 		t.Fatalf("g1 %+v, r1 %+v", g1, r1)
 	}
-	if r2, g3 := got["r2"], got["g3"]; r2.MergeSHA != "" || r2.Resume != "relay resume r2" || g3.MergeSHA != "c0ffee" {
+	if r2, g3 := got["r2"], got["g3"]; r2.MergeSHA != "" || r2.Resume != "agentik relay resume r2" || g3.MergeSHA != "c0ffee" {
 		t.Fatalf("r2 %+v, g3 %+v", r2, g3)
 	}
-	if !reflect.DeepEqual(st.Resume, []string{"relay resume r2"}) {
-		t.Fatalf("Resume = %v, want relay resume r2 alone", st.Resume)
+	if !reflect.DeepEqual(st.Resume, []string{"agentik relay resume r2"}) {
+		t.Fatalf("Resume = %v, want agentik relay resume r2 alone", st.Resume)
 	}
 	var b bytes.Buffer
 	night.PrintStatus(&b, st)
-	if out := b.String(); strings.Contains(out, "relay resume r1") || !strings.Contains(out, "relay resume r2") {
+	if out := b.String(); strings.Contains(out, "agentik relay resume r1") || !strings.Contains(out, "agentik relay resume r2") {
 		t.Fatalf("PrintStatus:\n%s", out)
 	}
 }
@@ -199,7 +199,7 @@ func ar56Row(n, id, state, before, after string) []map[string]any {
 // commit, so its tip is the cut X; while main is at X the owner runs `git
 // merge main` on an older night's waiting row g0, then lands g0 with a
 // plain `git merge`, which fast-forwards: X is now a later parent of a
-// merge on main's first-parent line. r2 keeps `relay resume r2`; g1,
+// merge on main's first-parent line. r2 keeps `agentik relay resume r2`; g1,
 // merged --no-ff by hand with its head_after its tip, still reads merged.
 // F2: night N1's red r1 committed A; the branch name is reused, and night
 // N2's r1 (B, off main) is merged by the relay. N1's r1 gets no sha, since
@@ -229,8 +229,8 @@ func TestAR56_5(t *testing.T) {
 		if got, want := night.HandMerges(effects.OSGit{}, lines, n1), map[string]string{"g1": g1}; !reflect.DeepEqual(got, want) {
 			t.Fatalf("HandMerges = %v, want %v (r2's tip is its cut)", got, want)
 		}
-		if r := night.BuildReport(lines, n1, effects.OSGit{}); !reflect.DeepEqual(r.Resume, []string{"relay resume r2"}) {
-			t.Fatalf("Resume = %v, want relay resume r2", r.Resume)
+		if r := night.BuildReport(lines, n1, effects.OSGit{}); !reflect.DeepEqual(r.Resume, []string{"agentik relay resume r2"}) {
+			t.Fatalf("Resume = %v, want agentik relay resume r2", r.Resume)
 		}
 	})
 	t.Run("F2", func(t *testing.T) {
@@ -256,7 +256,7 @@ func TestAR56_5(t *testing.T) {
 			t.Fatalf("N1's HandMerges = %v, want none (N1's commit is not in main)", got)
 		}
 		if r := night.BuildReport(lines, n1, effects.OSGit{}); len(r.Merged) != 0 ||
-			!reflect.DeepEqual(r.Resume, []string{"relay resume r1"}) {
+			!reflect.DeepEqual(r.Resume, []string{"agentik relay resume r1"}) {
 			t.Fatalf("N1's report: merged %v, resume %v", r.Merged, r.Resume)
 		}
 	})

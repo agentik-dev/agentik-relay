@@ -9,7 +9,7 @@ import (
 )
 
 func TestFileLedger(t *testing.T) {
-	state := filepath.Join(t.TempDir(), "agent-relay")
+	state := filepath.Join(t.TempDir(), "agentik-relay")
 	clock := FakeClock{time.Date(2026, 9, 22, 23, 5, 0, 0, time.UTC)}
 	l := NewLedger(state, clock, "2026-09-22-1")
 	if err := l.Append("plan", map[string]any{"row": "a3", "result_tail": strings.Repeat("x", 900)}); err != nil {
@@ -42,7 +42,7 @@ func TestFileLedger(t *testing.T) {
 // TestAR7_LinesOverflowError: a line over the scanner's 1 MiB cap is an
 // error naming the file, never a silent stop.
 func TestAR7_LinesOverflowError(t *testing.T) {
-	l := NewLedger(filepath.Join(t.TempDir(), "agent-relay"), FakeClock{}, "n")
+	l := NewLedger(filepath.Join(t.TempDir(), "agentik-relay"), FakeClock{}, "n")
 	if err := os.MkdirAll(l.Dir, 0o700); err != nil {
 		t.Fatal(err)
 	}

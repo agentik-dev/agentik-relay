@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/agentik-dev/agentik-relay/internal/relay"
 )
 
 // Notify tells the owner what the night did (§7, §9, D23). A failed Send is
@@ -76,7 +78,7 @@ func Notices(event string, fields map[string]any) (Notice, bool) {
 	}
 	suffix := ""
 	if st, _ := fields["state"].(string); event == "sitting" && (st == "red" || st == "failed") && n.Row != "" {
-		suffix = "; relay resume " + n.Row
+		suffix = "; " + relay.ResumeLine(n.Row)
 	}
 	suffix = capText(suffix, NoticeCap)
 	n.Body = capText(strings.Join(parts, " "), NoticeCap-len(suffix)) + suffix

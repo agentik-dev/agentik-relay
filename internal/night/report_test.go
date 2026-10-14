@@ -18,21 +18,21 @@ func TestStatusResumeLines(t *testing.T) {
 	w, q, by := nightWorld(t, spec{id: "r1", echo: "no", fixture: "ok.jsonl"}, spec{id: "r2", echo: "ok", fixture: "ok.jsonl"})
 	o := w.opts(t, by)
 	n := runNight(t, w, q, o)
-	want := []string{"relay resume r1"}
+	want := []string{"agentik relay resume r1"}
 	st := night.ReadStatus(effects.OSFS{}, o.State, n.ID)
 	if !reflect.DeepEqual(st.Resume, want) || st.Rows[0].Resume != want[0] || st.Rows[1].Resume != "" {
 		t.Fatalf("status resume %v %+v", st.Resume, st.Rows)
 	}
 	var b strings.Builder
 	night.PrintStatus(&b, st)
-	if !strings.Contains(b.String(), "\nrelay resume r1\n") {
+	if !strings.Contains(b.String(), "\nagentik relay resume r1\n") {
 		t.Fatalf("dashboard:\n%s", b.String())
 	}
 	r := night.BuildReport(w.ledger.Written(), n.ID)
 	if !reflect.DeepEqual(r.Resume, want) {
 		t.Fatalf("report resume %v", r.Resume)
 	}
-	if !strings.Contains(lastOf(w.ledger.Written(), "stop")["resume"].([]any)[0].(string), "relay resume r1") {
+	if !strings.Contains(lastOf(w.ledger.Written(), "stop")["resume"].([]any)[0].(string), "agentik relay resume r1") {
 		t.Fatal("the stop line has no resume line")
 	}
 }
@@ -106,12 +106,12 @@ func TestReportHeadingOrder(t *testing.T) {
 // `stop` line as `key: value` lines, keys sorted, `event` dropped, a list
 // joined by `, `, no fence; the report's JSON keeps the line whole.
 func TestAR5_StopLineKeyValue(t *testing.T) {
-	line := `{"event":"stop","state":"stopped","reason":"queue-empty","resume":["relay resume r1","relay resume r2"],"sittings":3}`
+	line := `{"event":"stop","state":"stopped","reason":"queue-empty","resume":["agentik relay resume r1","agentik relay resume r2"],"sittings":3}`
 	r := night.Report{Night: "2026-09-22-1", Stopped: night.Stopped{Reason: "queue-empty", Line: line}}
 	md := string(night.Markdown(r, "", ""))
 	sec := md[strings.Index(md, "## Stopped"):]
 	sec = sec[:strings.Index(sec, "## Waiting")]
-	want := "reason: queue-empty\nresume: relay resume r1, relay resume r2\nsittings: 3\nstate: stopped\n"
+	want := "reason: queue-empty\nresume: agentik relay resume r1, agentik relay resume r2\nsittings: 3\nstate: stopped\n"
 	if !strings.Contains(sec, want) || strings.Contains(sec, "```") || strings.Contains(sec, "event") {
 		t.Fatalf("## Stopped:\n%s", sec)
 	}

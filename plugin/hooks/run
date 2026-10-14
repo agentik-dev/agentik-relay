@@ -1,11 +1,15 @@
 #!/bin/sh
-# The hook shim (conventions §1, AR17B): hand the event to `$RELAY_BIN hook
-# <event>` (ChildEnv sets it to the running relay's absolute path), else to
-# `relay` on PATH. With neither, a sitting (RELAY_ROW set) fails closed: its
-# Bash calls are denied (ADV10-15); outside one the hook says {} (relay
-# doctor reports the missing binary).
+# The hook shim (conventions §1, AR17B; agentik-r1 §6.3 c11): hand the event
+# to `$RELAY_BIN hook <event>` (ChildEnv sets it to the running relay's
+# absolute path, which a child keeps), else to `agentik-relay` on PATH, else
+# to the old name `relay` (its alias until 2026-12-31). With none, a sitting
+# (RELAY_ROW set) fails closed: its Bash calls are denied (ADV10-15); outside
+# one the hook says {} (agentik-relay doctor reports the missing binary).
 if [ -n "$RELAY_BIN" ] && [ -x "$RELAY_BIN" ]; then
   exec "$RELAY_BIN" hook "$1"
+fi
+if command -v agentik-relay >/dev/null 2>&1; then
+  exec agentik-relay hook "$1"
 fi
 if command -v relay >/dev/null 2>&1; then
   exec relay hook "$1"

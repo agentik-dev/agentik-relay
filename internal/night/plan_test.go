@@ -220,7 +220,7 @@ func TestAR4_DepNeverSatisfiedByOwnBase(t *testing.T) {
 // are the argv run in the worktree.
 func TestAR5_SpawnLineWrapped(t *testing.T) {
 	home := "/home/owner"
-	wt := home + "/src/agent-relay/.claude/worktrees/a5-effects-plan-with-a-long-name"
+	wt := home + "/src/agentik-relay/.claude/worktrees/a5-effects-plan-with-a-long-name"
 	argv := SpawnArgv(queue.Row{Model: "claude-opus-5-5", Turns: 120, USD: 15}, NewUUID(), "Bash Edit Write MultiEdit NotebookEdit", true)
 	pieces := WrapSpawn(wt, argv, home)
 	if len(pieces) < 2 || !strings.HasPrefix(pieces[0], "  spawn: cd ~/src/") {

@@ -179,11 +179,11 @@ func TestOSGit(t *testing.T) {
 func TestStateDir(t *testing.T) {
 	env := map[string]string{"HOME": "/h"}
 	get := func(k string) string { return env[k] }
-	if d := StateDir(get); d != "/h/.local/state/agent-relay" {
+	if d := StateDir(get); d != "/h/.local/state/agentik-relay" {
 		t.Fatalf("StateDir = %q", d)
 	}
 	env["XDG_STATE_HOME"] = "/x"
-	if d := StateDir(get); d != "/x/agent-relay" {
+	if d := StateDir(get); d != "/x/agentik-relay" {
 		t.Fatalf("StateDir = %q", d)
 	}
 }

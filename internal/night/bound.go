@@ -508,7 +508,7 @@ func (b *boundShell) Run(dir, line string, timeout time.Duration) (int, string, 
 }
 
 // MeasurePoll is Options.Poll's default: how often the measure reads the
-// night's control file under `relay run` (AR34 act 2).
+// night's control file under `agentik-relay run` (AR34 act 2).
 var MeasurePoll = 2 * time.Second
 
 // stopError is a line the owner's stop left unrun or cut (AR34 act 2):

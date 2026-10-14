@@ -152,7 +152,7 @@ func TestAR70_2_GateOutAtTheWake(t *testing.T) {
 			t.Fatalf("pause lines after the wake %v, night %s; want none on a running night", p, n.State)
 		}
 		stop := lastOf(all, "stop")
-		if n.State != relay.Stopped(relay.UsageLimit) || !strings.Contains(fmt.Sprint(stop["resume"]), "relay resume r2") {
+		if n.State != relay.Stopped(relay.UsageLimit) || !strings.Contains(fmt.Sprint(stop["resume"]), "agentik relay resume r2") {
 			t.Fatalf("night %s, resume %v; want stopped:usage-limit naming r2", n.State, stop["resume"])
 		}
 		tree := ar67Tree(w, "r2")

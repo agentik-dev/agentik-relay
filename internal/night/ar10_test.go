@@ -288,7 +288,7 @@ func TestAR10_3_SecondPlanSameHeadNoShell(t *testing.T) {
 		t.Fatalf("checks differ:\n%v %v\n%v %v", p1.Verify, p1.Rows[1].Baseline, p2.Verify, p2.Rows[1].Baseline)
 	}
 	fx.Getenv = func(k string) string { return map[string]string{"XDG_STATE_HOME": "/"}[k] }
-	fx.FS.WriteFile("/agent-relay/baselines.json", fs.Files["/state/baselines.json"], 0o600)
+	fx.FS.WriteFile("/agentik-relay/baselines.json", fs.Files["/state/baselines.json"], 0o600)
 	BaselineOnMain(fx, "/root", q.Rows[1].Packet.Acceptance)
 	if m := len(sh.Calls()); m != n {
 		t.Fatalf("BaselineOnMain at the same head ran %d lines", m-n)

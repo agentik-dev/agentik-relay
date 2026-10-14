@@ -61,7 +61,7 @@ func TestAR62_4_StatusAndReport(t *testing.T) {
 			t.Errorf("%d columns: %s", len([]rune(l)), l)
 		}
 	}
-	if !strings.Contains(out.String(), "relay resume r1\nrelay r1: cause: acceptance 1:") {
+	if !strings.Contains(out.String(), "agentik relay resume r1\nrelay r1: cause: acceptance 1:") {
 		t.Fatalf("out:\n%s", out.String())
 	}
 	r := night.BuildReport(w.ledger.Written(), n.ID)
@@ -96,7 +96,7 @@ func TestAR62Fix_1_SkipReasonWhole(t *testing.T) {
 // reason naming its worktree, and a red row's long cause naming a file
 // under the root at the clip, leave no fragment of either.
 func TestAR62Fix_2_RootBeforeClip(t *testing.T) {
-	root, home := "/home/u/src/agent-relay", "/home/u"
+	root, home := "/home/u/src/agentik-relay", "/home/u"
 	id := "ar62-red-names-its-cause"
 	why := "stage " + id + ": the worktree " + root + "/.claude/worktrees/" + id + " exists"
 	cause := `acceptance 1: last "FAIL x_test.go:3 ` + strings.Repeat("y", 60) + ` open ` + root + `/a.txt", want reads 1`

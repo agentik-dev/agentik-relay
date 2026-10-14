@@ -259,7 +259,7 @@ func TestAR32A_4_WaitingStops(t *testing.T) {
 }
 
 // TestAR32A_4_RedRunsReadyRowsThenStops: o.1 lands b; o.2 edits the
-// brief and reads red; it is parked (no o.3, relay resume o.2), the
+// brief and reads red; it is parked (no o.3, agentik relay resume o.2), the
 // rows ready run, and the night stops orchestrator-red.
 func TestAR32A_4_RedRunsReadyRowsThenStops(t *testing.T) {
 	w, q, files := orchNight(t, "- act 1", nil)
@@ -274,7 +274,7 @@ func TestAR32A_4_RedRunsReadyRowsThenStops(t *testing.T) {
 	if got := sittings(w); !slices.Equal(got, []string{"o.1=green", "b=green", "o.2=red"}) || n.Reason != relay.OrchestratorRed {
 		t.Fatalf("sittings %v, stop %s", got, n.Reason)
 	}
-	if !strings.Contains(out.String(), "relay resume o.2") {
+	if !strings.Contains(out.String(), "agentik relay resume o.2") {
 		t.Fatalf("no resume line:\n%s", out.String())
 	}
 }

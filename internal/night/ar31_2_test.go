@@ -39,7 +39,7 @@ func TestAR31_2_NightNamesLog(t *testing.T) {
 		t.Fatalf("night %s: %s", n.State, states(n))
 	}
 	got := out.String()
-	if !strings.Contains(got, "relay r1: red\nrelay r1: log: /x/r1-line1.log\nrelay resume r1\n") {
+	if !strings.Contains(got, "relay r1: red\nrelay r1: log: /x/r1-line1.log\nagentik relay resume r1\n") {
 		t.Errorf("no r1 log line between its red line and its resume line in:\n%s", got)
 	}
 	if !strings.Contains(got, "relay r2: green\n") || strings.Contains(got, "relay r2: log:") {

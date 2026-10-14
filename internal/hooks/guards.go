@@ -56,14 +56,40 @@ var Guards = []Guard{
 var NestedRun = Guard{"nested-run", nil, "a sitting never builds the relay, starts a night, gates, resumes, nor plans without --rows", nil, nestedRun}
 
 // relayPath reports a word naming the relay's main package: a path (or a
-// .go file in one) that filepath.Cleans to cmd/relay or ends in /cmd/relay;
-// with bare, also one that cleans to relay (`cd cmd && go run ./relay`).
+// .go file in one) that filepath.Cleans to cmd/agentik-relay or the old
+// cmd/relay, or ends in either; with bare, also one that cleans to
+// agentik-relay or relay (`cd cmd && go run ./agentik-relay`). The old
+// spelling stays denied (agentik-r1 §6.3 c12).
 func relayPath(w string, bare bool) bool {
 	c := filepath.Clean(w)
 	if strings.HasSuffix(c, ".go") {
 		c = filepath.Dir(c)
 	}
-	return c == "cmd/relay" || strings.HasSuffix(c, "/cmd/relay") || strings.Contains(w, "cmd/relay") || bare && c == "relay"
+	for _, m := range relayMains {
+		if c == "cmd/"+m || strings.HasSuffix(c, "/cmd/"+m) || strings.Contains(w, "cmd/"+m) || bare && c == m {
+			return true
+		}
+	}
+	return false
+}
+
+// relayMains are the relay's main package names, the new and the old.
+var relayMains = []string{"agentik-relay", "relay"}
+
+// relayName reports words[j], the command word, naming the relay under any
+// of its spellings (agentik-r1 §6.3 c12): a binary named agentik-relay or
+// relay, or the front door agentik with relay next, whose relay word is
+// then the binary (at is j+1).
+func relayName(words []string, j int) (at int, ok bool) {
+	switch filepath.Base(words[j]) {
+	case "agentik-relay", "relay":
+		return j, true
+	case "agentik":
+		if j+1 < len(words) && words[j+1] == "relay" {
+			return j + 1, true
+		}
+	}
+	return -1, false
 }
 
 // HelperRelay is the helper's run guard (relay-r1 §15, AR40): a Bash call
@@ -80,9 +106,10 @@ var helperVerbs = map[string]bool{"run": true, "plan": true, "gate": true, "resu
 
 // relayBin finds the relay in a segment's argv (ADV10-6, -18; ADV11-9). i
 // is the command word. build is a go build or go install of a path that
-// cleans to cmd/relay, the binary may then run under any name; otherwise
-// bin is go run's cmd/relay package, a command word named relay, or any
-// cmd/relay path, and -1 when there is none.
+// cleans to cmd/agentik-relay or cmd/relay, the binary may then run under
+// any name; otherwise bin is go run's package, a command word naming the
+// relay (relayName: agentik-relay, relay, or agentik relay, whose bin is
+// the relay word), or any such path, and -1 when there is none.
 func relayBin(words []string) (i, bin int, build bool) {
 	i = commandWord(words)
 	bin = -1
@@ -105,7 +132,13 @@ func relayBin(words []string) (i, bin int, build bool) {
 		}
 	}
 	for j := i; bin < 0 && j < len(words); j++ {
-		if j == i && filepath.Base(words[j]) == "relay" || relayPath(words[j], false) {
+		if j == i {
+			if at, ok := relayName(words, j); ok {
+				bin = at
+				break
+			}
+		}
+		if relayPath(words[j], false) {
 			bin = j
 		}
 	}
@@ -805,15 +838,20 @@ func helperLine(words []string, i, d, turns int) bool {
 	return print && maxTurns && budget
 }
 
-// DetachedServer and ClaudeSession are the row's process doors (AR25 act
+// DetachedServer and NestedSession are the row's process doors (AR25 act
 // 0; ADV15-2, -5): a multiplexer's window is its server's child, never the
 // sitting's, so the watchdog and the sweep never see it and it outlives
-// the row; and a row starts no sitting of its own.
+// the row; and a row starts no sitting of its own. NestedSession matches
+// the session tool under all three spellings, the old one still denied
+// (agentik-r1 §6.3 c12), and lets the charter verb through under each:
+// the orchestrator's rules tell a row to open its charter, which starts
+// no sitting.
 var (
 	DetachedServer = Guard{"detached-server", regexp.MustCompile(`^(tmux|screen|byobu|dtach|abduco|zellij)(\s|$)`),
 		"a detached server's child is never the sitting's, so the sweep never sees it; run the command itself", nil, nil}
-	ClaudeSession = Guard{"claude-session", regexp.MustCompile(`^claude-session(\s|$)`),
-		"a row starts no sitting, so do the work in this one (or run one helper)", nil, nil}
+	NestedSession = Guard{"nested-session", regexp.MustCompile(`^(claude-session|agentik-session|agentik session)(\s|$)`),
+		"a row starts no sitting, so do the work in this one (or run one helper)",
+		regexp.MustCompile(`^(claude-session|agentik-session|agentik session) charter(\s|$)`), nil}
 )
 
 func devicePattern(extra []string) *regexp.Regexp {
@@ -889,7 +927,7 @@ func hookTurns(env func(string) string) int {
 // a claude by k (AR25 act 0; AR27C act 1): the markers ride, a claude is
 // the helper line, and no detached server or new sitting.
 func rowMarkers(d, turns int, k claudeKey) []Guard {
-	return []Guard{markers(d), helper(d, turns, k), DetachedServer, ClaudeSession}
+	return []Guard{markers(d), helper(d, turns, k), DetachedServer, NestedSession}
 }
 
 // Verdict is the one entry of the PreToolUse guards (AR17B): whether cmd is
@@ -935,13 +973,19 @@ func literal(w string) bool {
 }
 
 // wordsLiteral is CommandWordLiteral for one segment. git run by xargs with
-// no verb takes its verb from stdin, so it is not literal either.
+// no verb takes its verb from stdin, so it is not literal either. The front
+// door agentik takes its tool from the next word, which names the command
+// as the command word does (agentik-r1 §6.3 c12), so that word is held to
+// literal too.
 func wordsLiteral(words []string) bool {
 	i := commandWord(words)
 	if i == len(words) {
 		return true
 	}
 	if !literal(words[i]) {
+		return false
+	}
+	if filepath.Base(words[i]) == "agentik" && i+1 < len(words) && !literal(words[i+1]) {
 		return false
 	}
 	if filepath.Base(words[i]) != "git" {
@@ -1147,8 +1191,9 @@ var PidDir func() (string, error)
 // `~/` read under HOME, resolved against cwd when relative and Cleaned, is
 // denied when an element is .git (a worktree's .git file, a root's .git
 // dir; any case, as the Mac's file system folds it), or it lies in the
-// state root (stateRoot, as the relay resolves it) or the account's pid
-// dir (PidDir), or it names a .claude element (claudeIn, AR27B act 3).
+// state root (either spelling under stateBase, agentik-r1 §6.3 c2) or the
+// account's pid dir (PidDir's, either spelling), or it names a .claude
+// element (claudeIn, AR27B act 3).
 // Roots and path are compared as spelled and again with
 // their existing prefixes' symlinks resolved (a /tmp root written through
 // /private/tmp); a symlink made after the call still walks past it: the
@@ -1179,12 +1224,23 @@ func fileDoor(path, cwd string, env func(string) string) (Guard, bool) {
 		}
 		return within(root, path) || within(resolved(root), real)
 	}
-	if under(stateRoot(env)) {
-		return StateRoot, true
+	if base := stateBase(env); base != "" {
+		for _, n := range stateNames { // both spellings, whichever exists (§6.3 c2)
+			if under(filepath.Join(base, n)) {
+				return StateRoot, true
+			}
+		}
 	}
 	if PidDir != nil {
-		if dir, err := PidDir(); err == nil && under(dir) {
-			return PidLock, true
+		if dir, err := PidDir(); err == nil {
+			if under(dir) {
+				return PidLock, true
+			}
+			for _, n := range stateNames {
+				if under(filepath.Join(filepath.Dir(dir), n)) {
+					return PidLock, true
+				}
+			}
 		}
 	}
 	return Guard{}, false

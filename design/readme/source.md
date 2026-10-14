@@ -1,8 +1,8 @@
-# agent-relay
+# agentik-relay
 
 <img src="assets/icon.svg" alt="" width="56" align="left">
 
-agent-relay is a static Go binary, `relay`, and a Claude Code plugin, `agent-relay`, that run queued packet sittings headless overnight. Each queue row gets one git worktree, one branch and one sitting, and the row merges into `main` only when its gate reads green.
+agentik-relay is a static Go binary, `agentik-relay` (`relay` a link to it until 2026-12-31), and a Claude Code plugin, `relay`, that run queued packet sittings headless overnight. Each queue row gets one git worktree, one branch and one sitting, and the row merges into `main` only when its gate reads green.
 
 ## Why it exists
 
@@ -12,46 +12,46 @@ agent-relay is a static Go binary, `relay`, and a Claude Code plugin, `agent-rel
 
 ## The door
 
-- `relay status`: the night's state and reason, one line per row, every resume line.
-- `relay resume <row>`: runs `claude --resume <session_id>` in the row's worktree, interactive. Every red or failed row carries this exact line in its ledger line, in `relay status` and in `relay report`.
-- `/agent-relay:resume`: the same door from inside Claude Code; prints the line and the worktree.
-- Morning: `relay report` (plain markdown: merged SHAs, stops verbatim, burn per sitting, branches waiting, resume lines, charter handovers).
+- `agentik relay status`: the night's state and reason, one line per row, every resume line.
+- `agentik relay resume <row>`: runs `claude --resume <session_id>` in the row's worktree, interactive. Every red or failed row carries this exact line in its ledger line, in `agentik relay status` and in `agentik relay report`.
+- `/relay:resume`: the same door from inside Claude Code; prints the line and the worktree.
+- Morning: `agentik relay report` (plain markdown: merged SHAs, stops verbatim, burn per sitting, branches waiting, resume lines, charter handovers).
 
 ## Install
 
 ```
 claude plugin marketplace add agentik-dev/agentik-relay
-claude plugin install agent-relay@agent-relay
-go install github.com/agentik-dev/agentik-relay/cmd/relay@latest
+claude plugin install relay@agentik
+go install github.com/agentik-dev/agentik-relay/cmd/agentik-relay@latest
 ```
 
-- From a clone: `make install` (go install into GOBIN or GOPATH/bin).
-- Then `relay doctor`: checks claude and its flags, git worktrees, caffeinate, tmux (a warning only), a writable state directory, and that the queue parses. Exit 0 or 2; an unknown result is never a pass.
+- From a clone: `make install`: `agentik-relay` into `BINDIR` (default `~/.local/bin`), `relay` a link to it until 2026-12-31, and the `agentik` front door beside it.
+- Then `agentik relay doctor`: checks claude and its flags, git worktrees, caffeinate, tmux (a warning only), a writable state directory, and that the queue parses. Exit 0 or 2; an unknown result is never a pass.
 - Requires: Go, git, the `claude` CLI. No plugin dependency is required.
-- Optional: `respeak` (>=0.6.0) renders `/agent-relay:report` as a narrative and renders this README; `claude-code-session` is an optional override layer (its resolved config, read when present).
+- Optional: `respeak` (>=0.6.0) renders `/relay:report` as a narrative and renders this README; `agentik-session` is an optional override layer (its resolved config, read when present).
 - tmux is optional (`tmux: auto`); without it each row gets a file window (a log file).
 
 ## The night
 
-- `relay plan --rows ar1,ar2 --until 06:00`: validate the queue and packets, resolve dependencies, snapshot origin refs, run the acceptance lines on `main` for a baseline, print each exact spawn line. Spawns nothing.
-- `relay run --until 06:00 --max-sittings 4 --max-usd 20 --parallel 2`: plan, then the loop. Ends on an empty queue, the count, the clock, an owner stop, or a failure.
-- `relay stop`: ask the night to stop after the running sittings; `relay kill ar2`: stop a row now. Both write the night's control file, read after every event.
-- `relay attach ar2`: the row's tmux window; without tmux, `tail -f` of its log.
-- `relay gate ar2`: the gate by hand. `relay clean --merged`: remove merged rows' worktrees; `relay clean --stale`: remove dead relays' locks and their untouched worktrees.
-- `relay version`. Every verb takes `--json`.
+- `agentik relay plan --rows ar1,ar2 --until 06:00`: validate the queue and packets, resolve dependencies, snapshot origin refs, run the acceptance lines on `main` for a baseline, print each exact spawn line. Spawns nothing.
+- `agentik relay run --until 06:00 --max-sittings 4 --max-usd 20 --parallel 2`: plan, then the loop. Ends on an empty queue, the count, the clock, an owner stop, or a failure.
+- `agentik relay stop`: ask the night to stop after the running sittings; `agentik relay kill ar2`: stop a row now. Both write the night's control file, read after every event.
+- `agentik relay attach ar2`: the row's tmux window; without tmux, `tail -f` of its log.
+- `agentik relay gate ar2`: the gate by hand. `agentik relay clean --merged`: remove merged rows' worktrees; `agentik relay clean --stale`: remove dead relays' locks and their untouched worktrees.
+- `agentik relay version`. Every verb takes `--json`.
 - The queue is `relay/queue.yaml` in the target repo; packets are `design/packets/<id>.md`.
-- State directory: `${XDG_STATE_HOME:-~/.local/state}/agent-relay` (ledger, `status.json`, logs, control file). The ledger never enters a repo.
+- State directory: `${XDG_STATE_HOME:-~/.local/state}/agentik-relay` (the old name's folder while only it exists) (ledger, `status.json`, logs, control file). The ledger never enters a repo.
 
 ## The plugin
 
 Commands (each runs one verb with `--json`):
 
-- `/agent-relay:resume`: the door back into a stopped sitting.
-- `/agent-relay:status`: where the night is.
-- `/agent-relay:plan`: dry-run the queue.
-- `/agent-relay:gate`: gate one row by hand.
-- `/agent-relay:report`: the morning read; a narrative through respeak when installed.
-- `/agent-relay:doctor`: check the machine for a night.
+- `/relay:resume`: the door back into a stopped sitting.
+- `/relay:status`: where the night is.
+- `/relay:plan`: dry-run the queue.
+- `/relay:gate`: gate one row by hand.
+- `/relay:report`: the morning read; a narrative through respeak when installed.
+- `/relay:doctor`: check the machine for a night.
 
 Agents (for hand-run coordinator sittings):
 
@@ -65,8 +65,8 @@ Hooks are guards (belt and braces; nothing under the driver depends on them): Pr
 
 Lowest first: shipped defaults; user file; repo file; session resolved file (when present); flags.
 
-- User file `~/.config/agent-relay/config.yaml`: `ntfy` (`url`, `topic`), `tmux` (`auto`), `allowed_tools`, `caffeinate` (`true`).
-- Repo file `.claude/claude-code-session/config.yaml`, section `agent-relay`: `queue`, `merge`.
+- User file `~/.config/agentik/relay/config.yaml`: `ntfy` (`url`, `topic`), `tmux` (`auto`), `allowed_tools`, `caffeinate` (`true`).
+- Repo file `.claude/agentik/config.yaml`, section `relay` (else the old path and section, which doctor flags): `queue`, `merge`.
 
 ## Exit codes
 

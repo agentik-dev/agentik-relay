@@ -19,7 +19,7 @@ import (
 // owner-stop at its next poll, the status never reading draining; `kill
 // r1`, `kill *` and a SIGINT stop it owner-kill, with no `kill` line (a
 // paused row has no child). Each: r1 failed usage-limit, its stage
-// unlocked, its tree kept, one sitting line, `relay resume r1` in the stop
+// unlocked, its tree kept, one sitting line, `agentik relay resume r1` in the stop
 // line. Red on the pin: a stop or `kill r1` while paused was ignored.
 func TestAR66_1_OwnerWhilePaused(t *testing.T) {
 	for _, c := range []struct {
@@ -74,7 +74,7 @@ func TestAR66_1_OwnerWhilePaused(t *testing.T) {
 			if s := n.Sittings["r1"]; s.State != relay.Failed || s.Reason != relay.UsageLimit {
 				t.Fatalf("r1 %s %s, want failed usage-limit", s.State, s.Reason)
 			}
-			if night.Locked(wt) || len(rowLines(all, "sitting", "r1")) != 1 || fmt.Sprint(stop["resume"]) != "[relay resume r1]" {
+			if night.Locked(wt) || len(rowLines(all, "sitting", "r1")) != 1 || fmt.Sprint(stop["resume"]) != "[agentik relay resume r1]" {
 				t.Fatalf("locked %v, sitting lines %d, the stop line's resume %v", night.Locked(wt), len(rowLines(all, "sitting", "r1")), stop["resume"])
 			}
 			if _, err := os.Stat(wt); err != nil {

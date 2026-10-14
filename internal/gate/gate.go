@@ -1,5 +1,5 @@
 // Package gate gathers §6's facts for one row through effects and judges
-// them with relay.Decide, so `relay gate <row>` by hand and the night's own
+// them with relay.Decide, so `agentik-relay gate <row>` by hand and the night's own
 // gate are the same code; and it merges only on green (D22).
 package gate
 
@@ -1338,7 +1338,7 @@ func run(fx effects.Effects, st *night.Staged, p *packet.Packet, baseline []rela
 	return res, why, g, f.err
 }
 
-// Hand is `relay gate <row>` by hand (§9, the packet's rulings): the stage
+// Hand is `agentik-relay gate <row>` by hand (§9, the packet's rulings): the stage
 // facts come from the row's last `stage` ledger line when there is one; the
 // acceptance rerun happens in the row's worktree when it exists, else in a
 // temporary detached worktree `.claude/worktrees/gate-<id>` at the branch's

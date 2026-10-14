@@ -182,7 +182,7 @@ func ar68Continuation(t *testing.T, nl bool) {
 // refused, exit 143), every other the fake claude; o.2's charter DONE.
 // The night pauses; at the wake one `wake` line, and o.1 is halted, never
 // continued: failed usage-limit, unlocked, its tree kept, one spawn, no
-// `relay resume o.1`. The loop cuts o.2 under a new session, its
+// `agentik relay resume o.1`. The loop cuts o.2 under a new session, its
 // SittingStart.Red without o.1, and the night stops done, clean: the stop
 // line's red 0, its resume empty. A night that stops after the halt and
 // before the cut (the fix round's F1) names o.1 in its resume lines and
@@ -216,14 +216,14 @@ func TestAR68_4_OrchestratorWake(t *testing.T) {
 	if !night.Clean(n) {
 		t.Fatalf("night.Clean false: %s, %s", n.Reason, states(n))
 	}
-	if strings.Contains(out.String(), "relay resume o.1") {
-		t.Fatalf("the night printed `relay resume o.1`:\n%s", out)
+	if strings.Contains(out.String(), "agentik relay resume o.1") {
+		t.Fatalf("the night printed `agentik relay resume o.1`:\n%s", out)
 	}
 
 	// The fix round's F1: o.1 is recovered only once o.2 is cut. Stopped
 	// before (--max-sittings 1 reached at the wake; o.2's worktree path
 	// taken while paused, so it cannot stage), o.1 is red: the stop line's
-	// red 1 and resume `relay resume o.1`, printed once, the night not clean.
+	// red 1 and resume `agentik relay resume o.1`, printed once, the night not clean.
 	for _, c := range []struct {
 		name   string
 		max    int
@@ -243,14 +243,14 @@ func TestAR68_4_OrchestratorWake(t *testing.T) {
 				t.Fatalf("o.2 spawned: %v", rows)
 			}
 			stop := stopOf(t, w)
-			if number(stop["red"]) != 1 || fmt.Sprint(stop["resume"]) != "[relay resume o.1]" {
-				t.Fatalf("the stop line's red %v, resume %v; want 1, [relay resume o.1]", stop["red"], stop["resume"])
+			if number(stop["red"]) != 1 || fmt.Sprint(stop["resume"]) != "[agentik relay resume o.1]" {
+				t.Fatalf("the stop line's red %v, resume %v; want 1, [agentik relay resume o.1]", stop["red"], stop["resume"])
 			}
 			if night.Clean(n) {
 				t.Fatalf("night.Clean true: %s, %s", n.Reason, states(n))
 			}
-			if k := strings.Count(out.String(), "relay resume o.1\n"); k != 1 {
-				t.Fatalf("the night printed `relay resume o.1` %d times, want once:\n%s", k, out)
+			if k := strings.Count(out.String(), "agentik relay resume o.1\n"); k != 1 {
+				t.Fatalf("the night printed `agentik relay resume o.1` %d times, want once:\n%s", k, out)
 			}
 		})
 	}
