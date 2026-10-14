@@ -18,7 +18,7 @@
 | 3 | paths new, else old (c1-c4, c6); `Config.Warnings` | done `5f3ebb5` |
 | 4 | one resume line (`relay.ResumeLine`, `ResumeRow`); the alias note | done `1bd305c` |
 | 5 | `cmd/agentik-relay`, the Makefile, the plugin (c11, c14, D2, D3) | done `3fd0214`, `72c0fe0` |
-| 6 | the sweep to `renamed` 0 | done |
+| 6 | the sweep to `renamed` 0 | done `ded6d6f` (its last four files in the closing commit) |
 
 Rulings beyond the packet, one line each:
 
@@ -36,12 +36,17 @@ Rulings beyond the packet, one line each:
 
 ## Handover
 
-(none yet)
+- NICE_TO_HAVE, owner: relay's maintainer: `cmd/agentik-relay/e2e_test.go` still builds its
+  binary as `relay` (the alias path); rename it when e2e next runs.
+- decide, owner: commons' agentik-r1 author, consumer agentik-session: the session's resolved
+  file is read from `agentik-session/sessions/<id>/`, else `claude-code-session/...` (c1).
 
 ## Next act
 
-`make check` once under load 12, the acceptance lines, then close this charter.
+DONE: the packet's six acts landed; `make check` exit 0 in 465 s (load 6.8); the six acceptance
+lines read 4, 4, 5, 4, 2, 3. Next: the gate, then review.
 
 ## Exit
 
-(open)
+Closed 2026-10-13: acts 1-6 done, `make check` 0, `renamed` 0 outside the allowlist; branch
+`agentik-r1-relay`, not pushed.

@@ -26,7 +26,7 @@ func withLine(t *testing.T, id, line string) error {
 // TestAR13_7_ParseUnwrapsWrappers: Unbounded reads a line as the hook does
 // (hooks.Segments, hooks.Normalise; ADV6-12, R6 C6): `go test` with any
 // `...` or `-run .`, `make` with check among its targets under any flag,
-// `relay plan|run|gate` unbounded inside any wrapper or `sh -c`, and a
+// `agentik-relay plan|run|gate` unbounded inside any wrapper or `sh -c`, and a
 // segment whose command is claude are refused; the bounded forms parse.
 func TestAR13_7_ParseUnwrapsWrappers(t *testing.T) {
 	for _, line := range []string{
