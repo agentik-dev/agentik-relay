@@ -488,8 +488,10 @@ func RunRow(fx effects.Effects, sp effects.Spawner, st *Staged, rp *RowPlan, pro
 	var spawnBand map[string]any
 	if fx.Band != nil && opts.Part < 2 {
 		b, end := askBand(ctx, fx, rp, opts, log)
-		sit.band = map[string]any{"asks": b.asks, "wait_s": b.waitS, "verdict": b.verdict}
-		spawnBand = map[string]any{"verdict": b.verdict, "peak": peakOf(b.peak)}
+		if b.asks > 0 { // a part that never asked has no band key (ruling 7; the fix round's finding 5)
+			sit.band = map[string]any{"asks": b.asks, "wait_s": b.waitS, "verdict": b.verdict}
+			spawnBand = map[string]any{"verdict": b.verdict, "peak": peakOf(b.peak)}
+		}
 		if end != bandSpawn {
 			sit.start = fx.Clock.Now()
 			return unspawned(end == bandUntil)
