@@ -46,4 +46,4 @@ A night picks rows up to `--parallel` and reads no usage (`PickIn`, `internal/ni
 
 ## 7. The refuter round (2026-10-14)
 
-One adversary, read-only, at 049bc2c: BLOCK on F1, notes N1 to N6; the proof holds. F1: every part asked (§2.2) and only `--until` and `stop` bounded a hold (§2.4), so entries 11 and 12 changed though §2.5 said not; now only a first spawn asks and a hold ends at the five-hour reset. Taken too: the session id (§2.2, re-run under both ids); N1, N2, N3, N5 (§6); N6 (§5); renumbered AR80, AR81 (AR76, AR77 taken). N4 is not folded.
+One adversary, read-only, at 049bc2c: BLOCK on F1, notes N1 to N6; the proof holds. F1: every part asked (§2.2) and only `--until` and `stop` bounded a hold (§2.4), so entries 11 and 12 changed though §2.5 said not; now only a first spawn asks and a hold ends at the five-hour reset. Taken too: the session id (§2.2, re-run under both ids); N1, N2, N3, N5 (§6); N6 (§5); renumbered AR80, AR81 (AR76, AR77 taken). N4 confirms P3 (band-target reaches the relay through the verdict).
