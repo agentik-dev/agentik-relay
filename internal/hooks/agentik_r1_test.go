@@ -118,3 +118,25 @@ func TestAgentikR1_3_StateRootNewElseOld(t *testing.T) {
 		t.Errorf("a sibling of the state root is denied by %s", g.Name)
 	}
 }
+
+// TestAgentikR1Fix_FrontDoorToolLiteral (the fix round's F1): the front
+// door's tool word names the command, so a row holds it to literal as it
+// holds the command word: a substitution, a variable or a glob in it is
+// denied, as the old spelling's tricks are; the literal spellings pass.
+func TestAgentikR1Fix_FrontDoorToolLiteral(t *testing.T) {
+	for _, cmd := range []string{
+		"agentik ${T:-relay} run", "agentik $(echo relay) run", "X=relay; agentik $X run",
+		"agentik rela? run", "agentik ${S:-session} start", "agentik sessio? start",
+	} {
+		if deny, why := Verdict(cmd, true); !deny {
+			t.Errorf("Verdict(%q, true) allowed; want denied", cmd)
+		} else if !strings.HasPrefix(why, "relay: ") {
+			t.Errorf("Verdict(%q, true) = %q", cmd, why)
+		}
+	}
+	for _, cmd := range []string{"agentik relay status", "agentik session charter open"} {
+		if deny, why := Verdict(cmd, true); deny {
+			t.Errorf("Verdict(%q, true) = %q; want allowed", cmd, why)
+		}
+	}
+}

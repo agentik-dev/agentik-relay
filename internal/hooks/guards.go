@@ -973,13 +973,19 @@ func literal(w string) bool {
 }
 
 // wordsLiteral is CommandWordLiteral for one segment. git run by xargs with
-// no verb takes its verb from stdin, so it is not literal either.
+// no verb takes its verb from stdin, so it is not literal either. The front
+// door agentik takes its tool from the next word, which names the command
+// as the command word does (agentik-r1 §6.3 c12), so that word is held to
+// literal too.
 func wordsLiteral(words []string) bool {
 	i := commandWord(words)
 	if i == len(words) {
 		return true
 	}
 	if !literal(words[i]) {
+		return false
+	}
+	if filepath.Base(words[i]) == "agentik" && i+1 < len(words) && !literal(words[i+1]) {
 		return false
 	}
 	if filepath.Base(words[i]) != "git" {
