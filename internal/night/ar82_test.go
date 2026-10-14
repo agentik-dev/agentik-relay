@@ -13,7 +13,7 @@ import (
 // a family's weekly cap pauses only that family's rows; an overage limit
 // stops the night at once.
 
-// TestAR82_3_FamilyWeekly (AR82 ruling 2; DECISIONS entry 12): TestAR71's
+// TestAR82_3_FamilyWeekly (AR82 ruling 2; the ledger's entry 12): TestAR71's
 // world with r1 on claude-opus-5-5, r2 and r3 on claude-fable-5-1, at
 // --parallel 2. r1's part 1 is a refused seven_day_opus event resetting at
 // 02:00, exit 143: one pause line [r1], kind model, scope opus, wake 02:02,
