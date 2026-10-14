@@ -1,6 +1,6 @@
 # agent-relay design: the usage limit pauses the night (r1)
 
-**Status:** design r1, 2026-10-10, written before code; refuter round 1 folded. The owner's word, as the observer recorded it (example-mac `history/observer/2026-10-10.md:52`): "sessions and relay runs resume by themselves after a usage limit (the 5-hour window), instead of stopping." That window pauses. So do a model's own limit that names its reset (only that model's rows) and a limit text the relay does not recognize (one probe, 30 minutes on). A weekly limit stops, as today. This amends relay-r1 §1, §5 and §9; this repo's `DECISIONS.md` is silent.
+**Status:** design r1, 2026-10-10, written before code; refuter round 1 folded. The owner's word, as the observer recorded it (example-mac `history/observer/2026-10-10.md:52`): "sessions and relay runs resume by themselves after a usage limit (the 5-hour window), instead of stopping." That window pauses. So do a model's own limit that names its reset (only that model's rows) and a limit text the relay does not recognize (one probe, 30 minutes on). A weekly limit stops, as today. This amends relay-r1 §1, §5 and §9; this repo's `DECISIONS.md` is silent. AR77 built §5 packet 6's status and report half.
 
 ## 1. The problem
 

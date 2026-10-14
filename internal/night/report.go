@@ -116,7 +116,12 @@ var GitChanged = func(root, base, branch, dir string) ([]string, error) {
 // `spawn` line, the row's next part in flight, which `status` reads
 // running; a `skip` line is untouched, and the burn keeps every sitting.
 // Its handovers come once, at its stage, and none while its last sitting
-// is in flight (ruling 3).
+// is in flight (ruling 3). A `sitting` line the night paused on (`limit:
+// paused`) is no verdict (AR77 ruling 3, as `redSittings`): it takes back
+// and holds its row, with no entry, until the row's next `spawn` or
+// `sitting`; the night's `stop` line halts each row still held, failed
+// usage-limit, with its resume line only when that line's `resume` names
+// it, so a sitting the wake halted has none, as `status`.
 func BuildReport(lines []map[string]any, night string, g ...effects.Git) Report {
 	r := Report{Night: night, Merged: []Merged{}, Sittings: []Burn{}, Waiting: []string{}, Resume: []string{},
 		Handovers: []Handover{}, Stopped: Stopped{Rows: []StoppedRow{}}}
@@ -135,10 +140,15 @@ func BuildReport(lines []map[string]any, night string, g ...effects.Git) Report 
 		sitting bool // a `sitting` line's, so a later one of its row takes it back (AR74)
 	}
 	var stops []stop
+	// held is the rows whose last line is a paused sitting line, in its
+	// order, and heldCause that line's gate.cause (AR77 ruling 3).
+	var held []string
+	heldCause := map[string]string{}
 	takeBack := func(row string) { // an earlier sitting's verdict, its row's next line here (AR74)
 		green = slices.DeleteFunc(green, func(id string) bool { return id == row })
 		r.Resume = slices.DeleteFunc(r.Resume, func(x string) bool { id, ok := relay.ResumeRow(x); return ok && id == row })
 		stops = slices.DeleteFunc(stops, func(s stop) bool { return s.sitting && s.Row == row })
+		held = slices.DeleteFunc(held, func(id string) bool { return id == row })
 	}
 	for _, l := range lines {
 		if l["night"] != night {
@@ -165,6 +175,10 @@ func BuildReport(lines []map[string]any, night string, g ...effects.Git) Report 
 			gate, _ := l["gate"].(map[string]any)
 			cause, _ := gate["cause"].(string)
 			takeBack(row)
+			if str("limit") == "paused" { // no verdict: the night paused on it (AR77 ruling 3)
+				held, heldCause[row] = append(held, row), cause
+				break
+			}
 			resume := relay.ResumeLine(row)
 			switch state, reason := str("state"), str("reason"); state {
 			case "green":
@@ -182,6 +196,21 @@ func BuildReport(lines []map[string]any, night string, g ...effects.Git) Report 
 			r.State = str("state")
 			b, _ := json.Marshal(l)
 			r.Stopped.Line = string(b)
+			named := map[string]bool{} // the halt's resume lines (AR77 ruling 3)
+			for _, x := range stringsOf(l["resume"]) {
+				if id, ok := relay.ResumeRow(x); ok {
+					named[id] = true
+				}
+			}
+			for _, id := range held {
+				sr := StoppedRow{Row: id, State: string(relay.Failed), Reason: string(relay.UsageLimit), Cause: heldCause[id]}
+				if named[id] {
+					sr.Resume = relay.ResumeLine(id)
+					r.Resume = append(r.Resume, sr.Resume)
+				}
+				stops = append(stops, stop{sr, true})
+			}
+			held = nil
 		}
 	}
 	for _, s := range stops {
@@ -389,6 +418,24 @@ func stopValue(v any) string {
 		return string(b)
 	}
 	return fmt.Sprint(v)
+}
+
+// stringsOf is a line's list of strings: []any read back from the
+// ledger's JSON, []string a line still in memory; anything else none.
+func stringsOf(v any) []string {
+	switch x := v.(type) {
+	case []string:
+		return x
+	case []any:
+		var out []string
+		for _, e := range x {
+			if s, ok := e.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	return nil
 }
 
 func or(s, d string) string {

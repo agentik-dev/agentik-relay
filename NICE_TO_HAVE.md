@@ -560,7 +560,7 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 ## The queue file only grows (2026-10-13, the observer, the owner's question; S4)
 - The busiest consumer's `relay/queue.yaml` holds 237 rows in 40 KB (Load and Order 17 ms at 18:4x), and finished rows never leave it. Fix: move finished rows to `relay/queue-archive.yaml`, loaded only to resolve `depends_on` and `base`, so the live file stays the night's open work.
 
-## After a usage-limit wake, status and report show the dead sitting (2026-10-14, the observer; S4)
+## After a usage-limit wake, status and report show the dead sitting (2026-10-14, the observer; S4) (AR77)
 - Night 2026-10-13-7 (the consumer): at 23:26 all three rows hit the five-hour limit (po1bfix exit 143, "You've hit your session limit · resets 12:30am"; the others "usage-limit before the spawn"); the night paused and woke at 00:32, re-spawning po1bfix, po2fix and us3afix. At 00:33 the row logs advance (po1bfix turn 9, 69k; po2fix turn 11, 64k; us3afix turn 4, 52k), yet `agentik relay status --json` keeps each row's `reason: usage-limit` with the first sitting's turns and context (1/0k, 0/0k, 10/61k), and `agentik relay report` lists all three as `failed`. Also `next` reads "count-reached after 5 sittings (3 so far)" while `burn.sittings` reads 6: two counts, both called sittings; the cap's excludes the dead ones. (the observer's attendant, confirmed from status, report and the row logs)
 
 ## Side-by-side verifies outlast the fixed cut (2026-10-14, the observer; S3)
@@ -586,3 +586,11 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 - S4: the TypeScript reference's `SDKRateLimitEvent` (as of 2026-10-14) gives a refused event `errorCode: "credits_required"` (Claude Code 2.1.181 or later) when a subscription's included usage is spent and only bought credits continue the session; the relay does not read it, so such a refusal takes its `rateLimitType`'s kind and may pause for a reset that does not lift it. Read it as a stop once a real event shows its type.
 - S4 (AR82's review, 2026-10-14): a `rejected` usage-limit event acts even when it carries `isUsingOverage: true` and `overageStatus: "allowed"`, the case where extra usage keeps serving the request; a probe paused and re-ran a clean part after one. `isUsingOverage` is on the wire (`testdata/real.jsonl:8`). Decide whether that is the cautious choice by design, and say so in usage-limit-resume-r1.
 - S4 (AR82's review): an undocumented capitalised `"Allowed_warning"` status is read as a refusal (`internal/stream/account.go:39-50`). Unproven: whether Fable usage counts against the opus weekly cap.
+
+## AR77's build (2026-10-14): what it leaves (S4)
+- `nightBurn` counts a part that staged and never spawned as a sitting: its `sitting` line alone adds an entry, while its comment and relay-r1 §9 say a sitting counts from its `spawn` line. Night 2026-10-13-7's po2fix and us3afix, killed before their spawns, made `burn.sittings` 6 at 00:33 where four parts had spawned. Either count from the `spawn` line, or say that a staged part's line counts too.
+
+## AR75 to AR77's reviews (2026-10-14): what they leave (S4; the observer, at the merges)
+- AR75: `doctor` finds the root with its own `toplevel()` while the verbs use `Git.Root`, so in a worktree the two can name different roots; and an unreadable `config.local.yaml` stops every verb, where a missing one is skipped.
+- AR76: a quoted `"null"`, `''` or `'~'` reads as `no provider.inputs`, since the YAML reader drops the quotes; an empty HOME gives StateDir a relative dir (Pin refuses it); `~user/x` and relative values guard nothing (Pin refuses them); the comment at `guards.go:1187` says the hooks import nothing of the relay, which `internal/xdg` now makes untrue.
+- AR77: `stringsOf` (`internal/night/report.go:425`) lies outside the packet's may-touch list; an orchestrator halted at the wake reads `failed` in status but `paused` in the burn until the stop line; a night that closes with an error and no stop line leaves a held row with no entry.
