@@ -55,7 +55,8 @@ func TestAgentikR1_3_LayersNewElseOld(t *testing.T) {
 	fs := &FakeFS{}
 	fs.WriteFile("/h/.config/agent-relay/config.yaml", []byte("tmux: never\n"), 0o600)
 	fs.WriteFile("/r/.claude/claude-code-session/config.yaml", []byte("agent-relay: {queue: o.yaml}\n"), 0o600)
-	fs.WriteFile("/h/.local/state/claude-code-session/sessions/s1/resolved.yaml", []byte("agent-relay: {allowed_tools: Bash}\n"), 0o600)
+	fs.WriteFile("/h/.local/state/claude-code-session/sessions/s1/resolved.yaml", []byte("agent-relay: {allowed_tools: Bash}\n"+
+		inputs(fs, "/r/.claude/claude-code-session/config.yaml", "/r/.claude/claude-code-session/config.local.yaml")), 0o600)
 	c, err := LoadConfig(fs, get, "/r")
 	if err != nil || c.Tmux != "never" || c.Queue != "o.yaml" || c.AllowedTools != "Bash" || len(c.Sources) != 3 {
 		t.Fatalf("the old files = %+v, %v", c, err)
@@ -66,7 +67,8 @@ func TestAgentikR1_3_LayersNewElseOld(t *testing.T) {
 	}
 	fs.WriteFile("/h/.config/agentik/relay/config.yaml", []byte("tmux: auto\n"), 0o600)
 	fs.WriteFile("/r/.claude/agentik/config.yaml", []byte("relay: {queue: n.yaml}\n"), 0o600)
-	fs.WriteFile("/h/.local/state/agentik-session/sessions/s1/resolved.yaml", []byte("relay: {allowed_tools: Edit}\n"), 0o600)
+	fs.WriteFile("/h/.local/state/agentik-session/sessions/s1/resolved.yaml", []byte("relay: {allowed_tools: Edit}\n"+
+		inputs(fs, "/r/.claude/agentik/config.yaml", "/r/.claude/agentik/config.local.yaml")), 0o600)
 	c, err = LoadConfig(fs, get, "/r")
 	want := []string{"/h/.config/agentik/relay/config.yaml", "/r/.claude/agentik/config.yaml",
 		"/h/.local/state/agentik-session/sessions/s1/resolved.yaml"}
