@@ -26,8 +26,10 @@ const contextFormat = "CONTEXT: relay row %s; your working tree is %s on branch 
 
 // VerifyOnceSeconds is the longest verify line, in seconds on main, the
 // CONTEXT line tells a child to run once before its last commit (AR61 act
-// 1): a tenth under the Bash tool's 600 s cap; past it the line is the
-// gate's alone.
+// 1): a tenth under the Bash tool's 600,000 ms foreground ceiling (its
+// default is 120,000 ms, and a command at its timeout moves to the
+// background: "Tools reference", code.claude.com, as of 2026-10-14);
+// past it the line is the gate's alone.
 const VerifyOnceSeconds = 540
 
 // Context is what the CONTEXT line carries.

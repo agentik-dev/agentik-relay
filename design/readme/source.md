@@ -35,6 +35,7 @@ go install github.com/agentik-dev/agentik-relay/cmd/agentik-relay@latest
 
 - `agentik relay plan --rows ar1,ar2 --until 06:00`: validate the queue and packets, resolve dependencies, snapshot origin refs, run the acceptance lines on `main` for a baseline, print each exact spawn line. Spawns nothing.
 - `agentik relay run --until 06:00 --max-sittings 4 --max-usd 20 --parallel 2`: plan, then the loop. Ends on an empty queue, the count, the clock, an owner stop, or a failure.
+- Money overshoots both caps. A row's budget `usd` is its child's `--max-budget-usd`, which Claude Code compares after each model response with a client-side estimate, so a sitting can pass it by one response plus what its running subagents spend before they stop ("How the agent loop works", Budget headroom, code.claude.com, as of 2026-10-14). `--max-usd` is compared before each pick and never kills a running sitting, so a night can pass it by the running rows' budgets. Leave that headroom in both.
 - `agentik relay stop`: ask the night to stop after the running sittings; `agentik relay kill ar2`: stop a row now. Both write the night's control file, read after every event.
 - `agentik relay attach ar2`: the row's tmux window; without tmux, `tail -f` of its log.
 - `agentik relay gate ar2`: the gate by hand. `agentik relay clean --merged`: remove merged rows' worktrees; `agentik relay clean --stale`: remove dead relays' locks and their untouched worktrees.
@@ -101,7 +102,7 @@ Shared with its sibling plugins:
 
 ## Status
 
-Status: version `0.1.3`, rendered `2026-10-13`, `699` Go tests.
+Status: version `0.1.3`, rendered `2026-10-14`, `723` Go tests.
 
 Nothing is stable before `1.0.0`.
 

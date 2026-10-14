@@ -1,6 +1,6 @@
 ---
 status: current
-updated: 2026-09-28
+updated: 2026-10-12
 ---
 # agentik-relay: what is settled
 

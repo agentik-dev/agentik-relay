@@ -54,7 +54,9 @@ type Spawner interface {
 }
 
 // DropSitting is environ with a sitting's marks gone: every CLAUDE*
-// variable (a nested spawn is its own session with its own hooks), every
+// variable (the relay's choice, not Claude Code's rule: a nested spawn is
+// its own session with its own hooks, and Claude Code's own CLAUDECODE and
+// CLAUDE_CODE_CHILD_SESSION marks would make it a nested session), every
 // RELAY_* but RELAY_DEVICE_VERBS too (the child's hook reads the owner's
 // device verbs, ADV6-11). ChildEnv's drop, and every helper's env the relay
 // starts that is not a sitting: each tmux command (a tmux server the relay
