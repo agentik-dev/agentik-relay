@@ -584,7 +584,7 @@ func repoConfig() (repo, state string, cfg effects.Config, err error) {
 	return repo, state, cfg, err
 }
 
-// orchestrateRefusal is why `relay run --orchestrate` refuses before the
+// orchestrateRefusal is why `agentik-relay run --orchestrate` refuses before the
 // lock and the plan (orchestrator r1 §8, AR32A act 5), "" when it may
 // start: no ntfy URL and topic, no orchestrator row, or a red or failed
 // sitting of the row today; branch-only defaults start (ar32b act 4). A
@@ -787,7 +787,7 @@ type gateReport struct {
 	Error  string           `json:"error,omitempty"`
 }
 
-// gateVerb is `relay gate <row> [--json]`: §6 by hand, the night's own code
+// gateVerb is `agentik-relay gate <row> [--json]`: §6 by hand, the night's own code
 // (gate.Hand). The queue, the config and the row's packet are read in the
 // root (Git.Root), never the cwd's toplevel: from a row's worktree, the
 // child's own packet never judges it (ADV6-10). Exit 0 green, 1 red or failed, 2 unrun
@@ -884,7 +884,7 @@ func gateVerb(args []string, stdout, stderr io.Writer) int {
 	return finish(err)
 }
 
-// printGate is `relay gate`'s text: a check that kept its log names it
+// printGate is `agentik-relay gate`'s text: a check that kept its log names it
 // (AR31 act 2), and a gate stopped after its lines ran names theirs under
 // its error.
 func printGate(w io.Writer, r gateReport) {
@@ -921,7 +921,7 @@ func printGate(w io.Writer, r gateReport) {
 	}
 }
 
-// clean is `relay clean --merged|--stale [--json]` (§8, §9): --merged
+// clean is `agentik-relay clean --merged|--stale [--json]` (§8, §9): --merged
 // removes each worktree under the root's .claude/worktrees/ whose branch
 // is an ancestor of main, unless its stage lock has a live holder
 // (night.LiveHolder, AR66: a paused row's tree is at its cut); --stale removes each stage lock whose holder is
@@ -1125,7 +1125,7 @@ func contains(xs []string, x string) bool {
 	return false
 }
 
-// runVerb is `relay run [--rows a,b] [--until HH:MM] [--max-sittings N]
+// runVerb is `agentik-relay run [--rows a,b] [--until HH:MM] [--max-sittings N]
 // [--max-usd X] [--parallel N] [--words T] [--measure-seconds N]
 // [--stall-seconds N] [--no-tmux] [--no-notify] [--dry] [--json] [--orchestrate]`
 // (§9): plan, then with --dry each row's spawn line and the rendered
@@ -1387,7 +1387,7 @@ func stateAndNight(f map[string]string) (string, string) {
 	return state, night.Latest(effects.OSFS{}, state)
 }
 
-// statusVerb is `relay status [--night D] [--json] [--watch N [--hold]]`:
+// statusVerb is `agentik-relay status [--night D] [--json] [--watch N [--hold]]`:
 // the night's status.json, printed as the dashboard once; with no night, an
 // empty one. --watch N redraws it in-process every N seconds (N from 1 to
 // maxWatch) until the night stops or its relay is gone, prints it once more and
@@ -1453,7 +1453,7 @@ var (
 	}
 )
 
-// controlVerb is `relay stop` and `relay kill [<row>]`: one line appended
+// controlVerb is `agentik-relay stop` and `agentik-relay kill [<row>]`: one line appended
 // to the latest night's control file, read by the night's loop after every
 // event; a night with no status.json yet, or one reading `planning` (its
 // plan's mark, AR60 act 2), is still measuring, and its
@@ -1573,7 +1573,7 @@ var execAttach = func(argv []string) error {
 	return syscall.Exec(bin, argv, os.Environ())
 }
 
-// attachVerb is `relay attach [<row>] [--night D] [--print]` (§9, D16): with
+// attachVerb is `agentik-relay attach [<row>] [--night D] [--print]` (§9, D16): with
 // the night's tmux session alive, `tmux attach` to it or to the row's
 // window; without, `tail -f` the row's log (no row: every row's). The line
 // is printed, then run by exec; --print stops after printing. Exit 2 for no
@@ -1637,7 +1637,7 @@ func holdPid(verb string, stderr io.Writer, refused func()) (release func(), cod
 	return release, exitOK
 }
 
-// resumeVerb is `relay resume [<row>]`: with a row, `claude --resume
+// resumeVerb is `agentik-relay resume [<row>]`: with a row, `claude --resume
 // <uuid>` printed and run (interactively, by exec) in the tree git lists at
 // <root>/.claude/worktrees/<row>, the uuid its newest Claude Code
 // transcript's; a row with no branch, tree or transcript gets the picker,
@@ -1646,7 +1646,7 @@ func holdPid(verb string, stderr io.Writer, refused func()) (release func(), cod
 // the latest night's resume lines. Exit 2 for a row with no sitting (the
 // ledger may refuse, never direct).
 func resumeVerb(args []string, stdout, stderr io.Writer) int {
-	// The run guard (ADV10-18): a sitting never resumes one, as `relay run`.
+	// The run guard (ADV10-18): a sitting never resumes one, as `agentik-relay run`.
 	if night.Nested(getenv) {
 		fmt.Fprintf(stderr, "relay resume: %v\n", night.ErrNested)
 		return exitUsage
@@ -1832,7 +1832,7 @@ func newestTranscript(home, dir string) string {
 	return best
 }
 
-// reportVerb is `relay report [--night D] [--write PATH] [--json]`: the
+// reportVerb is `agentik-relay report [--night D] [--write PATH] [--json]`: the
 // morning read from the ledger, as markdown (the root written `.`, home
 // `~`); --write puts it at PATH relative to this repo (D18), the only write
 // into a repo. A night with no `night-open` line takes its state from its

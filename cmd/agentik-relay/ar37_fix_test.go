@@ -57,7 +57,7 @@ func ar37Repos(t *testing.T) (home, a, b, state string, do func(args ...string) 
 
 // TestAR37Fix_F1_StopWhileMeasuring (AR37 fix F1): a night still measuring
 // (no status.json, its groups.json naming root A) is named in A by `relay
-// status` and `relay stop`, with the note from repo B; a half-written
+// status` and `agentik-relay stop`, with the note from repo B; a half-written
 // status.json with no groups.json takes A from the ledger's night-open
 // line.
 func TestAR37Fix_F1_StopWhileMeasuring(t *testing.T) {

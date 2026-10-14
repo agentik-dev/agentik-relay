@@ -11,7 +11,7 @@ import (
 	"github.com/agentik-dev/agentik-relay/internal/night"
 )
 
-// TestAR39_1_StatusDefaultSkipsHand (AR39 act 1): `relay status` with no
+// TestAR39_1_StatusDefaultSkipsHand (AR39 act 1): `agentik-relay status` with no
 // --night, over a state holding a dated night's status.json and the gate's
 // `hand` dir, names the dated night in its header, not `hand`; `--night
 // hand` still reads the gate's dir.

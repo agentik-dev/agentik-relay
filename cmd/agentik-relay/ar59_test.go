@@ -15,7 +15,7 @@ import (
 )
 
 // TestAR59_4_DoctorSuggests is AR59 act 4, on TestAR25_3_DoctorVerify's
-// fixture: `relay doctor --verify` prints the repo's limit and, for a line
+// fixture: `agentik-relay doctor --verify` prints the repo's limit and, for a line
 // that exits 0, a suggested verify_seconds (a quick line: 900); with
 // `verify_seconds: 1800` in the repo's config the limit is 1800; a red
 // line suggests nothing and says why; exit codes are unchanged.

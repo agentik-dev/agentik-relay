@@ -11,7 +11,7 @@ import (
 	"github.com/agentik-dev/agentik-relay/internal/night"
 )
 
-// TestAR17B_2_ResumeNested: `relay resume` refuses in a sitting as `relay
+// TestAR17B_2_ResumeNested: `agentik-relay resume` refuses in a sitting as `relay
 // run` does (ADV10-18), before it reads the ledger.
 func TestAR17B_2_ResumeNested(t *testing.T) {
 	home := t.TempDir()

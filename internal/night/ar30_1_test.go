@@ -63,7 +63,7 @@ func TestAR30_1_PlanReadsBlock(t *testing.T) {
 }
 
 // movingMain is the machine's Git with a commit landing on main right
-// after the plan's first read, as a merge landing during `relay plan`
+// after the plan's first read, as a merge landing during `agentik-relay plan`
 // would; the commit removes CLAUDE.md.
 type movingMain struct {
 	effects.OSGit

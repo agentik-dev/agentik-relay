@@ -20,7 +20,7 @@ import (
 
 // Status is the night's dashboard (§9 `status`), written as
 // <state>/nights/<night>/status.json after every event. Next is the next
-// stop condition and its time; Resume is `relay resume <row>` for every red
+// stop condition and its time; Resume is `agentik-relay resume <row>` for every red
 // or failed row.
 type Status struct {
 	Night  string      `json:"night"`
@@ -131,7 +131,7 @@ func number(v any) float64 {
 const inFlight = string(relay.Running)
 
 // nightBurn is a night's burn from its ledger lines (AR51 ruling 2), the one
-// count `relay report` and status.json both read: BuildReport calls it over
+// count `agentik-relay report` and status.json both read: BuildReport calls it over
 // the ledger, the night's tap over the same lines as it appends them. A
 // sitting counts from its `spawn` line: per row the `sitting` line once
 // written, else the `exit` line (its turns, context and cost), else the
@@ -253,7 +253,7 @@ func buildStatus(n *Night, ids []string, rows map[string]*RowStatus, burn Burn, 
 // ShowRoot) and its state with the rows counted by state; then the rows, numbers right-aligned; each row's acts
 // (AR30), one line each under 100 columns; each red or failed row's
 // `cause of <row>: <cause>`, clipped under 100 columns (AR62); the burn; the next
-// stop; and last, every red or failed row's `relay resume <row>` on a line
+// stop; and last, every red or failed row's `agentik-relay resume <row>` on a line
 // of its own. No colour, no cursor movement: it is read over ssh.
 func PrintStatus(w io.Writer, s Status) {
 	if s.Night == "" {
@@ -538,7 +538,7 @@ func writeStatus(fs effects.FS, dir string, st Status) {
 	}
 }
 
-// MarkPlanning is the night's status while `relay run` plans it (AR60 act
+// MarkPlanning is the night's status while `agentik-relay run` plans it (AR60 act
 // 1): it makes the night's directory and writes its status.json, state
 // `planning` under this relay's pid and start (Run's own pair), with its
 // root and no rows, so a reader tells a planning night from no night. Run's

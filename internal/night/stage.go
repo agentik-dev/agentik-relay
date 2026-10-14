@@ -210,7 +210,7 @@ func StaleLock(procs effects.Procs, path string) (LockHolder, bool) {
 }
 
 // LiveHolder is the holder of worktree's stage lock when the lock exists
-// and StaleLock reads it held (AR66 ruling 4): `relay clean --merged`
+// and StaleLock reads it held (AR66 ruling 4): `agentik-relay clean --merged`
 // keeps such a tree, a paused row's at its cut, an ancestor of main
 // (usage-limit-resume r1 §2). No lock, or a gone holder: false.
 func LiveHolder(procs effects.Procs, worktree string) (LockHolder, bool) {
@@ -305,7 +305,7 @@ func flockPath(path string) (*os.File, error) {
 
 // ReapStale removes every stage lock under LockDir whose holder is gone
 // (StaleLock), each with a `lock-reclaimed` line, and returns their
-// holders: `relay clean --stale` (§9). The roots' flock files are never
+// holders: `agentik-relay clean --stale` (§9). The roots' flock files are never
 // stale (the kernel drops a dead holder's) and stay.
 func ReapStale(fx effects.Effects) ([]LockHolder, error) {
 	dir := LockDir()
@@ -539,7 +539,7 @@ func LsRemotes(g effects.Git, dir string, remotes []string, urls map[string][]st
 }
 
 // AccountKept is the account stop the row's last `exit` line carries, ""
-// when it carries none (run 10 ruling 1): `relay clean --stale` keeps that
+// when it carries none (run 10 ruling 1): `agentik-relay clean --stale` keeps that
 // worktree, its uncommitted files the next attempt's.
 func AccountKept(lines []map[string]any, row string) relay.StopReason {
 	var r relay.StopReason

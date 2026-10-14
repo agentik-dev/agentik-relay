@@ -36,7 +36,7 @@ const (
 	StateRefused = "refused"
 )
 
-// Plan is what `relay plan` found: the night it would open, the template,
+// Plan is what `agentik-relay plan` found: the night it would open, the template,
 // each selected row, and the queue's problems. Origin is the remote refs
 // snapshot (§6's origin check compares against it). Verify is the repo's
 // verify line measured once on main in the root (D22's baseline for the
@@ -79,7 +79,7 @@ type Plan struct {
 	Block       []byte `json:"-"`
 	BlockSource string `json:"block"`
 	// Stopped is the reason the owner's stop ended the measure under run
-	// (AR34 act 2), owner-stop; empty when none, always under `relay plan`.
+	// (AR34 act 2), owner-stop; empty when none, always under `agentik-relay plan`.
 	Stopped string `json:"-"`
 	// VerifySeconds is the verify baseline's run on main in seconds,
 	// rounded up, timed by the bound shell's clock or read from its memo
@@ -197,10 +197,10 @@ type Options struct {
 	// §2, §8); without it that row is never planned.
 	Orchestrate bool
 	// Control is the night's control file, which the measure reads every
-	// Poll (0: MeasurePoll) on the clock under `relay run` (AR34 act 2): a
+	// Poll (0: MeasurePoll) on the clock under `agentik-relay run` (AR34 act 2): a
 	// stop or a kill there ends the measure as its deadline would, and
 	// every live group in Groups (nil: the effects' own, the trap's) gets
-	// SIGTERM, then SIGKILL after KillGrace. Empty, no poll (`relay plan`).
+	// SIGTERM, then SIGKILL after KillGrace. Empty, no poll (`agentik-relay plan`).
 	Control string
 	Poll    time.Duration
 	Groups  *effects.Groups
@@ -437,7 +437,7 @@ func BuildPlan(fx effects.Effects, q *queue.Queue, opts Options) (*Plan, error) 
 			return nil, fmt.Errorf("the ledger: %w", err)
 		}
 	}
-	if p.Budget > 0 { // AR54 act 1: the plan names the stop `relay run` makes on it
+	if p.Budget > 0 { // AR54 act 1: the plan names the stop `agentik-relay run` makes on it
 		p.RunStop = string(relay.MeasureTimeout) + ": " + MeasureTimeoutDetail(p)
 	}
 	warnPerAct(p, rows) // AR61 act 3: after the verify measure, never a problem

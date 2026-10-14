@@ -11,7 +11,7 @@ import (
 	"github.com/agentik-dev/agentik-relay/internal/night"
 )
 
-// verifyReport is `relay doctor --verify <dir>`'s answer (--json).
+// verifyReport is `agentik-relay doctor --verify <dir>`'s answer (--json).
 type verifyReport struct {
 	Dir     string  `json:"dir"`
 	Branch  string  `json:"branch"`
@@ -32,7 +32,7 @@ type verifyReport struct {
 	Suggest int `json:"suggest"`
 }
 
-// doctorVerify is `relay doctor --verify <dir>` (AR25 act 3, ADV15-4):
+// doctorVerify is `agentik-relay doctor --verify <dir>` (AR25 act 3, ADV15-4):
 // dir's verify line measured as a gate measures it. Under run's pin (a
 // night's), a fresh clone of dir's HEAD branch at its sha (gate.Fresh, one
 // ref, under the state root's gate/); the line is `auto` resolved there

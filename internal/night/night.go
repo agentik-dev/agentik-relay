@@ -177,7 +177,7 @@ func RenderPrompt(fx effects.Effects, p *Plan, r queue.Row, rp *RowPlan, words s
 	return stdin, rules, hash, nil
 }
 
-// held is a Spawner that keeps the row's Process for `relay kill`; a kill
+// held is a Spawner that keeps the row's Process for `agentik-relay kill`; a kill
 // before the child starts is delivered on Start. A kill escalates as the
 // ceiling's does (§7): SIGTERM, then SIGKILL after KillGrace unless the
 // child has been waited on. The child's group is in groups (with its
@@ -1044,7 +1044,7 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 			// ends; before any early return below (review round 1, F1),
 			// so a stop, a question or a queue refused names it merged.
 			// Post-review F1: each writes its own `merge` line, merged at
-			// the sitting's merge via the sitting, so `relay report`
+			// the sitting's merge via the sitting, so `agentik-relay report`
 			// counts it merged, never waiting on a hand merge.
 			for _, id := range ids {
 				if bs := n.Sittings[id]; !orc.is(id) && bs.State == relay.Green && bs.MergeSHA == "" &&

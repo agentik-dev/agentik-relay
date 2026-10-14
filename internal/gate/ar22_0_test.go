@@ -114,7 +114,7 @@ func TestAR22_0_CloneHoldsNoRootState(t *testing.T) {
 	state := t.TempDir()
 	fx := w.fx
 	fx.Getenv = func(k string) string { return map[string]string{"XDG_STATE_HOME": state}[k] }
-	gates := filepath.Join(state, "agent-relay", "gate")
+	gates := filepath.Join(state, "agentik-relay", "gate")
 	a1, main := gitIn(t, w.root, "rev-parse", "a1"), gitIn(t, w.root, "rev-parse", "main")
 	if _, _, err := Fresh(fx, w.root, effects.Ref{Name: "refs/heads/a1", Sha: main}); !errors.Is(err, effects.ErrRefMoved) {
 		t.Fatalf("Fresh with a1 bound at main's sha: %v, want ref-moved", err)

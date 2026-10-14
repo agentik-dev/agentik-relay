@@ -42,7 +42,7 @@ func TestSock(t *testing.T) {
 
 // TestAR31_3_SocketFixture is AR31 act 3, the owner's acceptance 2: a
 // fixture repo whose test binds a unix socket in os.MkdirTemp("", "sy"),
-// at a name 40 bytes past TMPDIR/, passes `relay doctor --verify` (auto:
+// at a name 40 bytes past TMPDIR/, passes `agentik-relay doctor --verify` (auto:
 // make check, so go test under the pin): exit 0, ok, no log, and no file
 // in the test's own Logs. The same fixture under a TMPDIR padded past
 // TmpMax is red, and its kept log names the failed test and the bind

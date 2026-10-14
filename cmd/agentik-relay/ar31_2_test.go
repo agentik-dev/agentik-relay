@@ -51,7 +51,7 @@ func logsIn(t *testing.T, dir string) []string {
 }
 
 // TestAR31_2_DoctorKeepsLog is AR31 act 2, the owner's acceptance 3: a red
-// `relay doctor --verify` line's --json names a 0600 log in the pin's Logs
+// `agentik-relay doctor --verify` line's --json names a 0600 log in the pin's Logs
 // holding its whole output (its first line the line's TMPDIR, gone after
 // the command), and the clone is gone; the text's fourth line is `log:
 // <path>`. A green line and the `auto` probe keep none. A line bounded
@@ -151,7 +151,7 @@ func TestAR31_2_DoctorKeepsLog(t *testing.T) {
 	}
 }
 
-// TestAR31_2_PrintGateNamesLog is AR31 act 2: `relay gate`'s text ends a
+// TestAR31_2_PrintGateNamesLog is AR31 act 2: `agentik-relay gate`'s text ends a
 // check's line `; log: <path>` when it kept one, and a gate that stopped
 // with an error prints `  log: <path>` for each check that kept one.
 func TestAR31_2_PrintGateNamesLog(t *testing.T) {

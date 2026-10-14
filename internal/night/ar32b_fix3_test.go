@@ -30,7 +30,7 @@ func mergeLineOf(w *world, row string) map[string]any {
 // TestAR32BFix_LandedRowReportsMerged is ar32b post-review F1 (orchestrator
 // r1 §6, relay-r1 §9's report): a build row that lands through a sitting's
 // merge writes a `merge` ledger line (result merged, the sitting's merge
-// sha, via the sitting), so `relay report` counts it merged and never
+// sha, via the sitting), so `agentik-relay report` counts it merged and never
 // lists it as waiting on a hand merge, as the stop line says.
 func TestAR32BFix_LandedRowReportsMerged(t *testing.T) {
 	w, q, files := ar32bNight(t, "- act 1")

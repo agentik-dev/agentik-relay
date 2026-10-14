@@ -114,7 +114,7 @@ func (w *Windows) Check() (fallback bool, gone bool) {
 	return true, false
 }
 
-// Attach is what `relay attach [<row>]` runs for the night in st (§9, D16):
+// Attach is what `agentik-relay attach [<row>]` runs for the night in st (§9, D16):
 // `tmux attach` to the session, or to the row's window, when the session is
 // alive; else `tail -f` the row's log (no row: every row's). An error names
 // a night with no rows or a row the night does not hold.

@@ -11,7 +11,7 @@ import (
 	"github.com/agentik-dev/agentik-relay/internal/night"
 )
 
-// TestAR34_2_StopVerbSaysWhenNotOpen: `relay stop` and `relay kill` against
+// TestAR34_2_StopVerbSaysWhenNotOpen: `agentik-relay stop` and `agentik-relay kill` against
 // a night with a directory and no status.json (its plan still measuring)
 // say the measure ends and no row starts, not "after its next event"; once
 // the night has opened (status.json), the loop's line again.

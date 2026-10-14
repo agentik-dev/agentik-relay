@@ -15,7 +15,7 @@ import (
 // TestAR32AFix_MergeRefusedParksTheDay is ar32a review round 1 (F1, F2):
 // a green sitting whose merge is refused (git-state-moved,
 // merge-tree-differs) reads red, though its `sitting` line says green, so
-// a later `relay run --orchestrate` that day refuses; so does a `stop`
+// a later `agentik-relay run --orchestrate` that day refuses; so does a `stop`
 // line naming the sitting in its resume ids. A merged sitting, a refusal
 // yesterday, another row's refusal and a plain merge error do not refuse.
 func TestAR32AFix_MergeRefusedParksTheDay(t *testing.T) {
@@ -64,7 +64,7 @@ func TestAR32AFix_MergeRefusedParksTheDay(t *testing.T) {
 }
 
 // TestAR32AFix_PlanRowReadsPacketsInItsWorktree is ar32a review round 1
-// (F2, F3): the RULES' check, `relay plan --queue relay/queue.yaml --rows
+// (F2, F3): the RULES' check, `agentik-relay plan --queue relay/queue.yaml --rows
 // <id>` from a sitting's worktree, reads the packet of a row the sitting
 // added from the worktree holding that queue, where the packet is
 // committed, not from the root, where it is not yet. Outside a row the

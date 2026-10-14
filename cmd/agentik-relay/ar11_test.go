@@ -9,7 +9,7 @@ import (
 	"github.com/agentik-dev/agentik-relay/internal/night"
 )
 
-// TestAR11_4_NestedRunRefuses: `relay run` under RELAY_MEASURE_DEPTH (every
+// TestAR11_4_NestedRunRefuses: `agentik-relay run` under RELAY_MEASURE_DEPTH (every
 // test's fakeEnv) or RELAY_ROW (a sitting) exits 2 before any stage, naming
 // the guard, with zero spawns and no shell line (relay-r1 §15, AR11; the
 // verb's other tests clear the depth with measuring).

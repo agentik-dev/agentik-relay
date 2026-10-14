@@ -96,7 +96,7 @@ func TestAR62Fix_1_SkipReasonWhole(t *testing.T) {
 // reason naming its worktree, and a red row's long cause naming a file
 // under the root at the clip, leave no fragment of either.
 func TestAR62Fix_2_RootBeforeClip(t *testing.T) {
-	root, home := "/home/u/src/agent-relay", "/home/u"
+	root, home := "/home/u/src/agentik-relay", "/home/u"
 	id := "ar62-red-names-its-cause"
 	why := "stage " + id + ": the worktree " + root + "/.claude/worktrees/" + id + " exists"
 	cause := `acceptance 1: last "FAIL x_test.go:3 ` + strings.Repeat("y", 60) + ` open ` + root + `/a.txt", want reads 1`

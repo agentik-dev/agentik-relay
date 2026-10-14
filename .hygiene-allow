@@ -13,13 +13,13 @@ DECISIONS.md: env
 README.md: env
 design/readme/source.md: env
 plugin/commands/doctor.md: env
-cmd/relay/main.go: env
-cmd/relay/main_test.go: env
-cmd/relay/nonotify_test.go: env
-cmd/relay/ar32a_test.go: env
-cmd/relay/ar32a_fix_test.go: env
-cmd/relay/ar32b_test.go: env
-cmd/relay/ar66_test.go: env
+cmd/agentik-relay/main.go: env
+cmd/agentik-relay/main_test.go: env
+cmd/agentik-relay/nonotify_test.go: env
+cmd/agentik-relay/ar32a_test.go: env
+cmd/agentik-relay/ar32a_fix_test.go: env
+cmd/agentik-relay/ar32b_test.go: env
+cmd/agentik-relay/ar66_test.go: env
 internal/effects/config.go: env
 internal/effects/config_test.go: env
 internal/effects/notify.go: env
@@ -43,7 +43,7 @@ history/sittings/2026-09-22-10.md: env
 # AR2-9's test feeds an invented home-shaped path to prove the exit line drops it.
 internal/night/ar2_test.go: home
 # The e2e and AR13 landed fixtures commit as an @example.invalid identity.
-cmd/relay/e2e_test.go: email
+cmd/agentik-relay/e2e_test.go: email
 internal/night/ar13_landed_test.go: email
 
 # `sibling` holds only the public sibling plugins' names (respeak, decisions, session, agents), so these
@@ -69,3 +69,28 @@ plugin/agents/*.md: sibling
 # The respeak config names the plugin in its path, and this file names that path.
 .claude/respeak/config.yaml: sibling
 .hygiene-allow: sibling
+
+# agentik-r1 §6.1, packet agentik-r1-relay ruling 10: the record copies of old packets keep the names they had.
+internal/packet/testdata/a*.md: renamed
+
+# The relay reads each old name while only it exists, new else old (agentik-r1 §6.3 c2-c4, c6): the state root's,
+# the config layers' and the section's old spellings live in these two files, beside their new ones.
+internal/effects/config.go: renamed
+internal/hooks/hooks.go: renamed
+
+# The guards deny the old spellings too (§6.3 c12, "the old stays denied"): the session guard's pattern, and the
+# tests that pin a guard on an old spelling.
+internal/hooks/guards.go: renamed
+internal/hooks/agentik_r1_test.go: renamed
+internal/hooks/ar11_test.go: renamed
+internal/hooks/ar20_6_test.go: renamed
+internal/hooks/ar21_2_test.go: renamed
+internal/hooks/ar25_test.go: renamed
+internal/hooks/ar27b_test.go: renamed
+internal/hooks/ar40_test.go: renamed
+internal/hooks/public_r1_test.go: renamed
+
+# Tests that pin an old path's or section's fallback (§6.3: readers take the new path, else the old).
+internal/effects/agentik_r1_test.go: renamed
+internal/effects/config_test.go: renamed
+internal/night/agentik_r1_test.go: renamed

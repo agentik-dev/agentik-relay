@@ -24,7 +24,7 @@ func ar32bGit(t *testing.T, dir string, args ...string) string {
 }
 
 // TestAR32B_4_OrchestrateAcceptsBranchOnly is ar32b act 4 (orchestrator
-// r1 §6, §11): `relay run --orchestrate` starts over branch-only
+// r1 §6, §11): `agentik-relay run --orchestrate` starts over branch-only
 // defaults, the standing row naming no merge and so merging on green; one
 // naming branch-only is still refused, as a queue problem.
 func TestAR32B_4_OrchestrateAcceptsBranchOnly(t *testing.T) {
@@ -56,7 +56,7 @@ func TestAR32B_4_OrchestrateAcceptsBranchOnly(t *testing.T) {
 
 // TestAR32B_3_CleanMergedTakesTheHop is ar32b act 3 (orchestrator r1 §6),
 // in real git: b's worktree, merged into sitting o.2 that landed on main,
-// goes with o.2's under `relay clean --merged`, since ancestry covers the
+// goes with o.2's under `agentik-relay clean --merged`, since ancestry covers the
 // hop; c, green on its branch and never merged, stays.
 func TestAR32B_3_CleanMergedTakesTheHop(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {

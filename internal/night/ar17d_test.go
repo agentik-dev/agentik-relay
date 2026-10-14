@@ -111,7 +111,7 @@ func TestAR17D_0_UncommittedKept(t *testing.T) {
 	}
 }
 
-// TestAR17D_0_StaleSkipsAccountStop: `relay clean --stale` keeps a worktree
+// TestAR17D_0_StaleSkipsAccountStop: `agentik-relay clean --stale` keeps a worktree
 // whose row's last exit line carries usage-limit or auth, and only then.
 func TestAR17D_0_StaleSkipsAccountStop(t *testing.T) {
 	lines := []map[string]any{

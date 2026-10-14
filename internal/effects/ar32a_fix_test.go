@@ -34,7 +34,7 @@ func TestAR32AFix_QueuePathIsRepoRelative(t *testing.T) {
 		{"''", "", "inside the repo"},
 	} {
 		fs := &FakeFS{}
-		fs.WriteFile(filepath.Join(repo, repoConfig), []byte("agent-relay:\n  queue: "+c.queue+"\n"), 0o600)
+		fs.WriteFile(filepath.Join(repo, repoConfig), []byte("relay:\n  queue: "+c.queue+"\n"), 0o600)
 		got, err := LoadConfig(fs, get, repo)
 		switch {
 		case c.err == "" && (err != nil || got.Queue != c.want):

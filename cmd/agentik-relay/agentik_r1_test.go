@@ -32,7 +32,7 @@ func TestAgentikR1_4_OldNameNote(t *testing.T) {
 		want        string
 	}{
 		{"relay", "status", true, note},
-		{"/Users/x/go/bin/relay", "run", true, note},
+		{"/opt/go/bin/relay", "run", true, note},
 		{"relay", "", true, note},
 		{"relay", "hook", true, ""},
 		{"relay", "status", false, ""},

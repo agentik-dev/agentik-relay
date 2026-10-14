@@ -78,7 +78,7 @@ func Liveness() func(pid int, started string) bool {
 	}
 }
 
-// Watch is `relay status --watch` (AR33 act 1): the night's dashboard,
+// Watch is `agentik-relay status --watch` (AR33 act 1): the night's dashboard,
 // redrawn in-process after Clear every `every`, until the night's state is
 // terminal (`stopped:<reason>`) or its relay is gone (live false for
 // RelayOf's pid); then the dashboard once more, the relay's last write, and

@@ -12,7 +12,7 @@ import (
 	"github.com/agentik-dev/agentik-relay/internal/effects"
 )
 
-// TestAR25_3_DoctorVerify is ADV15-4's measure: `relay doctor --verify
+// TestAR25_3_DoctorVerify is ADV15-4's measure: `agentik-relay doctor --verify
 // <dir>` runs dir's `make check` as a gate runs it, in a fresh clone of
 // its HEAD under the pin. The fixture's check prints its env: HOME is a
 // scratch dir under the pin's relay home, PYTHONNOUSERSITE=1; a file

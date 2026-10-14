@@ -11,7 +11,7 @@ import (
 	"github.com/agentik-dev/agentik-relay/internal/night"
 )
 
-// TestAR25_2_AttachNamesSocket is ADV15-2, -5: `relay attach` runs the
+// TestAR25_2_AttachNamesSocket is ADV15-2, -5: `agentik-relay attach` runs the
 // machine's tmux (newTmux, a fake tmux by lookPath) on the relay's own
 // socket, <state>/tmux/relay.sock, and the line it prints names it.
 func TestAR25_2_AttachNamesSocket(t *testing.T) {

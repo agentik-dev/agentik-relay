@@ -74,7 +74,7 @@ func DropSitting(environ []string) []string {
 
 // ChildEnv is §7's environment: DropSitting's drop (every CLAUDE* variable,
 // every RELAY_* but RELAY_DEVICE_VERBS), and RELAY_ROW=<row> added, and
-// RELAY_MEASURE_DEPTH=1 (§15: a row's own `relay plan` measures nothing); the child knows nothing of the
+// RELAY_MEASURE_DEPTH=1 (§15: a row's own `agentik-relay plan` measures nothing); the child knows nothing of the
 // plugin beyond its row (R25-91 (3)). Each of remotes gets its pushurl list
 // reset and set to DeniedPushURL through GIT_CONFIG_COUNT, after any the
 // parent set, so a push past the hook (`--no-verify`) lands nothing (ADV6-6).

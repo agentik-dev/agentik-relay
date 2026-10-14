@@ -71,7 +71,7 @@ func TestAR66_2_PausedSittingParksNothing(t *testing.T) {
 
 // TestAR66_3_CleanMergedKeepsHeld (AR66 ruling 4; usage-limit-resume r1
 // §2): in TestClean's world with TestAR13_4_CleanStale's locks, each named
-// by the sha1 of its worktree's path as the stage names it, `relay clean
+// by the sha1 of its worktree's path as the stage names it, `agentik-relay clean
 // --merged` keeps a merged tree whose lock's holder lives (a paused row's,
 // at its cut, an ancestor of main), naming the pid, exit 1; a dead
 // holder's merged tree and an unlocked one go as before; no lock is

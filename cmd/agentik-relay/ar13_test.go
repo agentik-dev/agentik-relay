@@ -16,7 +16,7 @@ import (
 	"github.com/agentik-dev/agentik-relay/internal/night"
 )
 
-// TestAR13_0_GateLoadsFromRoot (ADV6-10): `relay gate` run from the row's
+// TestAR13_0_GateLoadsFromRoot (ADV6-10): `agentik-relay gate` run from the row's
 // own worktree reads the queue and the packet in the root (Git.Root), never
 // the cwd's toplevel: a child that widened its own may-touch to cover
 // README.md is still judged by the root's packet, README.md outside.
@@ -54,7 +54,7 @@ func TestAR13_0_GateLoadsFromRoot(t *testing.T) {
 	}
 }
 
-// TestAR13_4_CleanStale (R6 §4, §9): `relay clean --stale` removes a
+// TestAR13_4_CleanStale (R6 §4, §9): `agentik-relay clean --stale` removes a
 // stage lock whose pid is dead and the worktree it held when that
 // worktree's tip equals its cut; a live holder's lock and a worktree with
 // commits past its cut stay.

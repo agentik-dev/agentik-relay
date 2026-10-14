@@ -18,12 +18,12 @@ func TestAR59_1_VerifySeconds(t *testing.T) {
 	if err != nil || c.VerifySeconds != 0 || c.VerifyLimit() != 900*time.Second || c.VerifyLimit() != Timeout {
 		t.Fatalf("unset: %+v, limit %s, %v", c, c.VerifyLimit(), err)
 	}
-	const repo = "/r/.claude/claude-code-session/config.yaml"
-	fs.WriteFile(repo, []byte("agent-relay:\n  verify_seconds: 1800\n"), 0o600)
+	const repo = "/r/.claude/agentik/config.yaml"
+	fs.WriteFile(repo, []byte("relay:\n  verify_seconds: 1800\n"), 0o600)
 	if c, err = LoadConfig(fs, get, "/r"); err != nil || c.VerifySeconds != 1800 || c.VerifyLimit() != 30*time.Minute || len(c.Unknown) != 0 {
 		t.Fatalf("1800: %+v, limit %s, unknown %q, %v", c, c.VerifyLimit(), c.Unknown, err)
 	}
-	fs.WriteFile("/h/.config/agent-relay/config.yaml", []byte("verify_seconds: 1200\n"), 0o600)
+	fs.WriteFile("/h/.config/agentik/relay/config.yaml", []byte("verify_seconds: 1200\n"), 0o600)
 	if c, err = LoadConfig(fs, get, "/r"); err != nil || c.VerifySeconds != 1800 {
 		t.Fatalf("the repo's layer over the user's: %+v, %v", c, err)
 	}
@@ -31,16 +31,16 @@ func TestAR59_1_VerifySeconds(t *testing.T) {
 	if c, err = LoadConfig(fs, get, "/r"); err != nil || c.VerifyLimit() != 20*time.Minute || len(c.Unknown) != 0 {
 		t.Fatalf("the user's layer: %+v, %v", c, err)
 	}
-	fs.Remove("/h/.config/agent-relay/config.yaml")
+	fs.Remove("/h/.config/agentik/relay/config.yaml")
 	for _, bad := range []string{"0", "-1", "3601", "15m"} {
-		fs.WriteFile(repo, []byte("agent-relay:\n  verify_seconds: "+bad+"\n"), 0o600)
+		fs.WriteFile(repo, []byte("relay:\n  verify_seconds: "+bad+"\n"), 0o600)
 		_, err := LoadConfig(fs, get, "/r")
 		if err == nil || !strings.Contains(err.Error(), "line 2") || !strings.Contains(err.Error(), "verify_seconds") ||
 			!strings.Contains(err.Error(), repo) {
 			t.Errorf("verify_seconds: %s: %v, want an error naming %s, line 2 and the key", bad, err, repo)
 		}
 	}
-	fs.WriteFile(repo, []byte("agent-relay:\n  verify_seconds: 3600\n"), 0o600)
+	fs.WriteFile(repo, []byte("relay:\n  verify_seconds: 3600\n"), 0o600)
 	if c, err = LoadConfig(fs, get, "/r"); err != nil || c.VerifyLimit() != time.Hour || MaxVerifySeconds != 3600 {
 		t.Fatalf("3600: %+v, %v", c, err)
 	}

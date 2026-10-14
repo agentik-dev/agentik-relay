@@ -486,7 +486,7 @@ func sitting(t *testing.T, l map[string]any, state string) {
 	}
 }
 
-// status is `relay status --json`.
+// status is `agentik-relay status --json`.
 func (f *fx) status(t *testing.T) map[string]any {
 	t.Helper()
 	code, out := f.run(t, "status", "--json")

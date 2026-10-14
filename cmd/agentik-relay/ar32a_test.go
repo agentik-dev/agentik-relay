@@ -27,7 +27,7 @@ func withEnv(t *testing.T, vals map[string]string) {
 }
 
 // TestAR32A_1_PlanRowsLockFreeInRow (orchestrator r1 §6): inside a row
-// (RELAY_ROW, or a helper's CLAUDE_SESSION_HELPER) `relay plan --rows`
+// (RELAY_ROW, or a helper's CLAUDE_SESSION_HELPER) `agentik-relay plan --rows`
 // takes no pid lock, measures nothing and writes no ledger line, even with
 // the measurement guard cleared; outside one the same plan takes the lock.
 func TestAR32A_1_PlanRowsLockFreeInRow(t *testing.T) {
@@ -72,7 +72,7 @@ func TestAR32A_1_PlanRowsLockFreeInRow(t *testing.T) {
 }
 
 // TestAR32A_5_OrchestrateRefusals is ar32a act 5 (orchestrator r1 §8):
-// `relay run --orchestrate` exits 2 before the lock and the plan without
+// `agentik-relay run --orchestrate` exits 2 before the lock and the plan without
 // --max-usd or --until, with --parallel above 1 or --rows, without ntfy's
 // URL and topic, with no orchestrator row, or with a red or failed
 // sitting of the row today; a red sitting yesterday does not refuse (ar32b

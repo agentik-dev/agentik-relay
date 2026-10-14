@@ -120,10 +120,10 @@ func TestAR29_1_ToolchainFailsClosed(t *testing.T) {
 func TestAR29_3_PacketsConfig(t *testing.T) {
 	for body, want := range map[string]string{"tmux: auto\n": "", "packets: /srv/packets\n": "/srv/packets", "packets: rel/packets\n": "error"} {
 		home, repo := t.TempDir(), t.TempDir()
-		if err := os.MkdirAll(filepath.Join(home, ".config", "agent-relay"), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(home, ".config", "agentik", "relay"), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(home, ".config", "agent-relay", "config.yaml"), []byte(body), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(home, ".config", "agentik", "relay", "config.yaml"), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		env := func(k string) string {

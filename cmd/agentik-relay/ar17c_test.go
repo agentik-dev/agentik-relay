@@ -146,5 +146,5 @@ func signalMid(t *testing.T, args ...string) {
 // exits 1 naming the signal, and no descendant is alive.
 func TestAR17C_1_SignalMidPlan(t *testing.T) { signalMid(t, "plan", "--rows", "r") }
 
-// TestAR17C_1_SignalMidGate: the same for `relay gate r` mid-measurement.
+// TestAR17C_1_SignalMidGate: the same for `agentik-relay gate r` mid-measurement.
 func TestAR17C_1_SignalMidGate(t *testing.T) { signalMid(t, "gate", "r") }
