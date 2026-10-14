@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agentik-dev/agentik-relay/internal/xdg"
 	"github.com/agentik-dev/agentik-relay/internal/yaml"
 )
 
@@ -84,8 +85,8 @@ const sessionLayer = 3
 // user's, the repo's and the session's each the new file when it exists in
 // fs, else the old when it exists, else the new (NewElseOld); the local
 // file in the picked repo file's folder (session-layer-r1 §2.2); the
-// session's only when env names a session, under $XDG_STATE_HOME with `~`
-// expanded (§2.4).
+// session's only when env names a session, under xdg.StateHome, `~`
+// expanded (§2.4; AR76).
 func ConfigPaths(fs FS, env func(string) string, repo string) []string {
 	home := env("HOME")
 	repoFile := NewElseOld(fs.Exists, filepath.Join(repo, repoConfig), filepath.Join(repo, oldRepoConfig))
@@ -95,13 +96,7 @@ func ConfigPaths(fs FS, env func(string) string, repo string) []string {
 		filepath.Join(filepath.Dir(repoFile), localConfig),
 	}
 	if id := env("CLAUDE_CODE_SESSION_ID"); id != "" {
-		state := env("XDG_STATE_HOME")
-		switch {
-		case state == "":
-			state = filepath.Join(home, ".local", "state")
-		case state == "~" || strings.HasPrefix(state, "~/"):
-			state = filepath.Join(home, state[1:])
-		}
+		state := xdg.StateHome(env)
 		id = filepath.Base(id)
 		paths = append(paths, NewElseOld(fs.Exists, filepath.Join(state, fmt.Sprintf(sessionConfig, id)),
 			filepath.Join(state, fmt.Sprintf(oldSessionConfig, id))))
@@ -178,12 +173,14 @@ var recordedSum = regexp.MustCompile(`^[0-9a-f]{64}$`)
 // (session-layer-r1 §2.1, §2.3): its provider.inputs must list repoFile and
 // localFile, each at the sha256 it has now through fs, a null matching only
 // a file still absent. Paths compare after filepath.Clean; an item with a
-// relative path is skipped; the other inputs are not checked.
+// relative path is skipped; the other inputs are not checked. An inputs
+// that is YAML's null is none (AR76 ruling 3); a path unlisted while its
+// other-folder twin is listed was resolved before the folder moved (ruling 2).
 func sessionFresh(fs FS, root yaml.Node, repoFile, localFile string) string {
 	const malformed = "malformed provider.inputs"
 	prov, _ := root.Get("provider")
 	list, ok := prov.Get("inputs")
-	if !ok {
+	if !ok || null(list) {
 		return "no provider.inputs"
 	}
 	if list.Kind != yaml.List {
@@ -209,9 +206,13 @@ func sessionFresh(fs FS, root yaml.Node, repoFile, localFile string) string {
 	}
 	want := []string{filepath.Clean(repoFile), filepath.Clean(localFile)}
 	for _, p := range want {
-		if len(sums[p]) == 0 {
-			return fmt.Sprintf("resolved for another checkout: %s not listed", p)
+		if len(sums[p]) > 0 {
+			continue
 		}
+		if tw := twin(p); tw != "" && len(sums[tw]) > 0 {
+			return "resolved before the config folder moved: " + tw
+		}
+		return fmt.Sprintf("resolved for another checkout: %s not listed", p)
 	}
 	for _, p := range want {
 		now := sumNow(fs, p)
@@ -219,6 +220,27 @@ func sessionFresh(fs FS, root yaml.Node, repoFile, localFile string) string {
 			if sum != now {
 				return fmt.Sprintf("%s changed since the session resolved it", p)
 			}
+		}
+	}
+	return ""
+}
+
+// null is whether n is YAML's null: a scalar `null`, `Null`, `NULL`, `~`,
+// or no value (the strict reader keeps each as its text).
+func null(n yaml.Node) bool {
+	s, ok := n.String()
+	return ok && (s == "" || s == "~" || s == "null" || s == "Null" || s == "NULL")
+}
+
+// twin is clean path p's other-folder twin: the same file name in its
+// repo's other config folder (the new for the old and back, agentik-r1
+// §6.3 c3), "" for a path in neither folder.
+func twin(p string) string {
+	dir, name := filepath.Dir(p), filepath.Base(p)
+	nw, old := filepath.Dir(repoConfig), filepath.Dir(oldRepoConfig)
+	for _, pair := range [2][2]string{{nw, old}, {old, nw}} {
+		if strings.HasSuffix(dir, string(filepath.Separator)+pair[0]) {
+			return filepath.Join(strings.TrimSuffix(dir, pair[0]), pair[1], name)
 		}
 	}
 	return ""

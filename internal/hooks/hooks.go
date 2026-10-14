@@ -24,6 +24,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/agentik-dev/agentik-relay/internal/xdg"
 )
 
 // Effects is every effect a hook has, so a test can fake them all.
@@ -164,17 +166,10 @@ func SoftPath(env func(string) string, session string) string {
 // the new; the file door denies both.
 var stateNames = [2]string{"agentik-relay", "agent-relay"}
 
-// stateBase is ${XDG_STATE_HOME:-~/.local/state}; "" when no base is known.
+// stateBase is ${XDG_STATE_HOME:-~/.local/state}, `~` expanded under HOME,
+// as the relay reads it: xdg.StateHome (AR76); "" when no base is known.
 func stateBase(env func(string) string) string {
-	base := env("XDG_STATE_HOME")
-	if base == "" {
-		home := env("HOME")
-		if home == "" {
-			return ""
-		}
-		base = filepath.Join(home, ".local", "state")
-	}
-	return base
+	return xdg.StateHome(env)
 }
 
 // stateRoot is <stateBase>/agentik-relay, else the old agent-relay when
@@ -189,7 +184,8 @@ func stateRoot(env func(string) string) string {
 }
 
 // newElseOld is §6.3's rule for a renamed path, as effects.NewElseOld
-// reads it on the real file system (hooks imports nothing of the relay).
+// reads it on the real file system (hooks imports nothing of the relay but
+// the stdlib-only xdg).
 func newElseOld(nw, old string) string {
 	exists := func(p string) bool { _, err := os.Stat(p); return err == nil }
 	if !exists(nw) && exists(old) {

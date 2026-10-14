@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/agentik-dev/agentik-relay/internal/xdg"
 )
 
 // Git is git as the plan, the stage, the gate and the merge need it: the
@@ -180,13 +182,10 @@ func SuggestVerifySeconds(took time.Duration) int {
 	return min(max(s, int(Timeout/time.Second)), MaxVerifySeconds)
 }
 
-// StateDir is StateIn(${XDG_STATE_HOME:-~/.local/state}) (D9's shape).
+// StateDir is StateIn(${XDG_STATE_HOME:-~/.local/state}) (D9's shape),
+// the base xdg.StateHome's, `~` expanded under HOME (AR76).
 func StateDir(env func(string) string) string {
-	base := env("XDG_STATE_HOME")
-	if base == "" {
-		base = filepath.Join(env("HOME"), ".local", "state")
-	}
-	return StateIn(base)
+	return StateIn(xdg.StateHome(env))
 }
 
 // StateIn is the relay's state dir under base: base/agentik-relay, else
