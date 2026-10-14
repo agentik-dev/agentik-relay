@@ -21,6 +21,18 @@ glob's `*` stays inside one path segment; a `secret` exception outside
 records) the `sibling` group is not evaluated; the rest still scan there.
 `secret` is matched case-sensitively, the others ignore case.
 
+The `renamed` group (agentik-r1 section 6.1) finds the names the tools had before
+agentik-r1, in the live files only: outside `design/`, `bugs/` and `history/`, and
+not a `NICE_TO_HAVE.md` or a `CHANGELOG*` at any depth. Under `history/` the
+live files are those a start line reads: `history/sessions/PROMPT-*`,
+`history/sessions/BRIEF-*`, and the newest charter of each running chain. A
+charter is `history/sittings/<YYYY-MM-DD>-<n>[-<chain>].md`. A repo declares its
+running chains in `.hygiene-live` at its root, one chain per line (`#` comments
+and blank lines skipped, `-` for the unsuffixed chain); per declared chain the
+greatest (date, n) is the newest, n compared as an integer. No file, or no
+line, means no charter is live; a line holding a `/` or a space exits 2.
+Its verb pattern wants a lowercase verb; the rest ignore case.
+
 This file holds the generic groups only: patterns that name nobody. The terms
 private to one owner (a name, a host, a domain, a private repo) live outside the
 repo, in the private list: `$AGENTIK_HYGIENE_PRIVATE` when set and not empty,
@@ -33,11 +45,20 @@ line is reported by its number. An absent list prints one stderr line and the
 scan runs on the generic groups; `--require-private` makes an absent or
 unreadable list exit 2.
 
+`--json` gives each group `lines` and `files`, every hit with the allowlisted
+ones, and `outside_lines` and `outside_files`, the hits outside the allowlist
+only (a `renamed` count of 0 reads `outside_files`); then the outside rows in
+`files`, `hits_outside_allowlist` and `oversize`. The text table shows `lines`
+and `files`, then the outside rows.
+
 Usage: hygiene [--json] [--allow FILE] [--repo DIR] [--require-private]
-Exit 0 when no hit lies outside the allowlist, 2 when one does (or when
-`--require-private` finds no readable private list), 1 on usage, a bad line in
-the private list, or when git fails. Stdlib only; one file, copied
-byte-identical into each repo.
+Exit codes report the task, not the content (the agentik guide): 0 when no hit
+lies outside the allowlist, 1 when one does (a check said no), 2 on usage, a bad
+line in the allowlist or the private list, git failing, a file it cannot read
+(one stderr line), any other error, or `--require-private` without a readable
+list; `--help` prints the usage and exits 0. Stdlib only; one
+file, its canonical copy in agentik-commons, vendored into each repo by
+`scripts/sync` and pinned in `scripts/vendored.sha256`.
 
 The patterns below are written so that this file does not match itself.
 """
@@ -61,6 +82,11 @@ GROUPS = (
                 r"github_pa[t]_[A-Za-z0-9_]{20,}", r"AGE-SECRET-KE[Y]-1[0-9A-Z]{20,}",
                 r"\bAKI[A][0-9A-Z]{16}\b", r"BEGI[N] [A-Z0-9 ]*PRIVATE KEY")),
     ("email", (r"\b[A-Za-z0-9._%+-]+[@][A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b",)),
+    ("renamed", (r"(?<![\w-])claude-cod[e]-(?:session|decision[s]|respea[k]|agents)",
+                 r"agent-rela[y]", r"claude-sessio[n]",
+                 r"claude-(?:api-agent|local|fanout|costs|agents)\b",
+                 r"\blocalri[g]\b", r"\bagentrout[e]\b",
+                 r"(?-i:`(?:relay|decision[s]) [a-z])")),
 )
 CASE_SENSITIVE = ("secret",)
 COMPILED = [(name, re.compile("|".join(pats), 0 if name in CASE_SENSITIVE else re.IGNORECASE))
@@ -79,9 +105,17 @@ OVERLAP = 4 * 1024
 LAST_BREAK = re.compile(rb"[^\x20-\x7e\t][\x20-\x7e\t]*\Z")
 RECORDS = ("history/sittings/",)
 RECORDS_SKIP = ("sibling",)
+LIVE_ONLY = ("renamed",)
+NOT_LIVE_DIRS = ("design/", "bugs/", "history/")
+NOT_LIVE_NAMES = ("NICE_TO_HAVE.md", "CHANGELOG*")
+LIVE_BRIEFS = ("history/sessions/PROMPT-*", "history/sessions/BRIEF-*")
+LIVE_FILE = ".hygiene-live"
+UNSUFFIXED = "-"
+CHARTER = re.compile(r"history/sittings/(\d{4}-\d{2}-\d{2})-(\d+)(?:-([^/]+))?\.md\Z")
 BINARY_GROUPS = ("home", "secret", "email")
 PRINTABLE_RUN = re.compile(rb"[\x20-\x7e\t]{8,}")
 SECRET_ALLOW_ROOT = ["tests", "fixtures"]
+USAGE = "usage: hygiene [--json] [--allow FILE] [--repo DIR] [--require-private]"
 
 
 class UsageError(Exception):
@@ -90,6 +124,21 @@ class UsageError(Exception):
 
 class NoPrivateList(Exception):
     pass
+
+
+class Help(Exception):
+    pass
+
+
+class Failure(Exception):
+    """A failed precondition (a file that cannot be read): one stderr line, exit 2."""
+
+
+def why(exc):
+    """A read error's reason, never the file's content."""
+    if isinstance(exc, UnicodeDecodeError):
+        return "not UTF-8"
+    return getattr(exc, "strerror", None) or type(exc).__name__
 
 
 def parse_args(argv):
@@ -107,7 +156,7 @@ def parse_args(argv):
             opts[arg[2:]] = argv[i + 1]
             i += 1
         elif arg in ("-h", "--help"):
-            raise UsageError(None)
+            raise Help()
         else:
             raise UsageError("unknown argument: %s" % arg)
         i += 1
@@ -162,23 +211,27 @@ def load_allow(path, required, known, strict):
         if required:
             raise UsageError("allow file not found: %s" % path)
         return []
+    try:
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise Failure("cannot read the allow file %s: %s" % (path, why(exc))) from None
     entries = []
-    with open(path, encoding="utf-8") as fh:
-        for n, raw in enumerate(fh, 1):
-            line = raw.split("#", 1)[0].strip()
-            if not line:
-                continue
-            glob, sep, groups = line.rpartition(":")
-            names = {g.strip() for g in groups.split(",") if g.strip()}
-            glob = glob.strip()
-            if not sep or not glob or not names or (strict and names - set(known)) or any(
-                    not GROUP_NAME.match(g) for g in names):
-                raise UsageError("%s:%d: bad entry" % (path, n))
-            parts = glob.split("/")
-            if "secret" in names and (parts[:2] != SECRET_ALLOW_ROOT or len(parts) < 3):
-                raise UsageError("%s:%d: a secret exception lies only under tests/fixtures/"
-                                 % (path, n))
-            entries.append((glob, names))
+    for n, raw in enumerate(text.split("\n"), 1):
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        glob, sep, groups = line.rpartition(":")
+        names = {g.strip() for g in groups.split(",") if g.strip()}
+        glob = glob.strip()
+        if not sep or not glob or not names or (strict and names - set(known)) or any(
+                not GROUP_NAME.match(g) for g in names):
+            raise UsageError("%s:%d: bad entry" % (path, n))
+        parts = glob.split("/")
+        if "secret" in names and (parts[:2] != SECRET_ALLOW_ROOT or len(parts) < 3):
+            raise UsageError("%s:%d: a secret exception lies only under tests/fixtures/"
+                             % (path, n))
+        entries.append((glob, names))
     return entries
 
 
@@ -276,27 +329,77 @@ def read_lines(path, full):
     return rows + pieces(data.decode("utf-8", "replace"), False), False
 
 
+def load_live(repo):
+    """The running chains `.hygiene-live` declares ("" for the unsuffixed one); an
+    absent file declares none."""
+    path = os.path.join(repo, LIVE_FILE)
+    if not os.path.lexists(path):
+        return set()
+    try:
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise Failure("cannot read %s: %s" % (path, why(exc))) from None
+    chains = set()
+    for n, raw in enumerate(text.split("\n"), 1):
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        if "/" in line or len(line.split()) > 1:
+            raise UsageError("%s:%d: bad entry (one chain per line)" % (path, n))
+        chains.add("" if line == UNSUFFIXED else line)
+    return chains
+
+
+def live_files(paths, chains):
+    """The live files of section 6.1: outside the record folders and files, plus the
+    briefs and the newest charter of each declared chain, its n compared as an integer."""
+    newest = {}
+    for path in paths:
+        m = CHARTER.match(path)
+        if m:
+            key, chain = (m.group(1), int(m.group(2))), m.group(3) or ""
+            if chain not in chains:
+                continue
+            if chain not in newest or key > newest[chain][0]:
+                newest[chain] = (key, path)
+    live = {path for _, path in newest.values()}
+    for path in paths:
+        if any(fnmatch.fnmatchcase(path.rsplit("/", 1)[-1], g) for g in NOT_LIVE_NAMES):
+            continue
+        if not path.startswith(NOT_LIVE_DIRS) or any(glob_match(path, g) for g in LIVE_BRIEFS):
+            live.add(path)
+    return live
+
+
 def scan(repo, entries, compiled):
     """Counts per group over `compiled` ([(group, regex)], a group may hold several);
     a line counts once per group it matches."""
     order = list(dict.fromkeys(name for name, _ in compiled))
-    groups = {name: {"lines": 0, "files": 0} for name in order}
+    groups = {name: {"lines": 0, "files": 0, "outside_lines": 0, "outside_files": 0}
+              for name in order}
     outside, oversize = [], 0
-    for path in files(repo):
+    paths = files(repo)
+    live_set = live_files(paths, load_live(repo))
+    for path in paths:
         counts = dict.fromkeys(order, 0)
         live = [(name, rx) for name, rx in compiled
-                if not (name in RECORDS_SKIP and path.startswith(RECORDS))]
-        lines, big = read_lines(path, os.path.join(repo, path))
-        oversize += big
-        for line, names in lines:
-            hit = set()
-            for name, rx in live:
-                if name in hit or (names is not ALL and name not in names):
-                    continue
-                if rx.search(line):
-                    hit.add(name)
-            for name in hit:
-                counts[name] += 1
+                if not (name in RECORDS_SKIP and path.startswith(RECORDS))
+                and not (name in LIVE_ONLY and path not in live_set)]
+        try:
+            lines, big = read_lines(path, os.path.join(repo, path))
+            oversize += big
+            for line, names in lines:
+                hit = set()
+                for name, rx in live:
+                    if name in hit or (names is not ALL and name not in names):
+                        continue
+                    if rx.search(line):
+                        hit.add(name)
+                for name in hit:
+                    counts[name] += 1
+        except OSError as exc:
+            raise Failure("cannot read %s: %s" % (path, why(exc))) from None
         for name in order:
             if not counts[name]:
                 continue
@@ -304,6 +407,8 @@ def scan(repo, entries, compiled):
             groups[name]["files"] += 1
             if not allowed(path, name, entries):
                 outside.append({"path": path, "group": name, "lines": counts[name]})
+                groups[name]["outside_lines"] += counts[name]
+                groups[name]["outside_files"] += 1
     return {"groups": groups,
             "hits_outside_allowlist": sum(f["lines"] for f in outside),
             "files": outside, "oversize": oversize}
@@ -337,19 +442,29 @@ def main(argv):
         known = [name for name, _ in compiled]
         entries = load_allow(allow, opts["allow"] is not None, known, bool(private))
         result = scan(repo, entries, compiled)
+    except Help:
+        print(USAGE)
+        return 0
     except NoPrivateList as exc:
         sys.stderr.write("hygiene: %s\n" % exc.args[0])
         return 2
     except UsageError as exc:
         if exc.args and exc.args[0]:
             sys.stderr.write("hygiene: %s\n" % exc.args[0])
-        sys.stderr.write("usage: hygiene [--json] [--allow FILE] [--repo DIR] [--require-private]\n")
-        return 1
+        sys.stderr.write(USAGE + "\n")
+        return 2
+    except Failure as exc:
+        sys.stderr.write("hygiene: %s\n" % exc.args[0])
+        return 2
+    except Exception as exc:  # never 1, which means a hit; the type only, never a value
+        sys.stderr.write("hygiene: unexpected %s, nothing scanned to the end\n"
+                         % type(exc).__name__)
+        return 2
     if opts["json"]:
         print(json.dumps(result, indent=1, sort_keys=True))
     else:
         print(render(result))
-    return 0 if result["hits_outside_allowlist"] == 0 else 2
+    return 0 if result["hits_outside_allowlist"] == 0 else 1
 
 
 if __name__ == "__main__":

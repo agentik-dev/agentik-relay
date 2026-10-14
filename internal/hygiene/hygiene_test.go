@@ -89,8 +89,8 @@ func TestPublicR1_1_LoadsPrivateList(t *testing.T) {
 	list := writeList(t, t.TempDir(), privateList)
 	r := scan(t, map[string]string{"a.txt": "one zorblax here\n", "b.txt": "a frobnicot\n"},
 		map[string]string{"AGENTIK_HYGIENE_PRIVATE": list}, "--require-private")
-	if r.code != 2 {
-		t.Fatalf("exit %d, want 2; stdout %q stderr %q", r.code, r.stdout, r.stderr)
+	if r.code != 1 {
+		t.Fatalf("exit %d, want 1; stdout %q stderr %q", r.code, r.stdout, r.stderr)
 	}
 	for _, want := range []string{"a.txt  invented  1", "b.txt  home  1", "hits outside allowlist: 2"} {
 		if !strings.Contains(r.stdout, want) {
@@ -133,8 +133,8 @@ func TestPublicR1_3_AbsentList(t *testing.T) {
 	}
 	// The address is built here, so this file holds no LAN address of its own.
 	r = scan(t, map[string]string{"a.txt": "a LAN host " + "192." + "168.0.9\n"}, env)
-	if r.code != 2 || !strings.Contains(r.stdout, "a.txt  lan  1") {
-		t.Fatalf("a generic hit without the list: exit %d, want 2:\n%s", r.code, r.stdout)
+	if r.code != 1 || !strings.Contains(r.stdout, "a.txt  lan  1") {
+		t.Fatalf("a generic hit without the list: exit %d, want 1:\n%s", r.code, r.stdout)
 	}
 }
 
@@ -168,15 +168,15 @@ func TestPublicR1_5_DefaultPath(t *testing.T) {
 	writeList(t, filepath.Join(xdg, "agentik"), privateList)
 	r := scan(t, map[string]string{"a.txt": "zorblax\n"},
 		map[string]string{"XDG_CONFIG_HOME": xdg}, "--require-private")
-	if r.code != 2 || !strings.Contains(r.stdout, "a.txt  invented  1") {
-		t.Errorf("XDG list: exit %d, want 2:\n%s%s", r.code, r.stdout, r.stderr)
+	if r.code != 1 || !strings.Contains(r.stdout, "a.txt  invented  1") {
+		t.Errorf("XDG list: exit %d, want 1:\n%s%s", r.code, r.stdout, r.stderr)
 	}
 	home := t.TempDir()
 	writeList(t, filepath.Join(home, ".config", "agentik"), privateList)
 	r = scan(t, map[string]string{"a.txt": "zorblax\n"},
 		map[string]string{"HOME": home}, "--require-private")
-	if r.code != 2 || !strings.Contains(r.stdout, "a.txt  invented  1") {
-		t.Errorf("HOME list: exit %d, want 2:\n%s%s", r.code, r.stdout, r.stderr)
+	if r.code != 1 || !strings.Contains(r.stdout, "a.txt  invented  1") {
+		t.Errorf("HOME list: exit %d, want 1:\n%s%s", r.code, r.stdout, r.stderr)
 	}
 }
 
@@ -195,7 +195,7 @@ func TestPublicR1_6_AllowAndBadLine(t *testing.T) {
 	}
 	bad := writeList(t, t.TempDir(), "invented zorblax-no-tab\n")
 	r := scan(t, map[string]string{"a.txt": "clean\n"}, map[string]string{"AGENTIK_HYGIENE_PRIVATE": bad})
-	if r.code != 1 || !strings.Contains(r.stderr, ":1: bad entry") || strings.Contains(r.stderr, "zorblax") {
-		t.Errorf("bad line: exit %d, want 1 naming the line only; stderr %q", r.code, r.stderr)
+	if r.code != 2 || !strings.Contains(r.stderr, ":1: bad entry") || strings.Contains(r.stderr, "zorblax") {
+		t.Errorf("bad line: exit %d, want 2 naming the line only; stderr %q", r.code, r.stderr)
 	}
 }

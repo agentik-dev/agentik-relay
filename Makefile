@@ -3,7 +3,6 @@ PY := $(shell pyenv which python3 2>/dev/null || command -v python3)
 # make through a variable: a literal $(MAKE) in check's line would run it under
 # `make -n check` (the relay's verify probe), taking the lock or waiting on load.
 UNLOCKED := $(MAKE)
-HYGIENE_SHA := acc3498d4ad3555b095f7f12b22c1c1257fc7d8f2f2f6055c34bd0a21ec34421
 DOCLINT_SHA := 3040666c1e9ad08faf1befe9c2efffaff0660f0464554d240f1d07437a03fcda
 
 JAVA ?= $(shell test -x /opt/homebrew/opt/openjdk/bin/java && echo /opt/homebrew/opt/openjdk/bin/java || command -v java)
@@ -28,8 +27,8 @@ lint: vet  ## conventions §5 name for vet
 doclint:  ## the doc gate (conventions §5), its bytes pinned (conventions §6)
 	@echo "$(DOCLINT_SHA)  scripts/doclint" | shasum -a 256 -c --status || { echo "doclint: scripts/doclint is not conventions §6's copy"; exit 2; }
 	$(PY) -B scripts/doclint
-hygiene:  ## the public-hygiene scan (conventions §6), its bytes pinned
-	@echo "$(HYGIENE_SHA)  scripts/hygiene" | shasum -a 256 -c --status || { echo "hygiene: scripts/hygiene is not conventions §6's copy"; exit 2; }
+hygiene:  ## the public-hygiene scan (conventions §6); scripts/{agentik,hygiene,bounded} pinned by scripts/vendored.sha256 (agentik-commons scripts/sync)
+	@shasum -a 256 -c --status scripts/vendored.sha256 || { echo "hygiene: scripts/{agentik,hygiene,bounded} are not agentik-commons' copies (scripts/vendored.sha256; run its scripts/sync)"; exit 2; }
 	$(PY) -B scripts/hygiene
 validate:  ## claude plugin validate plugin/ (doclint's plugin rule runs in check's doclint step)
 	$(PY) -B scripts/bounded --wall 60 -- claude plugin validate plugin/
