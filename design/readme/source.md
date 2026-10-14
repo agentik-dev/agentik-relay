@@ -102,7 +102,7 @@ Shared with its sibling plugins:
 
 ## Status
 
-Status: version `0.1.3`, rendered `2026-10-13`, `699` Go tests.
+Status: version `0.1.3`, rendered `2026-10-14`, `723` Go tests.
 
 Nothing is stable before `1.0.0`.
 

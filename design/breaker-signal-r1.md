@@ -26,7 +26,7 @@ A high load reading counts only when the CPU confirms it. Each place that compar
 > loaded at k = the 1-minute load is above k x cores **and** the idle share of the CPU is under `IdleFloor`.
 
 - **The idle share** is the idle fraction of all cores over a one-second sample. On darwin it is the second `CPU usage:` line of `top -l 2 -n 0 -s 1`: the second line is the change over the one-second wait, and the first line's window is not defined. On Linux it is two reads of the `cpu` line of `/proc/stat`, one second apart.
-- **`IdleFloor` is 25%, until P2 sets it** (§4). Background work that fills the 4 efficiency cores leaves 75% idle at the least; 32 or more runnable threads at normal priority leave none. The floor sits between the two, and a reading at the floor counts as under it.
+- **`IdleFloor` is 25% in the code** (`night.DefaultIdleFloor`); P2's sweep (§4, ran 2026-10-01) reads 0.50, a one-constant change that waits for the owner's word. Background work that fills the 4 efficiency cores leaves 75% idle at the least; 32 or more runnable threads at normal priority leave none. The floor sits between the two, and a reading at the floor counts as under it.
 - **The idle share is read only after the load key has turned.** A quiet machine pays nothing; a loaded one pays 1.4 s per read (measured twice).
 - **An unreadable idle share leaves the load key alone to decide**, as today. The rule can only narrow when the breaker fires; it never fires where today's does not.
 
@@ -56,7 +56,7 @@ In `scripts/bounded`: `wait_for_load` applies the same rule with the same reader
 
 The load rose toward one per background thread, the idle share stayed above 70%, and the foreground job kept its time. Under the rule this reading is not loaded at any k.
 
-**P2, owed, with no `relay run` or `relay gate` in `ps`.** It has two parts. First, forty busy loops at normal priority for 75 s: the rule holds if the idle share reads under 25% while the load climbs past 32. If the idle share stays above 25% under real saturation, this design is revised before any packet. Second, a sweep that sets the floor: over background work that holds the load above 32, add 4, 8 and 12 loops at normal priority, and at each step read the idle share and time a 16-wide job. The floor is the idle share at the first step where the 16-wide job slows by more than a tenth.
+**P2 as planned (it ran 2026-10-01, below), with no `relay run` or `relay gate` in `ps`.** It has two parts. First, forty busy loops at normal priority for 75 s: the rule holds if the idle share reads under 25% while the load climbs past 32. If the idle share stays above 25% under real saturation, this design is revised before any packet. Second, a sweep that sets the floor: over background work that holds the load above 32, add 4, 8 and 12 loops at normal priority, and at each step read the idle share and time a 16-wide job. The floor is the idle share at the first step where the 16-wide job slows by more than a tenth.
 
 **P2, ran 2026-10-01 13:10 in a compact form, with no relay verb and no check running.** Forty-eight loops at background priority for 100 s to carry the load past 32, then loops at normal priority added in steps. At each step: the idle share, and a 16-wide job (sixteen processes, `sum(range(12_000_000))` each), one run.
 
@@ -85,7 +85,7 @@ AR47 installs with the relay; AR48 reaches a repo at its next `make check`.
 ## 6. Open risks
 
 - **The load key still gates, and it misses real saturation.** During another session's `go test`, the machine read load 17.30 at 2.17% idle: 1.08 x cores, not loaded under today's rule or this one. Across five ledgers the breaker has never opened: 0 `breaker` lines, 0 opens in 166 plans, highest load 52.7. This design only narrows; it does not make the breaker see a saturated CPU at a low load. A rule that reads the idle share first would, at 1.4 s for every measured line, and it needs its own evidence (NICE_TO_HAVE).
-- The floor is a judgment until P2's sweep. Background work above load 32 with eight normal threads leaves exactly 25% idle, and a 16-wide line then has four performance cores free.
+- The code's floor, 0.25, is a judgment; P2's sweep reads 0.50, coarse (one run a step), and the change waits for the owner's word. Background work above load 32 with eight normal threads leaves exactly 25% idle, and a 16-wide line then has four performance cores free.
 - A one-second idle sample is an instant, and the load average is a minute. The close rule asks for two polls in a row; the open rule and D4 still act on one sample.
 - A spawn has no D4 behind it: a child started on a machine the rule calls not loaded just runs slowly.
 - `top` prints a localised line. The reader matches `% idle` and treats anything else as unreadable.

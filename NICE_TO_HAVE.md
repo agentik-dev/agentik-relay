@@ -1,6 +1,6 @@
 ---
 status: current
-updated: 2026-09-30
+updated: 2026-10-14
 ---
 # agent-relay: what a review or a packet left open, none of it blocking
 
