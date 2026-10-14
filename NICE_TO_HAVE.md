@@ -18,7 +18,7 @@ Nothing here blocks a review or a merge. An item leaves when it lands, or when a
 - The same night at 00:38 on 2026-10-02 (check-in 23; the attendant, from both verbs, the ledger and the row logs; none checked by the observer):
   - The orchestrator row does sit: `orient.1` spawned 23:58:47, once gfix, ewc and ovr were green. That answers the item above; status still showed no orchestrator line before it sat.
   - `orient.1.log` repeats `turn 63: Agent ""` 94 times while a helper runs, and status lags at turn 60.
-  - ovr's exit text says four tool results ended with a line asking for a status update, and it answered one. The source is not checked; if a headless child is shown that line, it is Claude Code's and not the relay's.
+  - ovr's exit text says four tool results ended with a line asking for a status update, and it answered one. The source is not checked; if a headless child is shown that line, it is not the relay's. Unconfirmed as Claude Code's (2026-10-14): the research site found no Claude Code documentation of such a line, so it stays an observation, S4, until a run reproduces it and names the CLI version.
 
 ## AR49's review (2026-10-01, two refuters, nothing blocking)
 - Python's temp name for a cache write (`<file>.pyc.<n>`) is still an entry, so a walk that lands inside that write still reads `tool-moved`. The window is the write itself. (the builder; not reproduced)
