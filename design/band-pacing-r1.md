@@ -1,6 +1,6 @@
 # agent-relay design: a night paces its spawns by the session band (r1)
 
-**Status:** design r1, 2026-10-14, written before code and revised once after its one refuter round (§7), which blocked on F1, now fixed. AR80 built §5 packet 1 (2026-10-14). It amends relay-r1 §9 (configuration) and §15 (the breaker) and consumes the session plugin's admission verdict, never recomputing it; the plugin keeps `-p` sessions in `observe` "until agent-relay checks rows itself" (admission-r1 §2.4). The owner's word (agentik-session `OPEN-QUESTIONS.md`, answers 2, 4, 5): helpers run to 97% of each five-hour window; nights and sittings share it, the first to start taking the room; an earlier weekly reset is the band's horizon.
+**Status:** design r1, 2026-10-14, written before code and revised once after its one refuter round (§7), which blocked on F1, now fixed. AR80 built §5 packet 1 (2026-10-14). AR81 built §5 packet 2 (2026-10-14). It amends relay-r1 §9 (configuration) and §15 (the breaker) and consumes the session plugin's admission verdict, never recomputing it; the plugin keeps `-p` sessions in `observe` "until agent-relay checks rows itself" (admission-r1 §2.4). The owner's word (agentik-session `OPEN-QUESTIONS.md`, answers 2, 4, 5): helpers run to 97% of each five-hour window; nights and sittings share it, the first to start taking the room; an earlier weekly reset is the band's horizon.
 
 ## 1. The problem
 

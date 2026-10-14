@@ -605,3 +605,7 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 - Fix 1 (a stopped night cancels its unspawned rows) reaches band-less nights too: at 2a52536 a row waiting on its spawn spacing spawned 30 s after a sibling's no-commit; it now ends `skipped owner-stop`, a label that also names stops the owner never made, and the band-less case has no test.
 - `e2eConfig` sits between `TestMain`'s doc comment and `TestMain` (`cmd/agentik-relay/main_test.go`), so the comment no longer documents it; `TestAR80_12` checks `e2e_test.go` by matching its source text, which breaks easily.
 - The fix round touched files outside the packet's may-touch list (the review accepted them).
+
+## AR81's build (2026-10-14): what it leaves (S4)
+- `effects.BandVersion` has no test of its own: the packet's may-touch named no effects test file, so only doctor's faked `bandVersion` covers its words. A script as the file, as `TestAR80_1_OSBand` runs one, would pin its first line, its exit and its timeout. (S4)
+- PrintStatus clips a held row's state cell to the room the other columns leave; a long reason on another row (a stage refusal's) still widens the state column for every line, held ones included, as before AR81. (S4)
