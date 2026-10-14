@@ -85,6 +85,10 @@ type NightOptions struct {
 	// empty).
 	Orchestrate bool
 	QueuePath   string
+	// Band is what the night's open resolved the session band to: its
+	// file, `absent` or `off` (band-pacing-r1 §3; AR80 ruling 2; "" reads
+	// absent), on the night-open line; the band itself is fx.Band.
+	Band string
 }
 
 // ErrBug wraps a Step or NightStep error: the loop asked the machine for a
@@ -589,10 +593,14 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 		register(&p.Rows[i])
 	}
 	put := func(event string, m map[string]any) { lg.Append(event, m) }
+	band := opts.Band
+	if band == "" {
+		band = "absent"
+	}
 	put("night-open", map[string]any{"rows": ids, "parallel": opts.Parallel, "until": opts.Until,
 		"max_sittings": opts.MaxSittings, "max_usd": opts.MaxUSD, "root": p.Root,
 		"template_hash": p.TemplateHash, "queue_hash": p.QueueHash, "no_tmux": opts.NoTmux,
-		"tmux": win.Mode, "session": win.Session, "revision": Revision()})
+		"tmux": win.Mode, "session": win.Session, "revision": Revision(), "band": band})
 	// skipRefused writes each registered refused row's skip line, as skip
 	// writes a stage refusal's: after night-open, and at a re-read's
 	// registration (AR58 hardening round).
@@ -685,6 +693,10 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 	if fx.Load != nil {
 		space = &spacer{clock: fx.Clock}
 	}
+	var asking *bandQueue // the rows asking the band, in launch order (AR80 ruling 6)
+	if fx.Band != nil {
+		asking = &bandQueue{clock: fx.Clock}
+	}
 	views := map[string]*actView{} // the running rows' acts (AR30 act 3)
 	readActs := func(id string) {
 		if acts, ok := views[id].read(fx.Git, p.Root); ok {
@@ -760,6 +772,10 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 		}
 		rctx, cancel := context.WithCancelCause(nightCtx)
 		ro.Ctx, ro.space, ro.hold = rctx, space, &heldLine{}
+		ro.Night, ro.Until, ro.band = n.ID, until, asking
+		if asking != nil && ro.Part < 2 { // a first part asks: its place in launch order (AR80 ruling 6)
+			asking.join(id)
+		}
 		h := &held{Spawner: sp, groups: groups, procs: fx.Procs, row: id, cancel: cancel}
 		running[id] = h
 		fresh[id] = true

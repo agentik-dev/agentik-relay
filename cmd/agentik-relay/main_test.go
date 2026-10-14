@@ -781,6 +781,8 @@ func TestMain(m *testing.M) {
 	}
 	// The tests push only into t.TempDir() remotes; the deny is advisory (relay-r1 §10; ADV11-8 deferred).
 	effects.DropEnvConfig()
+	// No test asks the account's session band (AR80 ruling 2).
+	bandFor = func(string, func(string) string) (effects.Band, string) { return nil, "absent" }
 	state, err := os.MkdirTemp("", "relay-state-")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

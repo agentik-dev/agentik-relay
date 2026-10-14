@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -86,8 +87,14 @@ type RunOptions struct {
 	// continuation's, each line through appendLine carries `part`.
 	Part int
 
-	space *spacer   // the night's: spawns SpawnSpacing apart (ADV6-13)
-	hold  *heldLine // the night's: a usage-limit part's held line (AR65; nil: written here)
+	// Night names the night in a band ask's tool use id and Until is the
+	// night's --until (zero: none), which ends a band hold (AR80).
+	Night string
+	Until time.Time
+
+	space *spacer    // the night's: spawns SpawnSpacing apart (ADV6-13)
+	hold  *heldLine  // the night's: a usage-limit part's held line (AR65; nil: written here)
+	band  *bandQueue // the night's: the rows asking the band, in launch order (AR80 ruling 6; nil: none)
 }
 
 // The causes the night cancels a row's Ctx with (R6 §4): a stop leaves a
@@ -125,6 +132,272 @@ func (sp *spacer) wait(ctx context.Context) bool {
 	}
 	sp.last = sp.clock.Now()
 	return true
+}
+
+// BandPoll is a held row's wait between two asks of the session band,
+// through the clock (band-pacing-r1 §2.4; AR80).
+var BandPoll = time.Minute
+
+// The band's verdicts (band-pacing-r1 §2.3): these spawn, these hold; any
+// other is unchecked and spawns.
+var (
+	bandSpawns = map[string]bool{"admitted": true, "unread": true, "stale": true}
+	bandHolds  = map[string]bool{"not-started": true, "deferred": true, "wait": true, "denied": true}
+)
+
+// bandQueue is a night's rows asking the band, in launch order (AR80
+// ruling 6): only the head asks; the next asks at once after an unheld
+// head, one BandPoll after a held one, however it left. moved closes at
+// every change.
+type bandQueue struct {
+	clock effects.Clock
+	mu    sync.Mutex
+	rows  []string
+	held  bool      // the head holds
+	after time.Time // the head asks no sooner
+	moved chan struct{}
+}
+
+// join takes row's place at the back; launch calls it, so places keep the
+// launch order.
+func (q *bandQueue) join(row string) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.rows = append(q.rows, row)
+}
+
+// place reads row's place: whether it heads the queue (a row with no place
+// does), whether the head holds and which it is, the head's earliest ask,
+// and the channel the next change closes.
+func (q *bandQueue) place(row string) (head, held bool, first string, after time.Time, moved <-chan struct{}) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if q.moved == nil {
+		q.moved = make(chan struct{})
+	}
+	if len(q.rows) == 0 || !slices.Contains(q.rows, row) {
+		return true, false, row, time.Time{}, q.moved
+	}
+	return q.rows[0] == row, q.held, q.rows[0], q.after, q.moved
+}
+
+// changed wakes every waiter; under mu.
+func (q *bandQueue) changed() {
+	if q.moved != nil {
+		close(q.moved)
+	}
+	q.moved = make(chan struct{})
+}
+
+// hold marks the head row held.
+func (q *bandQueue) hold(row string) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if len(q.rows) > 0 && q.rows[0] == row && !q.held {
+		q.held = true
+		q.changed()
+	}
+}
+
+// leave gives up row's place; the head's leaving sets the next head's
+// earliest ask, now after an unheld head, one BandPoll on after a held one.
+func (q *bandQueue) leave(row string, held bool) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for i, r := range q.rows {
+		if r != row {
+			continue
+		}
+		if i == 0 {
+			q.held, q.after = false, time.Time{}
+			if held {
+				q.after = q.clock.Now().Add(BandPoll)
+			}
+		}
+		q.rows = append(q.rows[:i], q.rows[i+1:]...)
+		q.changed()
+		return
+	}
+}
+
+// bandRecord is a part's band: its asks, its hold's wait and the verdict
+// it spawned on (the plugin's, `reset` or `unchecked`; a cut hold's last).
+type bandRecord struct {
+	asks, waitS int
+	verdict     string
+	peak        *float64
+}
+
+// How a band hold ended: the row spawns, the context cut it, or --until.
+type bandEnd int
+
+const (
+	bandSpawn bandEnd = iota
+	bandCut
+	bandUntil
+)
+
+// peakOf is a line's peak: the number, or null.
+func peakOf(p *float64) any {
+	if p == nil {
+		return nil
+	}
+	return *p
+}
+
+// askBand is a row's first part before the breaker (band-pacing-r1 §2.2 to
+// §2.4; AR80 rulings 3 to 6). At its turn in the queue it asks; a verdict
+// that spawns ends it, one that holds opens a hold (its one Reset read, a
+// `band` line `held`), and a row behind a held head opens its hold
+// `queued`. A hold asks again every BandPoll at the head, and ends at the
+// nearest of a spawning verdict (`admitted`), its reset (`reset`, the row
+// spawning unasked), --until or the context. An error, a verdict outside
+// the seven, or a reset that errs or is not after now is `unchecked` and
+// spawns. A re-ask writes no line but a hold's first `denied` that did not
+// open it.
+func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptions, log io.Writer) (*bandRecord, bandEnd) {
+	q, clock := opts.band, fx.Clock
+	r := &bandRecord{}
+	var since, reset, last time.Time // the hold's start (zero: unheld), its reset, the last ask
+	denied := false                  // the hold has a denied line
+	line := func(m map[string]any) {
+		m["row"], m["part"] = rp.ID, 1
+		fx.Ledger.Append("band", m)
+	}
+	waited := func() int {
+		if since.IsZero() {
+			return 0
+		}
+		return int(clock.Now().Sub(since).Seconds())
+	}
+	leave := func() {
+		r.waitS = waited()
+		if q != nil {
+			q.leave(rp.ID, !since.IsZero())
+		}
+	}
+	ends := func(m map[string]any) {
+		if !since.IsZero() {
+			m["asks"], m["wait_s"] = r.asks, r.waitS
+		}
+		line(m)
+	}
+	unchecked := func(why string) (*bandRecord, bandEnd) {
+		leave()
+		r.verdict, r.peak = "unchecked", nil
+		ends(map[string]any{"state": "unchecked", "error": why})
+		fmt.Fprintf(log, "relay %s: the band unchecked: %s\n", rp.ID, why)
+		return r, bandSpawn
+	}
+	open := func(now time.Time) string { // the hold's one reset; "" when it opens
+		at, err := fx.Band.Reset()
+		if err != nil {
+			return "reset: " + err.Error()
+		}
+		if !at.After(now) {
+			return "reset: " + at.Format(time.RFC3339) + " not after " + now.Format(time.RFC3339)
+		}
+		since, reset = now, at
+		return ""
+	}
+	for {
+		now := clock.Now()
+		switch {
+		case ctx.Err() != nil:
+			leave()
+			return r, bandCut
+		case !opts.Until.IsZero() && !now.Before(opts.Until):
+			leave()
+			return r, bandUntil
+		case !since.IsZero() && !now.Before(reset):
+			leave()
+			r.verdict, r.peak = "reset", nil
+			ends(map[string]any{"state": "reset"})
+			return r, bandSpawn
+		}
+		head, headHeld, first, after, moved := true, false, rp.ID, time.Time{}, (<-chan struct{})(nil)
+		if q != nil {
+			head, headHeld, first, after, moved = q.place(rp.ID)
+		}
+		if !head && headHeld && since.IsZero() { // behind a held head: queued
+			if why := open(now); why != "" {
+				return unchecked(why)
+			}
+			r.verdict = "queued"
+			line(map[string]any{"state": "held", "verdict": "queued", "peak": nil, "text": "behind " + first})
+			fmt.Fprintf(log, "relay %s: the band holds it behind %s\n", rp.ID, first)
+			continue
+		}
+		var at time.Time // the next ask (zero: not the head's)
+		if head {
+			at = after
+			if !last.IsZero() && last.Add(BandPoll).After(at) {
+				at = last.Add(BandPoll)
+			}
+		}
+		if !head || at.After(now) {
+			wake := at
+			for _, t := range []time.Time{reset, opts.Until} {
+				if !t.IsZero() && (wake.IsZero() || t.Before(wake)) {
+					wake = t
+				}
+			}
+			var tick <-chan time.Time
+			if !wake.IsZero() {
+				tick = clock.After(wake.Sub(now))
+				if !clock.Now().Before(wake) { // the clock reached it before the timer was set
+					continue
+				}
+			}
+			select {
+			case <-ctx.Done():
+			case <-moved:
+			case <-tick:
+			}
+			continue
+		}
+		last = now
+		r.asks++
+		v, err := fx.Band.Ask(ctx, rp.SessionID, effects.BandRequest{Model: flagOf(rp.Spawn, "--model"),
+			SubagentType: "relay-row", Background: true, ToolUseID: opts.Night + "/" + rp.ID + "/1"})
+		switch {
+		case err != nil && ctx.Err() != nil: // the ask the context cut (ruling 3)
+			continue
+		case err != nil:
+			return unchecked(err.Error())
+		case bandSpawns[v.Verdict]:
+			held := !since.IsZero()
+			leave()
+			r.verdict, r.peak = v.Verdict, v.Peak
+			if held {
+				ends(map[string]any{"state": "admitted"})
+			}
+			return r, bandSpawn
+		case !bandHolds[v.Verdict]:
+			return unchecked(fmt.Sprintf("verdict %q", v.Verdict))
+		}
+		r.verdict, r.peak = v.Verdict, v.Peak
+		held := map[string]any{"state": "held", "verdict": v.Verdict, "peak": peakOf(v.Peak), "text": v.Text}
+		if since.IsZero() {
+			if why := open(now); why != "" {
+				return unchecked(why)
+			}
+			denied = v.Verdict == "denied"
+			if q != nil {
+				q.hold(rp.ID)
+			}
+			line(held)
+			fmt.Fprintf(log, "relay %s: the band holds it: %s\n", rp.ID, v.Verdict)
+			continue
+		}
+		if q != nil {
+			q.hold(rp.ID) // a queued hold now heads the queue
+		}
+		if v.Verdict == "denied" && !denied {
+			denied = true
+			line(held)
+		}
+	}
 }
 
 // wallOf is the sitting's wall clock: opts.Wall, else DefaultWall.
@@ -183,14 +456,44 @@ func RunRow(fx effects.Effects, sp effects.Spawner, st *Staged, rp *RowPlan, pro
 	put := func(event string, m map[string]any) { appendLine(event, m) }
 	sum := sha256.Sum256(prompt)
 	promptHash := hex.EncodeToString(sum[:])
-	start := fx.Clock.Now()
-	sit := sitting{fx: fx, put: put, s: s, st: st, rp: rp, promptHash: promptHash, rulesHash: opts.rulesHash(), start: start, exit: -1, source: "none", deps: opts.Deps}
-	// The breaker before the spawn (§15): still open at its Max, the row is
-	// never spawned, no spawn or exit line, and the night stops load.
+	sit := sitting{fx: fx, put: put, s: s, st: st, rp: rp, promptHash: promptHash, rulesHash: opts.rulesHash(), exit: -1, source: "none", deps: opts.Deps}
 	ctx := opts.Ctx
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	// unspawned is a row never spawned (R6 §4): the owner's stop or kill, or an
+	// account's stop, during a wait, or --until reached in a band hold.
+	unspawned := func(until bool) (*relay.Sitting, relay.Gate) {
+		s.State, s.Reason, sit.stop = relay.Skipped, "", relay.OwnerStop
+		var as accountCause
+		switch {
+		case until:
+			sit.stop = relay.UntilReached
+		case errors.Is(context.Cause(ctx), ErrOwnerKill):
+			s.State, s.Reason, sit.stop = relay.Failed, relay.OwnerKill, relay.OwnerKill
+		case errors.As(context.Cause(ctx), &as):
+			s.State, s.Reason, sit.stop = relay.Failed, relay.StopReason(as), relay.StopReason(as)
+		}
+		fmt.Fprintf(log, "relay %s: %s before the spawn\n", rp.ID, sit.stop)
+		sit.end(opts.hold, stream.Limit{})
+		return s, relay.Gate{}
+	}
+	// The band before the breaker (band-pacing-r1 §2.2; AR80 ruling 3): a
+	// row's first part asks, and holds while the band says no room; the
+	// sitting's clock starts after the hold.
+	var spawnBand map[string]any
+	if fx.Band != nil && opts.Part < 2 {
+		b, end := askBand(ctx, fx, rp, opts, log)
+		sit.band = map[string]any{"asks": b.asks, "wait_s": b.waitS, "verdict": b.verdict}
+		spawnBand = map[string]any{"verdict": b.verdict, "peak": peakOf(b.peak)}
+		if end != bandSpawn {
+			sit.start = fx.Clock.Now()
+			return unspawned(end == bandUntil)
+		}
+	}
+	sit.start = fx.Clock.Now()
+	// The breaker before the spawn (§15): still open at its Max, the row is
+	// never spawned, no spawn or exit line, and the night stops load.
 	breaker := DefaultBreaker
 	breaker.Idle = fx.Idle
 	brk, ok := breaker.wait(ctx, fx.Load, fx.Clock, func(state string, r reading) {
@@ -201,17 +504,7 @@ func RunRow(fx effects.Effects, sp effects.Spawner, st *Staged, rp *RowPlan, pro
 		ok = opts.space.wait(ctx)
 	}
 	if !ok && ctx.Err() != nil {
-		// The owner's stop or kill during the wait (R6 §4): never spawned.
-		s.State, s.Reason, sit.stop = relay.Skipped, "", relay.OwnerStop
-		var as accountCause
-		if errors.Is(context.Cause(ctx), ErrOwnerKill) {
-			s.State, s.Reason, sit.stop = relay.Failed, relay.OwnerKill, relay.OwnerKill
-		} else if errors.As(context.Cause(ctx), &as) {
-			s.State, s.Reason, sit.stop = relay.Failed, relay.StopReason(as), relay.StopReason(as)
-		}
-		fmt.Fprintf(log, "relay %s: %s before the spawn\n", rp.ID, sit.stop)
-		sit.end(opts.hold, stream.Limit{})
-		return s, relay.Gate{}
+		return unspawned(false)
 	}
 	if !ok {
 		fmt.Fprintf(log, "relay %s: load %.2f over %d cores: the breaker still open after %d s; not spawned\n", rp.ID, brk.last, brk.cores, brk.WaitS)
@@ -222,10 +515,14 @@ func RunRow(fx effects.Effects, sp effects.Spawner, st *Staged, rp *RowPlan, pro
 	}
 	// The spawn line is appended before the child starts (§7); a failed
 	// append spawns nothing and fails the sitting.
-	if err := appendLine("spawn", map[string]any{"argv": rp.Spawn, "prompt_hash": promptHash,
+	spawn := map[string]any{"argv": rp.Spawn, "prompt_hash": promptHash,
 		"rules_hash": opts.rulesHash(), "block": opts.Block, "model": flagOf(rp.Spawn, "--model"),
 		"turns": atoi(flagOf(rp.Spawn, "--max-turns")), "usd": atoi(flagOf(rp.Spawn, "--max-budget-usd")),
-		"session_id": rp.SessionID, "wall_limit_s": int(wallOf(opts).Seconds())}); err != nil {
+		"session_id": rp.SessionID, "wall_limit_s": int(wallOf(opts).Seconds())}
+	if spawnBand != nil { // a part that asked (AR80 ruling 7)
+		spawn["band"] = spawnBand
+	}
+	if err := appendLine("spawn", spawn); err != nil {
 		fmt.Fprintf(log, "relay %s: the spawn ledger line: %v\n", rp.ID, err)
 		s.State, s.Reason = relay.Failed, relay.LedgerError
 		sit.write()
@@ -447,7 +744,7 @@ func RunRow(fx effects.Effects, sp effects.Spawner, st *Staged, rp *RowPlan, pro
 	account := relay.AccountStop(killed)
 
 	line := map[string]any{"child_exit": exit, "turns": tally.Turns, "context": tally.Context,
-		"usage": tally.Usage, "cost_read": tally.Result != nil, "non_json": tally.NonJSON, "duration_ms": fx.Clock.Now().Sub(start).Milliseconds()}
+		"usage": tally.Usage, "cost_read": tally.Result != nil, "non_json": tally.NonJSON, "duration_ms": fx.Clock.Now().Sub(sit.start).Milliseconds()}
 	if r := tally.Result; r != nil {
 		line["subtype"], line["is_error"], line["turns"] = r.Subtype, r.IsError, r.NumTurns
 		line["cost_usd"], line["duration_ms"], line["denials"] = r.CostUSD, r.DurationMS, r.Denials
@@ -614,7 +911,8 @@ type sitting struct {
 	stall      *StallSample
 	deps       map[string]bool
 	orphans    int
-	paused     bool // the night paused on this part: `limit: paused` (AR65)
+	paused     bool           // the night paused on this part: `limit: paused` (AR65)
+	band       map[string]any // the part's asks, wait and verdict (AR80; nil: it never asked)
 }
 
 // live counts the children RunRow holds per tree, process-wide: one from
@@ -753,6 +1051,9 @@ func (x sitting) write() {
 		m["invariant"] = broken[0]
 	}
 	m["orphans"] = x.orphans
+	if x.band != nil {
+		m["band"] = x.band
+	}
 	if x.paused && len(broken) == 0 { // a broken invariant fails the part as before AR65 (fix round F1)
 		m["limit"] = "paused"
 	}
