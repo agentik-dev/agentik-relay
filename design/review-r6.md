@@ -56,7 +56,7 @@ The first thirteen charters escalated 59 decisions (their closing commits); afte
 - C5 `/agent-relay:plan` runs a whole-queue plan: bounded by scope, the memo, 600 s and the breaker. No cycle.
 - C6 `make readme` starts `claude -p`: 8 turns, never in check, no edge back. `packet.Parse` does not refuse it as an acceptance line; refuse any line that starts `claude`.
 - C7 `make check` runs `claude plugin validate`: no session, no hooks, no edge back.
-- C8 the Stop hook: bounded by `maxBlocks` (3) and `stop_hook_active`, and by Claude Code itself: "Automate actions with hooks" (code.claude.com, as of 2026-10-14) says Claude Code overrides a Stop hook after it blocks eight times in a row with no tool call from Claude in between, ending the turn with a warning. (The research site's notes filed this cap under C4; it is C8's bound.)
+- C8 the Stop hook: bounded by `maxBlocks`, `stop_hook_active` and Claude Code's 8-block cap (hooks-guide, 2026-10-14).
 - C9 the stand-in measuring this repo: C3 under example-mac's depth var; no test opens the real queue (tested).
 
 ## 4. Timing and edge conditions (the invariant; tested?)
