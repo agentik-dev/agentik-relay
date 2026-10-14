@@ -1653,7 +1653,7 @@ func resumeVerb(args []string, stdout, stderr io.Writer) int {
 	}
 	f, row, err := flagSet(args, nil, []string{"--json"}, true)
 	if err != nil {
-		fmt.Fprintf(stderr, "relay resume: %v\nusage: relay resume [<row>]\n", err)
+		fmt.Fprintf(stderr, "relay resume: %v\nusage: agentik relay resume [<row>]\n", err)
 		return exitUsage
 	}
 	// A refused resume prints the line it would exec (as --print does), so
