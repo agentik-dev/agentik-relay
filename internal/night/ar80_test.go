@@ -22,12 +22,14 @@ import (
 // step clock, T ar65T, the band's reset T+2h unless a test says.
 
 // ar80Spawner records each row's spawns on the clock: a row's first child
-// runs first[row] (exit 143), silent until wait[row] reads true when set;
-// every other child is clean.
+// stalls until its kill when stall[row], else runs first[row] (exit 143)
+// or a clean stream, silent until wait[row] reads true when set; every
+// other child is clean.
 type ar80Spawner struct {
 	clock *effects.StepClock
 	first map[string][]byte
 	wait  map[string]func() bool
+	stall map[string]bool
 	mu    sync.Mutex
 	at    map[string][]time.Time
 }
@@ -38,12 +40,16 @@ func (a *ar80Spawner) Start(sp effects.Spawn) (effects.Process, io.ReadCloser, e
 	a.at[row] = append(a.at[row], a.clock.Now())
 	k := len(a.at[row])
 	a.mu.Unlock()
-	out, ok := a.first[row]
-	if k > 1 || !ok {
-		return (&effects.FakeSpawner{Out: ar67Clean, PID: 4343}).Start(sp)
+	if k == 1 && a.stall[row] {
+		s := &ar65Stall{gone: make(chan struct{})}
+		return s, s, nil
 	}
-	p, rc, err := (&effects.FakeSpawner{Out: out, Exit: 143, PID: 4242}).Start(sp)
-	if u := a.wait[row]; u != nil && err == nil {
+	run := &effects.FakeSpawner{Out: ar67Clean, PID: 4343}
+	if out, ok := a.first[row]; ok && k == 1 {
+		run = &effects.FakeSpawner{Out: out, Exit: 143, PID: 4242}
+	}
+	p, rc, err := run.Start(sp)
+	if u := a.wait[row]; u != nil && k == 1 && err == nil {
 		rc = &ar69Silent{ReadCloser: rc, until: u}
 	}
 	return p, rc, err
@@ -73,7 +79,7 @@ func ar80World(t *testing.T, band *effects.FakeBand, ids ...string) (*world, *qu
 		}
 		w.fx.Band, o.Band = band, "/bin/agentik-session"
 	}
-	return w, q, o, &ar80Spawner{clock: clock, first: map[string][]byte{}, wait: map[string]func() bool{}, at: map[string][]time.Time{}}, clock
+	return w, q, o, &ar80Spawner{clock: clock, first: map[string][]byte{}, wait: map[string]func() bool{}, stall: map[string]bool{}, at: map[string][]time.Time{}}, clock
 }
 
 // ar80Asks is band's asks as `<row> <offset from T>`.

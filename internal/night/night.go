@@ -221,6 +221,18 @@ func (h *held) Start(sp effects.Spawn) (effects.Process, io.ReadCloser, error) {
 
 func (h *held) kill() { h.killFor(ErrOwnerKill) }
 
+// unspawned ends the wait of a row not yet spawned (AR80 fix round,
+// finding 1): its context cancelled with cause, so a band hold, a queued
+// place, the breaker or the spacing ends within one poll; a spawned or
+// killed row is left alone.
+func (h *held) unspawned(cause error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.proc == nil && !h.killed && h.cancel != nil {
+		h.cancel(cause)
+	}
+}
+
 // stopFor is another row's account stop (run 10 ruling 1): this row killed
 // the owner's way, its context's cause the reason.
 func (h *held) stopFor(r relay.StopReason) { h.killFor(accountCause(r)) }
@@ -622,6 +634,15 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 	}
 
 	var bug error
+	// endWaits ends every unspawned row's wait once the night leaves
+	// running or paused (AR80 fix round, finding 1): no held or queued row
+	// asks or spawns in a stopping night. Set once the rows are.
+	var endWaits func()
+	leaving := func() {
+		if n.State != relay.NightRunning && n.State != relay.NightPaused && endWaits != nil {
+			endWaits()
+		}
+	}
 	step := func(e relay.NightEvent, r relay.StopReason) {
 		next, err := relay.NightStep(n.State, e, r)
 		if err != nil {
@@ -634,8 +655,9 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 		if reason, ok := relay.StopReasonOf(next); ok {
 			n.Reason = reason
 		}
+		leaving()
 	}
-	stopWith := func(r relay.StopReason) { n.State, n.Reason = relay.Stopped(r), r }
+	stopWith := func(r relay.StopReason) { n.State, n.Reason = relay.Stopped(r), r; leaving() }
 	stopDetail := "" // the stop line's detail: why the night stopped, past its reason
 	stalls := 0      // the night's stalled rows (R6 §2)
 	step(relay.OnPlanned, "")
@@ -689,6 +711,11 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 	// spacing ends within one poll.
 	nightCtx, stopAll := context.WithCancelCause(context.Background())
 	defer stopAll(nil)
+	endWaits = func() {
+		for _, h := range running {
+			h.unspawned(ErrOwnerStop)
+		}
+	}
 	var space *spacer // spawns SpawnSpacing apart, when the breaker reads a load (ADV6-13)
 	if fx.Load != nil {
 		space = &spacer{clock: fx.Clock}
