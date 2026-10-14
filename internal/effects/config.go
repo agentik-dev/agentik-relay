@@ -1,16 +1,23 @@
 package effects
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/agentik-dev/agentik-relay/internal/yaml"
 )
 
 // Config is the relay's configuration after the §9 layers, lowest first:
-// the shipped defaults; the user file; the repo's `agent-relay` section; the
-// session's resolved file when present. Flags are the caller's, last.
+// the shipped defaults; the user file; the repo's `relay` section; its
+// config.local.yaml's; the session's resolved file when present and fresh
+// (session-layer-r1 §2). Flags are the caller's, last.
 // Unknown lists keys no layer knows ("<file>: <key>"), reported by doctor and
 // never fatal (D23); Sources lists the files read. Packets is the packets
 // source (key `packets`, AR29 act 3): an absolute dir the relay only reads,
@@ -20,8 +27,9 @@ import (
 // path under the repo relative to it, and a path that leaves the repo an
 // error, so every reader of the queue sees the one spelling. Warnings are
 // the old names a layer still uses (agentik-r1 §6.3 c4, c6): the repo's old
-// file whenever it exists, and a file holding both sections; doctor's
-// config check warns on them, never fails.
+// file whenever it exists, and a file holding both sections; and a session
+// layer not read, with why (session-layer-r1 §2.3); doctor's config check
+// warns on them, never fails.
 // VerifySeconds is the repo's verify limit (key `verify_seconds`, AR59 act
 // 1, the settled entry 10): an integer from 1 to MaxVerifySeconds; 0 is
 // unset, and VerifyLimit is then Timeout.
@@ -46,7 +54,8 @@ const (
 
 // The layer files, each new name beside its old (agentik-r1 §6.3 c1, c3,
 // c4, c6). The repo's is the session plugin's config, whose `relay`
-// section (else the old `agent-relay`) the relay reads; the session's
+// section (else the old `agent-relay`) the relay reads; its local file is
+// the one in the same folder (session-layer-r1 §2.2); the session's
 // resolved file is named by $CLAUDE_CODE_SESSION_ID (R25-91 (3)). The state
 // dir's two names are StateIn's.
 const (
@@ -54,6 +63,7 @@ const (
 	oldUserConfig    = ".config/agent-relay/config.yaml"
 	repoConfig       = ".claude/agentik/config.yaml"
 	oldRepoConfig    = ".claude/claude-code-session/config.yaml"
+	localConfig      = "config.local.yaml"
 	sessionConfig    = "agentik-session/sessions/%s/resolved.yaml"
 	oldSessionConfig = "claude-code-session/sessions/%s/resolved.yaml"
 	section          = "relay"
@@ -67,19 +77,30 @@ const (
 // (AR59 act 4).
 const RepoConfigFile = repoConfig
 
-// ConfigPaths returns the layer files LoadConfig reads, lowest first, each
-// the new file when it exists in fs, else the old when it exists, else the
-// new (NewElseOld); the session's only when env names a session.
+// sessionLayer is the session's place in ConfigPaths.
+const sessionLayer = 3
+
+// ConfigPaths returns the layer files LoadConfig reads, lowest first: the
+// user's, the repo's and the session's each the new file when it exists in
+// fs, else the old when it exists, else the new (NewElseOld); the local
+// file in the picked repo file's folder (session-layer-r1 §2.2); the
+// session's only when env names a session, under $XDG_STATE_HOME with `~`
+// expanded (§2.4).
 func ConfigPaths(fs FS, env func(string) string, repo string) []string {
 	home := env("HOME")
+	repoFile := NewElseOld(fs.Exists, filepath.Join(repo, repoConfig), filepath.Join(repo, oldRepoConfig))
 	paths := []string{
 		NewElseOld(fs.Exists, filepath.Join(home, userConfig), filepath.Join(home, oldUserConfig)),
-		NewElseOld(fs.Exists, filepath.Join(repo, repoConfig), filepath.Join(repo, oldRepoConfig)),
+		repoFile,
+		filepath.Join(filepath.Dir(repoFile), localConfig),
 	}
 	if id := env("CLAUDE_CODE_SESSION_ID"); id != "" {
 		state := env("XDG_STATE_HOME")
-		if state == "" {
+		switch {
+		case state == "":
 			state = filepath.Join(home, ".local", "state")
+		case state == "~" || strings.HasPrefix(state, "~/"):
+			state = filepath.Join(home, state[1:])
 		}
 		id = filepath.Base(id)
 		paths = append(paths, NewElseOld(fs.Exists, filepath.Join(state, fmt.Sprintf(sessionConfig, id)),
@@ -89,7 +110,9 @@ func ConfigPaths(fs FS, env func(string) string, repo string) []string {
 }
 
 // LoadConfig applies the layers in order. An absent file is no layer; a file
-// that does not parse, or a known key of the wrong shape, is an error.
+// that does not parse, or a known key of the wrong shape, is an error. A
+// session layer sessionFresh does not pass is skipped whole with a warning
+// (session-layer-r1 §2.3).
 func LoadConfig(fs FS, env func(string) string, repo string) (Config, error) {
 	c := Config{Tmux: "auto", AllowedTools: DefaultAllowedTools, Caffeinate: true, Queue: DefaultQueue}
 	from := "defaults" // the layer that set the queue path
@@ -97,7 +120,8 @@ func LoadConfig(fs FS, env func(string) string, repo string) (Config, error) {
 	if old := filepath.Join(repo, oldRepoConfig); fs.Exists(old) {
 		c.Warnings = append(c.Warnings, fmt.Sprintf("%s: the old path; move it to %s", old, RepoConfigFile))
 	}
-	for i, p := range ConfigPaths(fs, env, repo) {
+	paths := ConfigPaths(fs, env, repo)
+	for i, p := range paths {
 		if !fs.Exists(p) {
 			continue
 		}
@@ -109,10 +133,16 @@ func LoadConfig(fs FS, env func(string) string, repo string) (Config, error) {
 		if err != nil {
 			return c, fmt.Errorf("config %s: %w", p, err)
 		}
+		if i == sessionLayer {
+			if why := sessionFresh(fs, root, paths[1], paths[2]); why != "" {
+				c.Warnings = append(c.Warnings, fmt.Sprintf("%s: not read: %s", p, why))
+				continue
+			}
+		}
 		c.Sources = append(c.Sources, p)
 		was := c.Queue
 		node := root
-		if i > 0 { // the repo's and the session's files hold a section
+		if i > 0 { // the repo's, the local and the session's files hold a section
 			sec, ok := root.Get(section)
 			old, oldOK := root.Get(oldSection)
 			switch { // c6: with both present, relay wins with a warning
@@ -139,6 +169,73 @@ func LoadConfig(fs FS, env func(string) string, repo string) (Config, error) {
 	}
 	c.Queue = q
 	return c, nil
+}
+
+// recordedSum is a sha256 as a session file records it.
+var recordedSum = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+// sessionFresh is "" when the session layer root may be read, else why not
+// (session-layer-r1 §2.1, §2.3): its provider.inputs must list repoFile and
+// localFile, each at the sha256 it has now through fs, a null matching only
+// a file still absent. Paths compare after filepath.Clean; an item with a
+// relative path is skipped; the other inputs are not checked.
+func sessionFresh(fs FS, root yaml.Node, repoFile, localFile string) string {
+	const malformed = "malformed provider.inputs"
+	prov, _ := root.Get("provider")
+	list, ok := prov.Get("inputs")
+	if !ok {
+		return "no provider.inputs"
+	}
+	if list.Kind != yaml.List {
+		return malformed
+	}
+	sums := map[string][]string{} // a clean path's recorded sums
+	for _, item := range list.List {
+		pn, ok := item.Get("path")
+		path, scalar := pn.String()
+		if !ok || !scalar {
+			return malformed
+		}
+		if !filepath.IsAbs(path) {
+			continue
+		}
+		sn, ok := item.Get("sha256")
+		sum, scalar := sn.String()
+		if !ok || !scalar || (sum != "null" && !recordedSum.MatchString(sum)) {
+			return malformed
+		}
+		path = filepath.Clean(path)
+		sums[path] = append(sums[path], sum)
+	}
+	want := []string{filepath.Clean(repoFile), filepath.Clean(localFile)}
+	for _, p := range want {
+		if len(sums[p]) == 0 {
+			return fmt.Sprintf("resolved for another checkout: %s not listed", p)
+		}
+	}
+	for _, p := range want {
+		now := sumNow(fs, p)
+		for _, sum := range sums[p] {
+			if sum != now {
+				return fmt.Sprintf("%s changed since the session resolved it", p)
+			}
+		}
+	}
+	return ""
+}
+
+// sumNow is path's sha256 through fs as a session file records it: "null"
+// for an absent file, and "", which matches no record, for a file that
+// cannot be read.
+func sumNow(fs FS, path string) string {
+	b, err := fs.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return "null"
+	} else if err != nil {
+		return ""
+	}
+	s := sha256.Sum256(b)
+	return hex.EncodeToString(s[:])
 }
 
 // underRepo is path as a clean path relative to repo: a relative path

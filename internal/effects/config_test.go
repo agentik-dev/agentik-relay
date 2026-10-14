@@ -21,7 +21,8 @@ func TestLoadConfig(t *testing.T) {
 		"other: {x: 1}\nagent-relay:\n  queue: q.yaml\n  merge: branch-only\n  tmux: auto\n"), 0o600)
 	env["CLAUDE_CODE_SESSION_ID"] = "s1"
 	fs.WriteFile("/h/.local/state/claude-code-session/sessions/s1/resolved.yaml", []byte(
-		"agent-relay: {queue: s.yaml, allowed_tools: Bash}\n"), 0o600)
+		"agent-relay: {queue: s.yaml, allowed_tools: Bash}\n"+
+			inputs(fs, "/r/.claude/claude-code-session/config.yaml", "/r/.claude/claude-code-session/config.local.yaml")), 0o600)
 	c, err = LoadConfig(fs, get, "/r")
 	if err != nil {
 		t.Fatal(err)
