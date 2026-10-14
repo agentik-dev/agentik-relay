@@ -769,6 +769,11 @@ func TestAR4_JSONKeysSnake(t *testing.T) {
 // TestMain points XDG_STATE_HOME, the one state root (§5), at a temp
 // directory before any test, so no test reads or writes the machine's
 // ledger, locks or nights.
+// e2eConfig is the e2e fixture's relay config: caffeinate off (the fake
+// must be the relay's direct child) and the band off, so the built binary
+// never asks the account's agentik-session (AR80 fix round, finding 2).
+const e2eConfig = "caffeinate: false\nband: off\n"
+
 func TestMain(m *testing.M) {
 	// AR22 act 2: the account lock is a free port of this binary's (or its
 	// parent test binary's), never the account's.
