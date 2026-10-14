@@ -11,11 +11,14 @@ import (
 )
 
 // The kinds of a usage limit (AR63, usage-limit-resume-r1 §2): the 5-hour
-// window, the weekly cap, one model's cap, or none the stream names.
+// window, the weekly cap, one model's cap (a model family's weekly cap
+// too, AR82), the account's pay-as-you-go overage (AR82), or none the
+// stream names.
 const (
 	KindWindow  = "window"
 	KindWeekly  = "weekly"
 	KindModel   = "model"
+	KindOverage = "overage"
 	KindUnknown = "unknown"
 )
 
@@ -67,8 +70,17 @@ func (f *limitFacts) add(m map[string]any) {
 	}
 }
 
-// eventKinds maps a refused event's rateLimitType to its kind.
-var eventKinds = map[string]string{"five_hour": KindWindow, "seven_day": KindWeekly}
+// eventKinds maps a refused event's rateLimitType to its kind and scope
+// (AR82): the five values the Agent SDK references document, a model
+// family's weekly cap a model's limit scoped to the family's word. Any
+// other type, or none, falls to the text's kind.
+var eventKinds = map[string]struct{ kind, scope string }{
+	"five_hour":        {KindWindow, ""},
+	"seven_day":        {KindWeekly, ""},
+	"seven_day_opus":   {KindModel, "opus"},
+	"seven_day_sonnet": {KindModel, "sonnet"},
+	"overage":          {KindOverage, ""},
+}
 
 // modelWords are the words `hit your <word> limit` and `reached your <word>
 // limit` read as a model's limit (case-insensitive); any other word stops
@@ -81,18 +93,20 @@ var modelWords = map[string]bool{"fable": true, "opus": true, "sonnet": true, "h
 var usageWords = regexp.MustCompile(`(?:^|[^a-z0-9])(hit|reached) your ([a-z0-9-]+) limit(?:[^a-z0-9]|$)`)
 
 // Limit is the stop's facts at hit, the instant the stream first named it
-// (AR63): a usage limit's kind is its event's type, else its text's; its
-// reset the event's resetsAt within resetBound (Source `event`), else the
-// text's clause (ResetIn, Source `text`); Named the event's resetsAt
-// unbounded, else Reset (AR69). Any other stop names its reason alone; no
-// stop is the zero Limit.
+// (AR63): a usage limit's kind and scope are its event's type's (AR82),
+// else its text's; its reset the event's resetsAt within resetBound
+// (Source `event`), else the text's clause (ResetIn, Source `text`);
+// Named the event's resetsAt unbounded, else Reset (AR69). Any other stop
+// names its reason alone; no stop is the zero Limit.
 func (t Tally) Limit(hit time.Time) Limit {
 	l := Limit{Reason: t.Account}
 	if t.Account != relay.UsageLimit {
 		return l
 	}
 	f := t.limit
-	if l.Kind = eventKinds[f.typ]; l.Kind == "" {
+	if k, ok := eventKinds[f.typ]; ok {
+		l.Kind, l.Scope = k.kind, k.scope
+	} else {
 		l.Kind, l.Scope = textKind(f.text)
 	}
 	if f.at > 0 {
