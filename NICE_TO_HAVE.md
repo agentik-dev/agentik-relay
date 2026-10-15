@@ -663,3 +663,6 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 
 ## The refuter's F3 (2026-10-15): a parallel night's next ask reads before the admitted row runs (S3)
 - In a parallel night AR80 lets row B ask the band the moment row A is admitted, before A spawns (`bandQueue`'s leave, `internal/night/run.go`'s `askBand`), so B's ask never sees A as a running thread. agentik-session's fresh-session-r1 removes the double charge that hid this. Replayed under that fix: us3a's peak 286.5 to 190.0, usdoor's 90.7 to 69.1; no verdict changed in a window that reached 97. A fix: hold the next row's ask until the admitted row has spawned (or its first reading lands). Not built in AR85.
+
+## The observer's check-in 123 (2026-10-15; S4)
+- `report` counts an open band hold as no wait: night 2026-10-15-1 read `band: 1 hold, 0s waited` at 02:33 for po2c held since 01:30:41 (62 asks), since `wait_s` lands only on the hold's end line (AR81). Count an open hold to now, as `status --json`'s `band.since` already allows, or say `held since HH:MM`.
