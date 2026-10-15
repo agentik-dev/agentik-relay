@@ -563,7 +563,7 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 ## After a usage-limit wake, status and report show the dead sitting (2026-10-14, the observer; S4) (AR77)
 - Night 2026-10-13-7 (the consumer): at 23:26 all three rows hit the five-hour limit (po1bfix exit 143, "You've hit your session limit · resets 12:30am"; the others "usage-limit before the spawn"); the night paused and woke at 00:32, re-spawning po1bfix, po2fix and us3afix. At 00:33 the row logs advance (po1bfix turn 9, 69k; po2fix turn 11, 64k; us3afix turn 4, 52k), yet `agentik relay status --json` keeps each row's `reason: usage-limit` with the first sitting's turns and context (1/0k, 0/0k, 10/61k), and `agentik relay report` lists all three as `failed`. Also `next` reads "count-reached after 5 sittings (3 so far)" while `burn.sittings` reads 6: two counts, both called sittings; the cap's excludes the dead ones. (the observer's attendant, confirmed from status, report and the row logs)
 
-## Side-by-side verifies outlast the fixed cut (2026-10-14, the observer; S3)
+## Side-by-side verifies outlast the fixed cut (2026-10-14, the observer; S3) (AR78)
 - Night 2026-10-13-7 (`--parallel 3`): po2fix's and us3afix's verifies started 2 s apart (07:41:16Z, 07:41:18Z) and both were cut at 1800 s at 08:11:25Z, `verify-cut`, each log at 89 `ok` lines ending in `internal/converge`, the next package unfinished; the session gated both by hand afterwards, green, and merged them (consumer main a10e2862). One verify alone in the previous night took about 21 minutes. The cut does not scale with the verifies in flight, and since it falls before the consumer's own `go test -timeout`, a hang and a slow run look the same and leave no goroutine dump. Candidates: one verify at a time (a gate lock), or a cut scaled by the gates in flight; and a SIGQUIT before the kill so Go prints its stacks. (the observer, from the gate lines and the verify logs)
 
 ## A night takes a frozen session layer through tmux (2026-10-14, the observer; S2) (AR75)
@@ -628,3 +628,8 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 
 ## The observer's check-in 120 (2026-10-14)
 - S4, seen twice (night 2026-10-14-4's us2fix2, night 2026-10-14-5's po2b2fix at 17:52): a row whose child exited and whose gate runs `make check-fast` reads `running` in `status --json` and the printed table, its elapsed still counting (40m30s, the child out since 17:39); no state says the relay is gating, so a reader cannot tell a child at work from the relay's own verify. A `gating` row state (from the `child_exit` line until the gate's result) would say it.
+
+## AR78's build (2026-10-14): what it leaves (S4)
+- The gate lock keeps no order: a free wakes every waiting verify and one takes the slot, so with three rows of one root the last to arrive may run before one that waited longer. verify-cut-r1 asks for none; a queue in `gateSlot` would give first come, first served. (S4)
+- Neither the report nor `status` reads a `verify-wait` line yet (status is AR79's `wait` key), and a wait under a second leaves no `wait_s`, so a night's time behind the lock is read only from the ledger. (S4)
+- The verify releases the lock as `RunLogged` returns, not in a `defer`: a panic inside the shell would leave the root's slot held for the rest of the process. (S4)

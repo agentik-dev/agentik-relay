@@ -1,6 +1,6 @@
 # agent-relay design: one gate verify at a time per root (r1)
 
-**Status:** design r1, 2026-10-14, written before code and revised once after its one refuter round (§7), which passed with eight notes; the revision takes six of them. It amends relay-r1 §6 (the gate's verify) and §8 (concurrency). The settled entry 10 (`DECISIONS.md:37`, the verify limit) governs the limit, unchanged. The finding is `NICE_TO_HAVE.md`'s "Side-by-side verifies outlast the fixed cut".
+**Status:** design r1, 2026-10-14, written before code and revised once after its one refuter round (§7), which passed with eight notes; the revision takes six of them. AR78 built §5 packet 1 (2026-10-14). It amends relay-r1 §6 (the gate's verify) and §8 (concurrency). The settled entry 10 (`DECISIONS.md:37`, the verify limit) governs the limit, unchanged. The finding is `NICE_TO_HAVE.md`'s "Side-by-side verifies outlast the fixed cut".
 
 ## 1. The problem
 
