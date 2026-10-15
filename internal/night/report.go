@@ -37,10 +37,15 @@ type Report struct {
 // hold is a row's part with a `held` line; its wait is the first of its
 // end line's, its `unchecked` line's or its `sitting` line's band wait_s
 // (a sitting line with no band key: from the held line's ts to its own),
-// and an open hold counts with no wait yet.
+// and an open hold counts with no wait yet. Open counts the holds no line
+// ended, OpenSince the earliest of their held lines' ts as the ledger wrote
+// it (AR86): the report has no clock, so an open hold's wait is not counted
+// to now. A held line with no ts (never the ledger's) is not counted open.
 type BandHolds struct {
-	Holds int `json:"holds"`
-	WaitS int `json:"wait_s"`
+	Holds     int    `json:"holds"`
+	WaitS     int    `json:"wait_s"`
+	Open      int    `json:"open,omitempty"`
+	OpenSince string `json:"open_since,omitempty"`
 }
 
 // NotStopped is a report's State when the night's lines hold a
@@ -263,6 +268,15 @@ func BuildReport(lines []map[string]any, night string, g ...effects.Git) Report 
 				stops = append(stops, stop{sr, true})
 			}
 			held = nil
+		}
+	}
+	for _, since := range holding { // the holds no line ended (AR86): RFC3339 UTC, so the least string is the earliest
+		if since == "" {
+			continue
+		}
+		r.Band.Open++
+		if r.Band.OpenSince == "" || since < r.Band.OpenSince {
+			r.Band.OpenSince = since
 		}
 	}
 	for _, s := range stops {
@@ -598,7 +612,11 @@ func Markdown(r Report, root, home string) []byte {
 	cells = append(cells, []string{"total", "", fmt.Sprint(turns), "", costOf(total, unread, false), fmt.Sprint(builders), fmt.Sprint(output)})
 	mdTable(&b, cells, 2, 3, 4, 5, 6)
 	if r.Band.Holds > 0 { // AR81 ruling 5: after the sittings
-		fmt.Fprintf(&b, "\nband: %s, %s waited\n", plural(r.Band.Holds, "hold"), time.Duration(r.Band.WaitS)*time.Second)
+		fmt.Fprintf(&b, "\nband: %s, %s waited", plural(r.Band.Holds, "hold"), time.Duration(r.Band.WaitS)*time.Second)
+		if r.Band.Open > 0 { // AR86: the holds no line ended yet
+			fmt.Fprintf(&b, ", %d open since %s", r.Band.Open, r.Band.OpenSince)
+		}
+		b.WriteString("\n")
 	}
 	b.WriteString("\n## Handovers\n")
 	for _, h := range r.Handovers {
