@@ -166,3 +166,37 @@ func TestAR81_2_ReportHolds(t *testing.T) {
 		t.Fatalf("a night with no band line: %s\n%s", b, night.Markdown(none, "/r", "/h"))
 	}
 }
+
+// TestAR81_4_QueuedBehindNewHead (the fix round's finding 1): three rows,
+// r1 held then admitted at +60 s; r2, the new head, asks at +120 s and
+// holds; r3, queued behind r1 at T, now reads `behind r2`, still queued
+// with no ask, its since T.
+func TestAR81_4_QueuedBehindNewHead(t *testing.T) {
+	ad := effects.FakeAnswer{BandVerdict: effects.BandVerdict{Verdict: "admitted"}}
+	ns := func(text string) effects.FakeAnswer {
+		return effects.FakeAnswer{BandVerdict: effects.BandVerdict{Verdict: "not-started", Text: text}}
+	}
+	band := &effects.FakeBand{Answers: map[string][]effects.FakeAnswer{"r1": {ns("r1 no room"), ad}, "r2": {ns("r2 no room"), ad}}}
+	w, q, o, sp, clock := ar80World(t, band, "r1", "r2", "r3")
+	o.Parallel = 3
+	res := ar71Run(w, q, o, sp)
+	T := ar65T.Format(time.RFC3339)
+	ar65Until(t, "r3's queued line", func() bool { return len(rowLines(w.ledger.Written(), "band", "r3")) == 1 })
+	ar80Ask(t, band, 1, clock, 60*time.Second)
+	ar80Ask(t, band, 2, clock, 120*time.Second)
+	_, by := ar81Rows(t, o, "r2's ask", func(_ night.Status, by map[string]night.RowStatus) bool {
+		return by["r2"].Band != nil && by["r2"].Band.Asks == 1
+	})
+	if r := by["r2"]; r.State != "held" || r.Reason != "r2 no room" || by["r1"].Band != nil {
+		t.Fatalf("r2 at +120 s: %s, %q, %s; r1 %s", r.State, r.Reason, ar81Band(r.Band), ar81Band(by["r1"].Band))
+	}
+	if r := by["r3"]; r.State != "held" || r.Reason != "behind r2" || ar81Band(r.Band) != "{queued null "+T+" 0}" {
+		t.Fatalf("r3 at +120 s: %s, %q, %s", r.State, r.Reason, ar81Band(r.Band))
+	}
+	ar80Ask(t, band, 3, clock, 180*time.Second)
+	ar80Ask(t, band, 4, clock, 240*time.Second)
+	ar65End(t, res)
+	if got := ar80Asks(band); got != "r1 +0s, r1 +60s, r2 +120s, r2 +180s, r3 +240s" {
+		t.Fatalf("asks %s", got)
+	}
+}

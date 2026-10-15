@@ -856,7 +856,9 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 			lg.mu.Lock()
 			defer lg.mu.Unlock()
 			if rs := lg.rows[id]; rs != nil && rs.Band != nil {
-				rs.Band.Asks++
+				if v.Verdict != "queued" { // queued: a new head, no ask (the fix round's finding 1)
+					rs.Band.Asks++
+				}
 				rs.Band.Verdict, rs.Band.Peak, rs.Reason = v.Verdict, nil, v.Text
 				if v.Peak != nil {
 					p := *v.Peak
