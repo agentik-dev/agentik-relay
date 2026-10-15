@@ -1,6 +1,7 @@
 package night_test
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -191,10 +192,47 @@ func TestAR78_5_OneVerifyAtATime(t *testing.T) {
 	}
 }
 
+// ar78KillBeatsFree (AR78's fix round, F2; verify-cut-r1 §2.4): the
+// kill closed, then h0 freed, both inside the waiting mark, so both are
+// ready when the wait wakes: the kill wins every round, the lock never
+// taken (ErrGateKilled, the marks h0 then ""), and the slot is free
+// after. 200 rounds: before the fix about half took the lock.
+func ar78KillBeatsFree(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "root")
+	for i := range 200 {
+		unlock, _, err := night.GateLock(root, "h0", nil, nil)
+		if err != nil {
+			t.Fatalf("round %d: h0's lock: %v", i, err)
+		}
+		killed := make(chan struct{})
+		var marks []string
+		got, _, err := night.GateLock(root, "r1", killed, func(behind string, since time.Time) {
+			marks = append(marks, behind)
+			if behind != "" {
+				close(killed)
+				unlock()
+			}
+		})
+		if got != nil {
+			got()
+		}
+		if got != nil || !errors.Is(err, night.ErrGateKilled) || fmt.Sprintf("%q", marks) != `["h0" ""]` {
+			t.Fatalf("round %d: the lock taken %v, %v, marks %q; want ErrGateKilled, never taken, h0 then \"\"", i, got != nil, err, marks)
+		}
+		free, waited, err := night.GateLock(root, "t", nil, nil)
+		if err != nil || waited != 0 {
+			t.Fatalf("round %d: the slot after the kill: waited %s, %v; want it free", i, waited, err)
+		}
+		free()
+	}
+}
+
 // TestAR78_6_KillEndsTheWait (AR78 rulings 1, 3, 4): r1's verify behind
 // h0; `kill r1` at its `verify-wait` line ends the wait within 1 s: the
 // verify unrun, last the kill's, no block line run; r1 failed owner-kill.
+// First, a kill and a free that land together: the kill wins (F2).
 func TestAR78_6_KillEndsTheWait(t *testing.T) {
+	t.Run("the kill beats a free", ar78KillBeatsFree)
 	w, q, o, sh, root := ar78World(t, "block 100", "r1")
 	ar78Hold(t, root)
 	took := make(chan time.Duration, 1)

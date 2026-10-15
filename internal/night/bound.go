@@ -337,8 +337,9 @@ var ErrGateKilled = errors.New("killed waiting for the gate lock")
 // unlock and how long it waited, only once it holds it (verify-cut-r1
 // §3). A closed killed returns ErrGateKilled at once; a free lock is
 // taken at once, with no call to waiting. Else it calls waiting(the
-// holder's row, since), waits on killed and the lock, then, held or
-// killed, calls waiting("", since) once. A nil killed never closes; a nil
+// holder's row, since), waits on killed and the lock, checking killed
+// again before each take, so a kill that lands with the free wins; then,
+// held or killed, it calls waiting("", since) once. A nil killed never closes; a nil
 // waiting is not called. Real time, as the line's deadline.
 func GateLock(root, holder string, killed <-chan struct{}, waiting func(behind string, since time.Time)) (unlock func(), waited time.Duration, err error) {
 	v, _ := gateLocks.LoadOrStore(filepath.Clean(root), &gateSlot{})
@@ -361,7 +362,12 @@ func GateLock(root, holder string, killed <-chan struct{}, waiting func(behind s
 		case <-killed:
 			err = ErrGateKilled
 		case <-freed: // every wait wakes; one takes it, the rest wait again
-			unlock, _, freed = s.take(holder)
+			select {
+			case <-killed: // both ready: the kill wins, the line never runs (§2.4; AR78's fix round, F2)
+				err = ErrGateKilled
+			default:
+				unlock, _, freed = s.take(holder)
+			}
 		}
 	}
 	waited = time.Since(since)
