@@ -654,3 +654,8 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 - The verify round's S3 above (`TestAR78_5`'s flake) is closed by e593761: the earlier verify's `block` waits, under the lock, for the later row's `verify-wait` line (10 s at most); `go test -race -run '^TestAR78_' -count=20` passed.
 - S4: the `wait` cell is not clipped: AR81 clips only a held row's state cell, so a row with a long id waiting behind a long holder can print past 100 columns (`verify waits behind <row> <m>m` after the ten cells). A held row never carries a `wait` (the band holds before the spawn, the gate lock after the child), so the two clips never meet.
 - S4: `wait` inherits AR78's stale `behind` (AR78's review): with three rows of one root the holder can change while a row waits, and `waiting` marks once, so `wait` keeps the first holder's name.
+
+## AR79's review (2026-10-14, the observer; one adversary PASS, 0 findings)
+- S4: a relay killed by SIGKILL during a gate-lock wait leaves `wait` in `status.json`, and its minutes keep growing in `status` until a new night writes the file.
+- S4: a clock stepped back reads a wait one second in the future as `1439m` (ruling 3's modulo); harmless unless the system clock steps.
+- S4: with real row ids a waiting row's line is 146 columns (`ar79-verify-wait-status` behind `ar78-gate-lock`); a green row already printed 106 before AR79 (the builder's S4 above).
