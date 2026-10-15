@@ -143,12 +143,37 @@ func ar78Control(o night.NightOptions, line string) {
 	night.WriteControl(effects.OSFS{}, night.ControlPath(o.State, o.PlanOptions.Night), line)
 }
 
+// ar78Held is a Shell that runs hold before each line, then sh's.
+type ar78Held struct {
+	sh   effects.Shell
+	hold func(line string)
+}
+
+func (s *ar78Held) Run(dir, line string, timeout time.Duration) (int, string, error) {
+	s.hold(line)
+	return s.sh.Run(dir, line, timeout)
+}
+
 // TestAR78_5_OneVerifyAtATime (AR78 rulings 1, 5): r1 and r2 at --parallel
-// 2, each gate held until both have reached theirs, verify `block 800`:
-// the later line starts after the earlier ends; one `verify-wait` line,
-// for the later row, behind the earlier; both green.
+// 2, each gate held until both have reached theirs, verify `block 800`,
+// the earlier verify's block held, under the lock, until the later row's
+// `verify-wait` line stands (10 s at most, so a regression fails, never
+// hangs): the overlap does not hang on the two gathers ending within
+// 800 ms (the verify round's flake). The later line starts after the
+// earlier ends; one `verify-wait` line, for the later row, behind the
+// earlier; both green.
 func TestAR78_5_OneVerifyAtATime(t *testing.T) {
 	w, q, o, sh, _ := ar78World(t, "block 800", "r1", "r2")
+	w.fx.Shell = &ar78Held{sh: sh, hold: func(line string) {
+		if !strings.HasPrefix(line, "block ") {
+			return
+		}
+		for end := time.Now().Add(10 * time.Second); time.Now().Before(end); time.Sleep(5 * time.Millisecond) {
+			if len(ar65Events(w.ledger.Written(), "verify-wait")) > 0 {
+				return
+			}
+		}
+	}}
 	o.Parallel = 2
 	var mu sync.Mutex
 	arrived, both := 0, make(chan struct{})

@@ -886,6 +886,14 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 			if behind != "" { // the wait's mark; its end ("") writes no line (AR78 ruling 5)
 				put("verify-wait", map[string]any{"row": id, "behind": behind})
 			}
+			lg.mu.Lock() // status.json's wait, from the mark until the lock returns (AR79 ruling 2)
+			defer lg.mu.Unlock()
+			if rs := lg.rows[id]; rs != nil {
+				rs.Wait = ""
+				if behind != "" {
+					rs.Wait = "verify behind " + behind + " since " + since.UTC().Format("15:04:05") + "Z"
+				}
+			}
 		}}
 		running[id] = h
 		fresh[id] = true

@@ -63,6 +63,10 @@ type RowStatus struct {
 	// Cause is the gate's cause when the row ended red or failed (AR62
 	// act 2), gate.Cause through RedCause; "" else.
 	Cause string `json:"cause"`
+	// Wait is `verify behind <row> since <hh:mm:ss>Z` (UTC) while the row's
+	// verify waits for its root's gate lock, from GateLock's waiting mark
+	// until it returns; "" else (verify-cut-r1 §3; AR79 rulings 1, 2).
+	Wait string `json:"wait"`
 	// Band is the row's band hold while it holds (band-pacing-r1 §3; AR81
 	// ruling 1): State reads `held` and Reason the band's text then; nil
 	// when the row is not held.
@@ -322,7 +326,9 @@ func bandClause(rows []RowStatus) string {
 
 // PrintStatus is the dashboard once (§9's `Print(w, Status)`; the name
 // Print is plan's). The first line is the night, its root (AR37 act 1;
-// ShowRoot) and its state with the rows counted by state; then the rows, numbers right-aligned; each row's acts
+// ShowRoot) and its state with the rows counted by state; then the rows, numbers right-aligned,
+// a row whose verify waits for its root's gate lock one cell past merge,
+// `verify waits behind <row> <m>m` (AR79); each row's acts
 // (AR30), one line each under 100 columns; each red or failed row's
 // `cause of <row>: <cause>`, clipped under 100 columns (AR62); the burn; the next
 // stop; and last, every red or failed row's `agentik-relay resume <row>` on a line
@@ -349,6 +355,28 @@ func PrintStatus(w io.Writer, s Status) {
 		fmt.Fprintf(w, ": %s", strings.Join(counts, ", "))
 	}
 	fmt.Fprintln(w)
+	// waitCell is a row's wait as the line reads it (AR79 ruling 3): `verify
+	// waits behind <row> <m>m`, the whole minutes from the wait's clock to
+	// statusNow in UTC (a clock later than now is the day before); a wait
+	// that does not parse prints as it is.
+	waitCell := func(wait string) string {
+		rest, ok := strings.CutPrefix(wait, "verify behind ")
+		i := strings.LastIndex(rest, " since ")
+		if !ok || i <= 0 {
+			return wait
+		}
+		clock, ok := strings.CutSuffix(rest[i+len(" since "):], "Z")
+		at, err := time.Parse("15:04:05", clock)
+		if !ok || err != nil {
+			return wait
+		}
+		now := statusNow().UTC()
+		since := time.Date(now.Year(), now.Month(), now.Day(), at.Hour(), at.Minute(), at.Second(), 0, time.UTC)
+		if since.After(now) {
+			since = since.Add(-24 * time.Hour)
+		}
+		return fmt.Sprintf("verify waits behind %s %dm", rest[:i], int(now.Sub(since)/time.Minute))
+	}
 	cells := [][]string{{"row", "state", "turns", "context", "cost", "time", "last tool", "builders", "acts", "merge"}}
 	for _, r := range s.Rows {
 		ctx := fmt.Sprintf("%dk", r.Context/1000)
@@ -361,6 +389,9 @@ func PrintStatus(w io.Writer, s Status) {
 		}
 		cells = append(cells, []string{r.ID, state, strconv.Itoa(r.Turns), ctx, costOf(r.CostUSD, unreadOne(r.Unread), true),
 			dash(r.Elapsed), dash(clip(r.LastTool, 12)), strconv.Itoa(r.Builders), strconv.Itoa(len(r.Acts)), dash(short(r.MergeSHA))})
+		if r.Wait != "" { // one cell past merge, under no header (AR79 ruling 3)
+			cells[len(cells)-1] = append(cells[len(cells)-1], waitCell(r.Wait))
+		}
 	}
 	// AR81 ruling 4: a held row's state cell, the band's text with it, is
 	// clipped so its line stays under 100 columns.
@@ -408,6 +439,10 @@ func PrintStatus(w io.Writer, s Status) {
 		}
 	}
 }
+
+// statusNow is the clock PrintStatus reads a wait's minutes from (AR79
+// ruling 3); only the internal test sets it.
+var statusNow = time.Now
 
 // ShowRoot is a night's root as the owner reads it (AR37): the home
 // directory, read from HOME and cleaned (a trailing slash is the same
