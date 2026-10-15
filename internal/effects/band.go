@@ -236,7 +236,8 @@ type FakeAnswer struct {
 // FakeBand scripts each row's answers by the row in the tool use id
 // (`<night>/<row>/<part>`), the last repeating (none: `admitted`), and
 // Reset (ResetErr, else ResetAt; zero: no resetsAt). It records each ask
-// as `<tool_use_id> <session> <model>`, then the time when Clock is set.
+// as `<tool_use_id> <session> <model>`, then the time when Clock is set,
+// and the ask's request beside it (AR85 ruling 2).
 type FakeBand struct {
 	Answers  map[string][]FakeAnswer
 	ResetAt  time.Time
@@ -245,6 +246,7 @@ type FakeBand struct {
 
 	mu   sync.Mutex
 	asks []string
+	reqs []BandRequest
 	n    map[string]int
 }
 
@@ -260,6 +262,7 @@ func (f *FakeBand) Ask(_ context.Context, session string, req BandRequest) (Band
 		rec += " " + f.Clock.Now().UTC().Format(time.RFC3339)
 	}
 	f.asks = append(f.asks, rec)
+	f.reqs = append(f.reqs, req)
 	if f.n == nil {
 		f.n = map[string]int{}
 	}
@@ -288,4 +291,11 @@ func (f *FakeBand) Asks() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([]string(nil), f.asks...)
+}
+
+// Requests is every ask's request so far, in the order of Asks.
+func (f *FakeBand) Requests() []BandRequest {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]BandRequest(nil), f.reqs...)
 }
