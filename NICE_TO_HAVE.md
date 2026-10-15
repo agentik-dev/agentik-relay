@@ -616,3 +616,4 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 - `status --json` writes `band: null` on every row not held; the golden allows it, and the plugin reads it as no hold. (S4)
 - A `held` line written after the row's cancel could set `held` over a `paused` row's state until its sitting line (an ask finishing after the cut); not reproduced. (S4)
 - A queued row that becomes the head keeps `behind <old head>` until its first ask, one BandPoll later; the fix round updates only the rows behind a new head. (S4)
+- S4 (AR81's verify round): the 100-column clip also shortens `--json`'s `next` (`status.go:306`), which a script may read whole.
