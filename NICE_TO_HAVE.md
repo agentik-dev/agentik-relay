@@ -606,6 +606,18 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 - `e2eConfig` sits between `TestMain`'s doc comment and `TestMain` (`cmd/agentik-relay/main_test.go`), so the comment no longer documents it; `TestAR80_12` checks `e2e_test.go` by matching its source text, which breaks easily.
 - The fix round touched files outside the packet's may-touch list (the review accepted them).
 
+## AR81's build (2026-10-14): what it leaves (S4)
+- `effects.BandVersion` has no test of its own: the packet's may-touch named no effects test file, so only doctor's faked `bandVersion` covers its words. A script as the file, as `TestAR80_1_OSBand` runs one, would pin its first line, its exit and its timeout. (S4)
+- PrintStatus clips a held row's state cell to the room the other columns leave; a long reason on another row (a stage refusal's) still widens the state column for every line, held ones included, as before AR81. (S4)
+- The report sums the holds' waits row by row, so overlapping holds count twice: r1 held 120 s and r2 queued 180 s beside it read 300 s for 180 s of the clock. Neither the packet nor relay-r1 §9 says whether the band's wait is the rows' sum or the night's held time. (S4; the fix round's adversaries)
+- A `--version` that exits non-zero with no stderr reads `exit 3: ; spawns unchecked` in doctor; an empty last line could read `exit 3` alone. (S4)
+- Doctor prints `--version`'s first line uncapped: a tool that prints a huge line makes a huge detail. A clip, as the cause line has, would bound it. (S4)
+- Doctor never reads band.json (new folder or old): a missing or unreadable reset shows only as a night's `unchecked` line. (S4)
+- `status --json` writes `band: null` on every row not held; the golden allows it, and the plugin reads it as no hold. (S4)
+- A `held` line written after the row's cancel could set `held` over a `paused` row's state until its sitting line (an ask finishing after the cut); not reproduced. (S4)
+- A queued row that becomes the head keeps `behind <old head>` until its first ask, one BandPoll later; the fix round updates only the rows behind a new head. (S4)
+- S4 (AR81's verify round): the 100-column clip also shortens `--json`'s `next` (`status.go:306`), which a script may read whole.
+
 ## AR83's build (2026-10-14): what it leaves (S4)
 - No recorded stream holds two result events with a denial, so AR83's sum of `permission_denials` (ruling 3, the conservative reading) is unproven on a real child: a later result may repeat the earlier's list. And no ledger line counts a sitting's result events, so a night's record cannot tell a background-wait turn from the rest. Re-test both beside relay-r1 §15's background-work bullet.
 

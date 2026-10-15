@@ -95,6 +95,11 @@ type RunOptions struct {
 	space *spacer    // the night's: spawns SpawnSpacing apart (ADV6-13)
 	hold  *heldLine  // the night's: a usage-limit part's held line (AR65; nil: written here)
 	band  *bandQueue // the night's: the rows asking the band, in launch order (AR80 ruling 6; nil: none)
+	// asked is the night's: called after each re-ask in a hold with its
+	// verdict, which writes no line (AR81 ruling 2), and with `queued` and
+	// `behind <head>` when a queued row's head changes (the fix round's
+	// finding 1); nil: none.
+	asked func(effects.BandVerdict)
 }
 
 // The causes the night cancels a row's Ctx with (R6 §4): a stop leaves a
@@ -266,6 +271,7 @@ func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptio
 	r := &bandRecord{}
 	var since, reset, last time.Time // the hold's start (zero: unheld), its reset, the last ask
 	denied := false                  // the hold has a denied line
+	behind := ""                     // the head a queued row last read behind
 	line := func(m map[string]any) {
 		m["row"], m["part"] = rp.ID, 1
 		fx.Ledger.Append("band", m)
@@ -325,11 +331,17 @@ func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptio
 		if q != nil {
 			head, headHeld, first, after, moved = q.place(rp.ID)
 		}
+		if !head && !since.IsZero() && behind != "" && first != behind { // a new head: status reads it (AR81 fix round, finding 1)
+			behind = first
+			if opts.asked != nil {
+				opts.asked(effects.BandVerdict{Verdict: "queued", Text: "behind " + first})
+			}
+		}
 		if !head && headHeld && since.IsZero() { // behind a held head: queued
 			if why := open(now); why != "" {
 				return unchecked(why)
 			}
-			r.verdict = "queued"
+			r.verdict, behind = "queued", first
 			line(map[string]any{"state": "held", "verdict": "queued", "peak": nil, "text": "behind " + first})
 			q.hold(rp.ID)
 			fmt.Fprintf(log, "relay %s: the band holds it behind %s\n", rp.ID, first)
@@ -396,6 +408,9 @@ func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptio
 			}
 			fmt.Fprintf(log, "relay %s: the band holds it: %s\n", rp.ID, v.Verdict)
 			continue
+		}
+		if opts.asked != nil { // status counts the ask (AR81 ruling 2)
+			opts.asked(v)
 		}
 		if v.Verdict == "denied" && !denied {
 			denied = true

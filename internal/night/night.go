@@ -313,6 +313,9 @@ type tap struct {
 	// (AR51 ruling 4): the row's elapsed stops there, read on clock.
 	ended map[string]time.Time
 	clock effects.Clock
+	// unheld is each held row's state before its band hold (AR81 ruling
+	// 1), which the hold's end gives back.
+	unheld map[string]string
 
 	night  string
 	notify func(effects.Notice)
@@ -347,7 +350,14 @@ func (t *tap) Append(event string, m map[string]any) error {
 	}
 	num := func(k string) float64 { return number(m[k]) }
 	switch event {
+	case "band": // AR81 ruling 1: a held line holds the row, any other ends it
+		if m["state"] == "held" {
+			t.hold(id, rs, m)
+		} else {
+			t.unhold(id, rs)
+		}
 	case "spawn":
+		t.unhold(id, rs)
 		if t.budget == nil {
 			t.budget = map[string]float64{}
 		}
@@ -366,11 +376,53 @@ func (t *tap) Append(event string, m map[string]any) error {
 			t.usd += num("cost_usd")
 		}
 	case "sitting":
+		t.unhold(id, rs)
 		if b, ok := m["builders"].([]map[string]any); ok {
 			rs.Builders = len(b)
 		}
 	}
 	return err
+}
+
+// hold reads a band `held` line into rs (AR81 ruling 1): the row `held`,
+// its reason the band's text, its band the line's verdict and peak; the
+// first line of a hold sets since, the clock's now, and asks 1, or 0
+// when `queued`. A later one leaves since and the asks, which asked counts.
+func (t *tap) hold(id string, rs *RowStatus, m map[string]any) {
+	if rs.Band == nil {
+		since := ""
+		if t.clock != nil {
+			since = t.clock.Now().Format(time.RFC3339)
+		}
+		if t.unheld == nil {
+			t.unheld = map[string]string{}
+		}
+		t.unheld[id] = rs.State
+		rs.Band = &RowBand{Since: since, Asks: 1}
+		if m["verdict"] == "queued" {
+			rs.Band.Asks = 0
+		}
+	}
+	rs.State = "held"
+	rs.Reason, _ = m["text"].(string)
+	rs.Band.Verdict, _ = m["verdict"].(string)
+	rs.Band.Peak = nil
+	if p, ok := m["peak"].(float64); ok {
+		rs.Band.Peak = &p
+	}
+}
+
+// unhold ends rs's band hold, if any (AR81 ruling 1): band null and, while
+// the row still reads `held`, its reason "" and its state the one before.
+func (t *tap) unhold(id string, rs *RowStatus) {
+	if rs.Band == nil {
+		return
+	}
+	if rs.State == "held" {
+		rs.State, rs.Reason = t.unheld[id], ""
+	}
+	rs.Band = nil
+	delete(t.unheld, id)
 }
 
 // keep holds a burn line for nightBurn (AR51 ruling 2); a row's `turn` line
@@ -800,6 +852,20 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 		rctx, cancel := context.WithCancelCause(nightCtx)
 		ro.Ctx, ro.space, ro.hold = rctx, space, &heldLine{}
 		ro.Night, ro.Until, ro.band = n.ID, until, asking
+		ro.asked = func(v effects.BandVerdict) { // a re-ask writes no line (AR81 ruling 2)
+			lg.mu.Lock()
+			defer lg.mu.Unlock()
+			if rs := lg.rows[id]; rs != nil && rs.Band != nil {
+				if v.Verdict != "queued" { // queued: a new head, no ask (the fix round's finding 1)
+					rs.Band.Asks++
+				}
+				rs.Band.Verdict, rs.Band.Peak, rs.Reason = v.Verdict, nil, v.Text
+				if v.Peak != nil {
+					p := *v.Peak
+					rs.Band.Peak = &p
+				}
+			}
+		}
 		if asking != nil && ro.Part < 2 { // a first part asks: its place in launch order (AR80 ruling 6)
 			asking.join(id)
 		}

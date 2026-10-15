@@ -190,6 +190,37 @@ func ResolveBand(mode string, env func(string) string) (Band, string) {
 	return OSBand{File: file, Env: env, Timeout: BandTimeout}, file
 }
 
+// BandVersion is `<file> --version`'s first line, run under BandTimeout
+// (doctor's band check, band-pacing-r1 §3; AR81 ruling 6): it never asks,
+// since an ask writes a verdict line. A non-zero exit, the timeout or no
+// output errs.
+func BandVersion(file string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), BandTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, file, "--version")
+	var out, errb bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &errb
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
+	cmd.WaitDelay = time.Second
+	err := cmd.Run()
+	switch {
+	case ctx.Err() != nil:
+		return "", fmt.Errorf("%v after %s", ctx.Err(), BandTimeout)
+	case err != nil:
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			return "", fmt.Errorf("exit %d: %s", ee.ExitCode(), lastLine(errb.String()))
+		}
+		return "", err
+	}
+	first, _, _ := strings.Cut(strings.TrimSpace(out.String()), "\n")
+	if first = strings.TrimSpace(first); first == "" {
+		return "", errors.New("no output")
+	}
+	return first, nil
+}
+
 // The `band` key's values (band-pacing-r1 §2.1): pace, the default, or off.
 const (
 	BandPace = "pace"

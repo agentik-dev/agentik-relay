@@ -232,6 +232,28 @@ func doctor(asJSON bool, stdout io.Writer) int {
 	} else {
 		add("caffeinate", false, false, "not on PATH")
 	}
+	// AR81 ruling 6: the session band, never asked (an ask writes a
+	// verdict line); a broken plugin warns, as the night fails open.
+	bandMode := cfg.Band
+	if cfgErr != nil {
+		bandMode = effects.BandPace
+	}
+	switch _, file := bandFor(bandMode, getenv); file {
+	case effects.BandOff:
+		add("band", true, false, "off: the config turns pacing off")
+	case "absent", "":
+		add("band", true, true, "absent: %s not on PATH; spawns unpaced", effects.BandTool)
+	default:
+		shown := file
+		if home := getenv("HOME"); home != "" && strings.HasPrefix(file, home+"/") {
+			shown = "~" + strings.TrimPrefix(file, home)
+		}
+		if v, err := bandVersion(file); err != nil {
+			add("band", true, true, "%s --version: %v; spawns unchecked", shown, err)
+		} else {
+			add("band", true, false, "%s: %s", shown, v)
+		}
+	}
 	mode, modeErr := cfg.TmuxMode()
 	switch p, err := lookPath("tmux"); {
 	case mode == "never":
@@ -419,6 +441,11 @@ var effectsFor = func(state, night string) effects.Effects {
 var bandFor = func(mode string, env func(string) string) (effects.Band, string) {
 	return effects.ResolveBand(mode, env)
 }
+
+// bandVersion is doctor's read of the band's tool (AR81 ruling 6): its
+// --version's first line; a variable so a test never runs the account's
+// tool.
+var bandVersion = effects.BandVersion
 
 // plan validates the queue and every packet, resolves dependencies,
 // snapshots origin, measures the baseline on main in the root, and prints
