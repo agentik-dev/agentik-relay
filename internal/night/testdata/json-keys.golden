@@ -188,6 +188,7 @@ status rows.[]resume
 status rows.[]state
 status rows.[]turns
 status rows.[]unread
+status rows.[]wait
 status rows.[]worktree
 status started
 status state
