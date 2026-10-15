@@ -18,8 +18,8 @@ check-unlocked: test vet fmt doclint hygiene validate  ## the gate's body: test,
 	@if [ ! -f design/readme/source.md ]; then echo "readme: skipped, absent design/readme/source.md"; \
 	elif shasum -c --status design/readme/rendered.sha256; then echo "readme: fresh"; \
 	else echo "readme: stale, run make readme"; exit 2; fi
-test:  ## go test (no network, no quota)
-	go test -race ./...
+test:  ## go test (no network, no quota); a 15 min package timeout, since internal/night runs about 520 s quiet (go test's default is 600 s)
+	go test -race -timeout 15m ./...
 vet:  ## go vet
 	go vet ./...
 fmt:  ## gofmt: exit 2 naming the files it would change
