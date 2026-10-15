@@ -1,6 +1,7 @@
 package stream
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -51,5 +52,29 @@ func TestAR86_2_TwoResultsAndBuilders(t *testing.T) {
 		if tl.Usage != c.want {
 			t.Fatalf("%s: usage %+v, want %+v", c.name, tl.Usage, c.want)
 		}
+	}
+}
+
+// TestAR86_5_StreamAfterLastResult (the adversary's F1): a main-thread
+// message first seen after the last result counts at its streamed output
+// beside the results' (a second query cut before its result), and each
+// event's tally reads the output as it stands then.
+func TestAR86_5_StreamAfterLastResult(t *testing.T) {
+	msg := func(id string, out int) string {
+		return `{"type":"assistant","parent_tool_use_id":null,"message":{"id":"` + id + `","content":[],"usage":{"input_tokens":1,"cache_read_input_tokens":2,"cache_creation_input_tokens":3,"output_tokens":` + itoa(out) + `}}}`
+	}
+	src := strings.Join([]string{msg("m1", 5),
+		`{"type":"result","subtype":"success","num_turns":1,"total_cost_usd":0.5,"usage":{"input_tokens":1000,"cache_read_input_tokens":2000,"cache_creation_input_tokens":3000,"output_tokens":100}}`,
+		msg("m2", 7), msg("m3", 9)}, "\n") + "\n"
+	var seen []int
+	tl, err := Parse(strings.NewReader(src), func(_ Event, tl Tally) { seen = append(seen, tl.Usage.Output) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tl.Usage != (Usage{Input: 3, CacheRead: 6, CacheCreate: 9, Output: 116}) {
+		t.Fatalf("usage %+v, want output 116", tl.Usage)
+	}
+	if fmt.Sprint(seen) != "[5 100 107 116]" {
+		t.Fatalf("each event's output %v, want [5 100 107 116]", seen)
 	}
 }

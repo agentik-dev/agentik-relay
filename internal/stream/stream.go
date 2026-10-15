@@ -70,10 +70,12 @@ type ToolUse struct{ Name, Summary string }
 // Usage totals every assistant message's tokens, the builders' too, each
 // message id once at its last usage (AR28): what the sitting burned when
 // no result event reads its cost. Once a result reads a usage, Usage.Output
-// is the folded result's output plus the builders' streamed output, since an
-// assistant event carries its message's opening count (AR86). Input and the
-// caches stay the stream's, and a turn line, written before any result,
-// keeps the streamed output. Result is every result event folded into the
+// is the folded results' output plus the streamed output of the builders and
+// of the main-thread messages first seen after the last such result, since an
+// assistant event carries its message's opening count; input and the caches
+// stay the stream's (AR86). A turn line carries Usage as it stands at its
+// event: the streamed output before any result, after one the results' output
+// plus what streamed since. Result is every result event folded into the
 // first (AR83; Event.fold), CostUSD its cost.
 type Tally struct {
 	Turns, Context int
@@ -97,6 +99,8 @@ type Tally struct {
 	usage      map[string]Usage // by parent/message id, its last usage
 	streamed   Usage            // every message's last usage, summed (AR28)
 	builderOut int              // the builders' share of streamed.Output (AR86)
+	after      map[string]bool  // main-thread ids first seen since the last result with a usage
+	afterOut   int              // their share of streamed.Output (AR86)
 }
 
 // wireUsage is a usage object as the stream writes it: an assistant
@@ -234,6 +238,16 @@ func (t *Tally) Add(ev Event) {
 			t.streamed = t.streamed.plus(prev, -1).plus(*ev.Usage, 1)
 			if ev.ParentToolUseID != "" {
 				t.builderOut += ev.Usage.Output - prev.Output
+			} else {
+				if fresh {
+					if t.after == nil {
+						t.after = map[string]bool{}
+					}
+					t.after[key] = true
+				}
+				if t.after[key] {
+					t.afterOut += ev.Usage.Output - prev.Output
+				}
 			}
 			t.Usage = t.total()
 		}
@@ -261,16 +275,20 @@ func (t *Tally) Add(ev Event) {
 			r = f
 		}
 		t.ResultSeen, t.Result, t.CostUSD = true, &r, r.CostUSD
+		if ev.Usage != nil { // its output now holds the main thread's messages so far
+			t.after, t.afterOut = nil, 0
+		}
 		t.Usage = t.total()
 	}
 }
 
-// total is the stream's usage, its output the folded result's plus the
-// builders' streamed output once a result reads a usage (AR86).
+// total is the stream's usage, its output the folded results' plus the
+// builders' streamed output and the main thread's streamed since the last
+// result with a usage, once a result reads one (AR86).
 func (t *Tally) total() Usage {
 	u := t.streamed
 	if t.Result != nil && t.Result.Usage != nil {
-		u.Output = t.Result.Usage.Output + t.builderOut
+		u.Output = t.Result.Usage.Output + t.builderOut + t.afterOut
 	}
 	return u
 }
