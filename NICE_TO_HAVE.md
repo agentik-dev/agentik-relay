@@ -1,6 +1,6 @@
 ---
 status: current
-updated: 2026-10-14
+updated: 2026-10-15
 ---
 # agent-relay: what a review or a packet left open, none of it blocking
 
@@ -660,3 +660,6 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 - S4: a clock stepped back reads a wait one second in the future as `1439m` (ruling 3's modulo); harmless unless the system clock steps.
 - S4: with real row ids a waiting row's line is 146 columns (`ar79-verify-wait-status` behind `ar78-gate-lock`); a green row already printed 106 before AR79 (the builder's S4 above).
 - S3 (the observer, 2026-10-14 20:13): `TestAR28_1_TuneOnExit/commit` read `commit_turn` 4 (want 5) once inside a sharded `make check` (load 2.7 to 5, so the load was the check's own: four night shards beside `internal/gate`); it passed alone three times. A timing test that a serial run never exposed may now meet the shards' concurrency (AR84); a second sighting of any timing test would argue for fewer shards or `-p` beside them.
+
+## The refuter's F3 (2026-10-15): a parallel night's next ask reads before the admitted row runs (S3)
+- In a parallel night AR80 lets row B ask the band the moment row A is admitted, before A spawns (`bandQueue`'s leave, `internal/night/run.go`'s `askBand`), so B's ask never sees A as a running thread. agentik-session's fresh-session-r1 removes the double charge that hid this. Replayed under that fix: us3a's peak 286.5 to 190.0, usdoor's 90.7 to 69.1; no verdict changed in a window that reached 97. A fix: hold the next row's ask until the admitted row has spawned (or its first reading lands). Not built in AR85.
