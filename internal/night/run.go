@@ -388,8 +388,15 @@ func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptio
 		}
 		last = now
 		r.asks++
+		// An orchestrator sitting (Row set) asks as `relay-orchestrator`,
+		// every other part as `relay-row` (fresh-session-r1 §2.5; AR85
+		// ruling 1).
+		kind := "relay-row"
+		if rp.Row != "" {
+			kind = "relay-orchestrator"
+		}
 		v, err := fx.Band.Ask(ctx, rp.SessionID, effects.BandRequest{Model: flagOf(rp.Spawn, "--model"),
-			SubagentType: "relay-row", Background: true, ToolUseID: opts.Night + "/" + rp.ID + "/1"})
+			SubagentType: kind, Background: true, ToolUseID: opts.Night + "/" + rp.ID + "/1"})
 		switch {
 		case err != nil && ctx.Err() != nil: // the ask the context cut (ruling 3)
 			continue
