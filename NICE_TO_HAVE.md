@@ -633,3 +633,9 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 - The gate lock keeps no order: a free wakes every waiting verify and one takes the slot, so with three rows of one root the last to arrive may run before one that waited longer. verify-cut-r1 asks for none; a queue in `gateSlot` would give first come, first served. (S4)
 - Neither the report nor `status` reads a `verify-wait` line yet (status is AR79's `wait` key), and a wait under a second leaves no `wait_s`, so a night's time behind the lock is read only from the ledger. (S4)
 - The verify releases the lock as `RunLogged` returns, not in a `defer`: a panic inside the shell would leave the root's slot held for the rest of the process. (S4)
+
+## AR78's review (2026-10-14, the observer; two adversaries BLOCK, F1 and F2 fixed)
+- The row's wall timer stays armed through the gate (`run.go:607`), so a long gate-lock wait can SIGTERM the dead child's process group (`spawn.go:244`); the verdict is unaffected; not reproduced. (S4)
+- The sitting line's `wall_s` (`run.go:1067`) includes the gate-lock wait. (S4)
+- With three rows of one root, `behind` can go stale: the holder changes while a row waits and no second `verify-wait` line is written. (S4)
+- A kill does not stop a running verify, so a hung holder keeps the root's gate lock to its limit (predates AR78: the kill never stopped a running verify). (S4)
