@@ -227,3 +227,45 @@ func TestAR81_5_QueuedCutWait(t *testing.T) {
 		}
 	}
 }
+
+// TestAR81_6_NextClipped (the fix round's finding 3): six held rows with
+// long ids, the first held and five queued behind it: `next`'s band clause
+// names the first rows that fit and `+N`, its printed line under 100
+// columns.
+func TestAR81_6_NextClipped(t *testing.T) {
+	var ids []string
+	for i := 1; i <= 6; i++ {
+		ids = append(ids, fmt.Sprintf("ar81-held-row-number-%d", i))
+	}
+	ns := effects.FakeAnswer{BandVerdict: effects.BandVerdict{Verdict: "not-started", Text: "no room"}}
+	band := &effects.FakeBand{Answers: map[string][]effects.FakeAnswer{ids[0]: {ns, {BandVerdict: effects.BandVerdict{Verdict: "admitted"}}}}}
+	w, q, o, sp, clock := ar80World(t, band, ids...)
+	o.Parallel = 6
+	res := ar71Run(w, q, o, sp)
+	st, _ := ar81Rows(t, o, "six rows held", func(_ night.Status, by map[string]night.RowStatus) bool {
+		for _, id := range ids {
+			if by[id].Band == nil {
+				return false
+			}
+		}
+		return true
+	})
+	st.Root = ""
+	var b bytes.Buffer
+	night.PrintStatus(&b, st)
+	want := "next stop: the band holds " + ids[0] + " " + ids[1] + " +4 since 01:00"
+	found := false
+	for _, l := range strings.Split(strings.TrimRight(b.String(), "\n"), "\n") {
+		if n := len([]rune(l)); n >= 100 {
+			t.Fatalf("%d columns: %s", n, l)
+		}
+		found = found || l == want
+	}
+	if !found {
+		t.Fatalf("no line %q:\n%s", want, b.String())
+	}
+	for i := 1; i <= 6; i++ { // the head admitted at +60 s, each queued row one poll after the last
+		ar80Ask(t, band, i, clock, time.Duration(60*i)*time.Second)
+	}
+	ar65End(t, res)
+}

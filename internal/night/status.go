@@ -280,7 +280,8 @@ func buildStatus(n *Night, ids []string, rows map[string]*RowStatus, burn Burn, 
 }
 
 // bandClause is `the band holds <rows> since HH:MM`: the held rows in
-// order, the earliest since; "" when none is held (AR81 ruling 3).
+// order, the earliest since; "" when none is held (AR81 ruling 3). Rows
+// that do not fit under 100 columns read `+N`.
 func bandClause(rows []RowStatus) string {
 	var held []string
 	var since time.Time
@@ -296,11 +297,27 @@ func bandClause(rows []RowStatus) string {
 	if len(held) == 0 {
 		return ""
 	}
-	c := "the band holds " + strings.Join(held, " ")
+	tail := ""
 	if !since.IsZero() {
-		c += " since " + since.Format("15:04")
+		tail = " since " + since.Format("15:04")
 	}
-	return c
+	// The fix round's finding 3: the clause fits PrintStatus's `next stop: `
+	// line under 100 columns, naming the first rows that fit and `+N`.
+	const room = 99 - len("next stop: ")
+	for k := len(held); k >= 1; k-- {
+		more := ""
+		if k < len(held) {
+			more = fmt.Sprintf(" +%d", len(held)-k)
+		}
+		if c := "the band holds " + strings.Join(held[:k], " ") + more + tail; len([]rune(c)) <= room {
+			return c
+		}
+	}
+	more := ""
+	if len(held) > 1 {
+		more = fmt.Sprintf(" +%d", len(held)-1)
+	}
+	return clip("the band holds "+held[0], room-len(more)-len(tail)) + more + tail
 }
 
 // PrintStatus is the dashboard once (§9's `Print(w, Status)`; the name
