@@ -19,6 +19,7 @@ check-unlocked: test vet fmt doclint hygiene validate  ## the gate's body: test,
 	elif shasum -c --status design/readme/rendered.sha256; then echo "readme: fresh"; \
 	else echo "readme: stale, run make readme"; exit 2; fi
 test:  ## go test (no network, no quota): every package but internal/night in one go test, beside one go test of internal/night per line of its testdata/shards.txt, all at once, non-zero when any is (AR84); the 15 min package timeout a ceiling
+	test -s internal/night/testdata/shards.txt || { echo "test: internal/night/testdata/shards.txt is missing or empty, so no night test would run"; exit 2; }; \
 	pids=; go test -race -timeout 15m $$(go list ./... | grep -v '/internal/night$$') & pids=$$!; \
 	while read -r p; do go test -race -timeout 15m -run "$$p" ./internal/night & pids="$$pids $$!"; done < internal/night/testdata/shards.txt; \
 	rc=0; for p in $$pids; do wait $$p || rc=$$?; done; exit $$rc
