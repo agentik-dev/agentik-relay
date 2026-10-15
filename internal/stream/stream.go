@@ -69,8 +69,14 @@ type ToolUse struct{ Name, Summary string }
 // not seen before: one message streamed as several events is fresh once.
 // Usage totals every assistant message's tokens, the builders' too, each
 // message id once at its last usage (AR28): what the sitting burned when
-// no result event reads its cost. Result is every result event folded into
-// the first (AR83; Event.fold), CostUSD its cost.
+// no result event reads its cost. Once a result reads a usage, Usage.Output
+// is the folded results' output plus the streamed output of the builders and
+// of the main-thread messages first seen after the last such result, since an
+// assistant event carries its message's opening count; input and the caches
+// stay the stream's (AR86). A turn line carries Usage as it stands at its
+// event: the streamed output before any result, after one the results' output
+// plus what streamed since. Result is every result event folded into the
+// first (AR83; Event.fold), CostUSD its cost.
 type Tally struct {
 	Turns, Context int
 	CostUSD        float64
@@ -88,9 +94,26 @@ type Tally struct {
 	// ruling 1), "" when none.
 	Account relay.StopReason
 
-	limit limitFacts // a usage-limit stop's facts (AR63; Limit)
-	seen  map[string]bool
-	usage map[string]Usage // by parent/message id, its last usage
+	limit      limitFacts // a usage-limit stop's facts (AR63; Limit)
+	seen       map[string]bool
+	usage      map[string]Usage // by parent/message id, its last usage
+	streamed   Usage            // every message's last usage, summed (AR28)
+	builderOut int              // the builders' share of streamed.Output (AR86)
+	after      map[string]bool  // main-thread ids first seen since the last result with a usage
+	afterOut   int              // their share of streamed.Output (AR86)
+}
+
+// wireUsage is a usage object as the stream writes it: an assistant
+// message's, or a result's at the top level (AR86).
+type wireUsage struct {
+	Input       int `json:"input_tokens"`
+	CacheCreate int `json:"cache_creation_input_tokens"`
+	CacheRead   int `json:"cache_read_input_tokens"`
+	Output      int `json:"output_tokens"`
+}
+
+func (u wireUsage) usage() *Usage {
+	return &Usage{Input: u.Input, CacheCreate: u.CacheCreate, CacheRead: u.CacheRead, Output: u.Output}
 }
 
 type wire struct {
@@ -107,13 +130,9 @@ type wire struct {
 			Name  string          `json:"name"`
 			Input json.RawMessage `json:"input"`
 		} `json:"content"`
-		Usage *struct {
-			Input       int `json:"input_tokens"`
-			CacheCreate int `json:"cache_creation_input_tokens"`
-			CacheRead   int `json:"cache_read_input_tokens"`
-			Output      int `json:"output_tokens"`
-		} `json:"usage"`
+		Usage *wireUsage `json:"usage"`
 	} `json:"message"`
+	Usage      *wireUsage        `json:"usage"` // a result's (AR86)
 	NumTurns   int               `json:"num_turns"`
 	CostUSD    float64           `json:"total_cost_usd"`
 	IsError    bool              `json:"is_error"`
@@ -140,13 +159,16 @@ func Decode(line []byte) (Event, error) {
 	if w.Result != nil {
 		ev.ResultTail = tail(*w.Result, TailCap)
 	}
+	if w.Usage != nil && w.Type == "result" {
+		ev.Usage = w.Usage.usage()
+	}
 	if m := w.Message; m != nil && w.Type == "assistant" {
 		ev.MessageID = m.ID
 		if ev.Model == "" {
 			ev.Model = m.Model
 		}
-		if u := m.Usage; u != nil {
-			ev.Usage = &Usage{Input: u.Input, CacheCreate: u.CacheCreate, CacheRead: u.CacheRead, Output: u.Output}
+		if m.Usage != nil {
+			ev.Usage = m.Usage.usage()
 		}
 		for _, c := range m.Content {
 			if c.Type == "tool_use" {
@@ -205,14 +227,29 @@ func (t *Tally) Add(ev Event) {
 		t.seen[key] = true
 		t.Fresh = fresh
 		if ev.Usage != nil {
+			var prev Usage
 			if ev.MessageID != "" {
 				if t.usage == nil {
 					t.usage = map[string]Usage{}
 				}
-				t.Usage = t.Usage.plus(t.usage[key], -1)
+				prev = t.usage[key]
 				t.usage[key] = *ev.Usage
 			}
-			t.Usage = t.Usage.plus(*ev.Usage, 1)
+			t.streamed = t.streamed.plus(prev, -1).plus(*ev.Usage, 1)
+			if ev.ParentToolUseID != "" {
+				t.builderOut += ev.Usage.Output - prev.Output
+			} else {
+				if fresh {
+					if t.after == nil {
+						t.after = map[string]bool{}
+					}
+					t.after[key] = true
+				}
+				if t.after[key] {
+					t.afterOut += ev.Usage.Output - prev.Output
+				}
+			}
+			t.Usage = t.total()
 		}
 		if ev.ParentToolUseID != "" {
 			if fresh {
@@ -238,13 +275,29 @@ func (t *Tally) Add(ev Event) {
 			r = f
 		}
 		t.ResultSeen, t.Result, t.CostUSD = true, &r, r.CostUSD
+		if ev.Usage != nil { // its output now holds the main thread's messages so far
+			t.after, t.afterOut = nil, 0
+		}
+		t.Usage = t.total()
 	}
+}
+
+// total is the stream's usage, its output the folded results' plus the
+// builders' streamed output and the main thread's streamed since the last
+// result with a usage, once a result reads one (AR86).
+func (t *Tally) total() Usage {
+	u := t.streamed
+	if t.Result != nil && t.Result.Usage != nil {
+		u.Output = t.Result.Usage.Output + t.builderOut + t.afterOut
+	}
+	return u
 }
 
 // fold folds ev, a later result event, into r (AR83): a child that takes
 // one more turn after a background command ends writes a result per query.
-// num_turns, duration_ms and the denials are per query and sum; the cost is
-// the process's running total, so the highest any result read, never a sum.
+// num_turns, duration_ms, the denials and the usage are per query and sum;
+// the cost is the process's running total, so the highest any result read,
+// never a sum.
 // The end is the last result's (its tail and session), an error kept:
 // IsError when any result erred, Subtype the last erring result's, else the
 // last's.
@@ -252,6 +305,14 @@ func (r *Event) fold(ev Event) {
 	r.NumTurns += ev.NumTurns
 	r.DurationMS += ev.DurationMS
 	r.Denials += ev.Denials
+	if ev.Usage != nil { // a fresh sum: the first result's Usage is never written through
+		var u Usage
+		if r.Usage != nil {
+			u = *r.Usage
+		}
+		u = u.plus(*ev.Usage, 1)
+		r.Usage = &u
+	}
 	r.CostUSD = max(r.CostUSD, ev.CostUSD)
 	if ev.IsError || !r.IsError {
 		r.Subtype = ev.Subtype
