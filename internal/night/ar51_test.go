@@ -42,10 +42,10 @@ func holdGate(t *testing.T, o *night.NightOptions, row string) (reached chan str
 		b, ro, err := inner(r, rp)
 		if r.ID == row && ro.Gate != nil {
 			g := ro.Gate
-			ro.Gate = func(st *night.Staged, seen, isError bool) (relay.Result, relay.StopReason, relay.Gate) {
+			ro.Gate = func(st *night.Staged, seen, isError bool, gw night.GateWait) (relay.Result, relay.StopReason, relay.Gate) {
 				close(reached)
 				<-hold
-				return g(st, seen, isError)
+				return g(st, seen, isError, gw)
 			}
 		}
 		return b, ro, err

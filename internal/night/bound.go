@@ -294,6 +294,89 @@ func RootLock(root string) (func(), error) {
 	return LockRoot(filepath.Dir(LockDir()), root)
 }
 
+// gateLocks holds one slot per cleaned root, process-wide: one gate
+// verify at a time per root (verify-cut-r1 §2.1; AR78). No flock: the
+// account lock makes the night the only process that gates.
+var gateLocks sync.Map // root -> *gateSlot
+
+// gateSlot is one root's gate lock: held, by holder, until its unlock
+// closes freed.
+type gateSlot struct {
+	mu     sync.Mutex
+	held   bool
+	holder string
+	freed  chan struct{}
+}
+
+// take holds s for holder when it is free, and returns its unlock; else
+// the holder and the channel its unlock closes.
+func (s *gateSlot) take(holder string) (unlock func(), behind string, freed <-chan struct{}) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.held {
+		return nil, s.holder, s.freed
+	}
+	ch := make(chan struct{})
+	s.held, s.holder, s.freed = true, holder, ch
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			s.held, s.holder = false, ""
+			close(ch)
+		})
+	}, "", nil
+}
+
+// ErrGateKilled is GateLock's end when the owner's kill closed killed
+// before the lock was held: the verify line never runs (AR78 ruling 1).
+var ErrGateKilled = errors.New("killed waiting for the gate lock")
+
+// GateLock takes root's gate lock for holder (the row) and returns its
+// unlock and how long it waited, only once it holds it (verify-cut-r1
+// §3). A closed killed returns ErrGateKilled at once; a free lock is
+// taken at once, with no call to waiting. Else it calls waiting(the
+// holder's row, since), waits on killed and the lock, checking killed
+// again before each take, so a kill that lands with the free wins; then,
+// held or killed, it calls waiting("", since) once. A nil killed never closes; a nil
+// waiting is not called. Real time, as the line's deadline.
+func GateLock(root, holder string, killed <-chan struct{}, waiting func(behind string, since time.Time)) (unlock func(), waited time.Duration, err error) {
+	v, _ := gateLocks.LoadOrStore(filepath.Clean(root), &gateSlot{})
+	s := v.(*gateSlot)
+	since := time.Now() // real time: the line's deadline is (AR59 act 3)
+	select {
+	case <-killed: // a kill wins over a free lock (§2.4)
+		return nil, 0, ErrGateKilled
+	default:
+	}
+	unlock, behind, freed := s.take(holder)
+	if unlock != nil {
+		return unlock, 0, nil
+	}
+	if waiting != nil {
+		waiting(behind, since)
+	}
+	for unlock == nil && err == nil {
+		select {
+		case <-killed:
+			err = ErrGateKilled
+		case <-freed: // every wait wakes; one takes it, the rest wait again
+			select {
+			case <-killed: // both ready: the kill wins, the line never runs (§2.4; AR78's fix round, F2)
+				err = ErrGateKilled
+			default:
+				unlock, _, freed = s.take(holder)
+			}
+		}
+	}
+	waited = time.Since(since)
+	if waiting != nil {
+		waiting("", since)
+	}
+	return unlock, waited, err
+}
+
 // boundShell is the shell every measurement on main goes through (§15):
 // in the root, one line at a time (RootLock); the memo answers a line
 // already measured at head, and a line that ran is stored only when the

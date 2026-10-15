@@ -196,6 +196,11 @@ type held struct {
 	killed bool
 	exited chan struct{}
 	cancel context.CancelCauseFunc // the row's context: a kill before the spawn ends its wait
+	// killCh is the row's kill channel (AR78 ruling 4): the owner's kill
+	// closes it once, which ends a gate verify's wait for its root's gate
+	// lock; a stop, an account stop and the context never do. nil: none.
+	killCh   chan struct{}
+	killOnce sync.Once
 }
 
 func (h *held) Start(sp effects.Spawn) (effects.Process, io.ReadCloser, error) {
@@ -219,7 +224,14 @@ func (h *held) Start(sp effects.Spawn) (effects.Process, io.ReadCloser, error) {
 	return h.proc, out, err
 }
 
-func (h *held) kill() { h.killFor(ErrOwnerKill) }
+// kill is the owner's: the kill channel closed (once, before killFor, so
+// a kill after an account stop still closes it), then the row killed.
+func (h *held) kill() {
+	if h.killCh != nil {
+		h.killOnce.Do(func() { close(h.killCh) })
+	}
+	h.killFor(ErrOwnerKill)
+}
 
 // unspawned ends the wait of a row not yet spawned (AR80 fix round,
 // finding 1): its context cancelled with cause, so a band hold, a queued
@@ -869,7 +881,12 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 		if asking != nil && ro.Part < 2 { // a first part asks: its place in launch order (AR80 ruling 6)
 			asking.join(id)
 		}
-		h := &held{Spawner: sp, groups: groups, procs: fx.Procs, row: id, cancel: cancel}
+		h := &held{Spawner: sp, groups: groups, procs: fx.Procs, row: id, cancel: cancel, killCh: make(chan struct{})}
+		ro.wait = GateWait{Killed: h.killCh, Waiting: func(behind string, since time.Time) {
+			if behind != "" { // the wait's mark; its end ("") writes no line (AR78 ruling 5)
+				put("verify-wait", map[string]any{"row": id, "behind": behind})
+			}
+		}}
 		running[id] = h
 		fresh[id] = true
 		if first {

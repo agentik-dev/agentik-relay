@@ -34,7 +34,7 @@ func ar74World(t *testing.T) effects.Effects {
 	return effects.Effects{Git: g, Shell: sh, Clock: effects.FakeClock{T: now}, FS: fs, Ledger: l}
 }
 
-func ar74Green(*night.Staged, bool, bool) (relay.Result, relay.StopReason, relay.Gate) {
+func ar74Green(*night.Staged, bool, bool, night.GateWait) (relay.Result, relay.StopReason, relay.Gate) {
 	return relay.GreenResult, "", relay.Gate{Gathered: true, ResultSeen: true, ExitOK: true, Commit: true, Clean: true, OriginSame: true}
 }
 

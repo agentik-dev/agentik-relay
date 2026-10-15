@@ -1370,7 +1370,10 @@ func runVerb(args []string, stdout, stderr io.Writer) int {
 		} else {
 			stdin, _, _, err = night.RenderPrompt(disk, p, r, rp, words, pd.repo)
 		}
-		ro.Gate = func(st *night.Staged, seen, isError bool) (relay.Result, relay.StopReason, relay.Gate) {
+		ro.Gate = func(st *night.Staged, seen, isError bool, w night.GateWait) (relay.Result, relay.StopReason, relay.Gate) {
+			// AR78: the row's kill and the gate lock's mark, on a copy of v.
+			v := v
+			v.Killed, v.Waiting = w.Killed, w.Waiting
 			res, why, g, _ := gate.Run(fx, st, pk, rp.Baseline, &gate.ExitFacts{Seen: seen, IsError: isError}, v) // the gate line holds the detail
 			return res, why, g
 		}

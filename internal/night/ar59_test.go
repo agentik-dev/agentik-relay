@@ -67,8 +67,8 @@ func TestAR59_3_RowReason(t *testing.T) {
 	o.Row = func(r queue.Row, rp *night.RowPlan) ([]byte, night.RunOptions, error) {
 		p, ro, err := row(r, rp)
 		if gate := ro.Gate; r.ID == "r1" {
-			ro.Gate = func(st *night.Staged, seen, isError bool) (relay.Result, relay.StopReason, relay.Gate) {
-				_, _, g := gate(st, seen, isError)
+			ro.Gate = func(st *night.Staged, seen, isError bool, gw night.GateWait) (relay.Result, relay.StopReason, relay.Gate) {
+				_, _, g := gate(st, seen, isError, gw)
 				g.Verify = &relay.Check{Name: "make check", Expect: "exit 0", MainExit: -1, BranchExit: 124, Status: relay.CheckRed, Cut: 900}
 				return relay.RedResult, relay.VerifyCut, g
 			}

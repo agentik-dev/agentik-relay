@@ -76,8 +76,9 @@ func (w *world) opts(t *testing.T, by map[string]spec) night.NightOptions {
 		Row: func(r queue.Row, rp *night.RowPlan) ([]byte, night.RunOptions, error) {
 			s := by[r.ID]
 			return []byte("prompt"), night.RunOptions{Context: r.Context, Env: w.env(s.fixture, s.env...), Transcripts: w.transcripts,
-				Gate: func(st *night.Staged, seen, isError bool) (relay.Result, relay.StopReason, relay.Gate) {
-					res, why, g, _ := gate.Run(w.fx, st, r.Packet, rp.Baseline, &gate.ExitFacts{Seen: seen, IsError: isError}, gate.Verify{Name: r.Verify})
+				Gate: func(st *night.Staged, seen, isError bool, gw night.GateWait) (relay.Result, relay.StopReason, relay.Gate) {
+					v := gate.Verify{Name: r.Verify, Killed: gw.Killed, Waiting: gw.Waiting} // the row's kill and the lock's mark (AR78)
+					res, why, g, _ := gate.Run(w.fx, st, r.Packet, rp.Baseline, &gate.ExitFacts{Seen: seen, IsError: isError}, v)
 					return res, why, g
 				}}, nil
 		}}
@@ -266,9 +267,9 @@ func TestUntilAndCount(t *testing.T) {
 	o.Row = func(r queue.Row, rp *night.RowPlan) ([]byte, night.RunOptions, error) {
 		b, ro, err := row(r, rp)
 		g := ro.Gate
-		ro.Gate = func(st *night.Staged, seen, isError bool) (relay.Result, relay.StopReason, relay.Gate) {
+		ro.Gate = func(st *night.Staged, seen, isError bool, gw night.GateWait) (relay.Result, relay.StopReason, relay.Gate) {
 			clock.add(2 * time.Hour)
-			return g(st, seen, isError)
+			return g(st, seen, isError, gw)
 		}
 		return b, ro, err
 	}
@@ -387,7 +388,7 @@ func TestAR4_UnrunGateIsRed(t *testing.T) {
 	o.Row = func(r queue.Row, rp *night.RowPlan) ([]byte, night.RunOptions, error) {
 		p, ro, err := row(r, rp)
 		if r.ID == "r1" {
-			ro.Gate = func(*night.Staged, bool, bool) (relay.Result, relay.StopReason, relay.Gate) {
+			ro.Gate = func(*night.Staged, bool, bool, night.GateWait) (relay.Result, relay.StopReason, relay.Gate) {
 				return relay.Unrun, "", relay.Gate{}
 			}
 		}
@@ -514,9 +515,9 @@ func TestAR5_OriginMovedStopsNight(t *testing.T) {
 	o.Row = func(r queue.Row, rp *night.RowPlan) ([]byte, night.RunOptions, error) {
 		p, ro, err := row(r, rp)
 		inner := ro.Gate
-		ro.Gate = func(st *night.Staged, seen, isError bool) (relay.Result, relay.StopReason, relay.Gate) {
+		ro.Gate = func(st *night.Staged, seen, isError bool, gw night.GateWait) (relay.Result, relay.StopReason, relay.Gate) {
 			gitIn(t, w.root, "update-ref", "refs/remotes/origin/main", "HEAD")
-			return inner(st, seen, isError)
+			return inner(st, seen, isError, gw)
 		}
 		return p, ro, err
 	}

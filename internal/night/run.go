@@ -76,7 +76,7 @@ type RunOptions struct {
 	StallSeconds int
 	Log          io.Writer
 	Notify       func(string)
-	Gate         func(st *Staged, seen, isError bool) (relay.Result, relay.StopReason, relay.Gate)
+	Gate         func(st *Staged, seen, isError bool, w GateWait) (relay.Result, relay.StopReason, relay.Gate)
 	Env          []string
 	Transcripts  string
 	// RulesHash is the template hash the row's prompt was rendered under
@@ -100,6 +100,17 @@ type RunOptions struct {
 	// `behind <head>` when a queued row's head changes (the fix round's
 	// finding 1); nil: none.
 	asked func(effects.BandVerdict)
+	// wait is the night's: the row's kill channel and the gate lock's mark,
+	// which RunRow passes to Gate (AR78; zero: a kill never ends the wait).
+	wait GateWait
+}
+
+// GateWait is what a row's gate waits for its root's gate lock with
+// (AR78; GateLock): Killed, closed by the owner's kill alone, ends the
+// wait; Waiting marks it (behind the holder's row, then "" at its end).
+type GateWait struct {
+	Killed  <-chan struct{}
+	Waiting func(behind string, since time.Time)
 }
 
 // The causes the night cancels a row's Ctx with (R6 §4): a stop leaves a
@@ -811,7 +822,7 @@ func RunRow(fx effects.Effects, sp effects.Spawner, st *Staged, rp *RowPlan, pro
 	var why relay.StopReason
 	res, ev := relay.Unrun, relay.GateUnrun
 	if opts.Gate != nil && !account && killed != relay.HelperStorm {
-		res, why, g = opts.Gate(st, tally.ResultSeen, tally.Result == nil || tally.Result.IsError || exit != 0)
+		res, why, g = opts.Gate(st, tally.ResultSeen, tally.Result == nil || tally.Result.IsError || exit != 0, opts.wait)
 		if g.Orphans = sit.orphans; res == relay.GreenResult {
 			res, why = relay.Decide(g) // orphans swept: red
 		}

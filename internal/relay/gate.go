@@ -30,6 +30,10 @@ type Check struct {
 	// ledger line carries it as `cut`. Not in --json until a row may
 	// re-freeze json-keys.golden (§15), as PacketDiffers.
 	Cut int `json:"-"`
+	// Wait is the seconds a verify line waited for its root's gate lock
+	// before its clock started (AR78); 0 when it took it at once. The
+	// `gate` ledger line carries it as `wait_s`. Not in --json, as Cut.
+	Wait int `json:"-"`
 }
 
 // Gate is the record of facts the gate's effects gathered for one sitting
