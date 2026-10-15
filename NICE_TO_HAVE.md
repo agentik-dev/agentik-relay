@@ -666,3 +666,7 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 
 ## The observer's check-in 123 (2026-10-15; S4)
 - `report` counts an open band hold as no wait: night 2026-10-15-1 read `band: 1 hold, 0s waited` at 02:33 for po2c held since 01:30:41 (62 asks), since `wait_s` lands only on the hold's end line (AR81). Count an open hold to now, as `status --json`'s `band.since` already allows, or say `held since HH:MM`.
+
+## The observer's reading of us4b's exit line (2026-10-15 05:40; S4)
+- The exit and turn lines' `usage.output` under-counts by two orders: night 2026-10-15-2's us4b exit line reads `"output":675` for 70 turns and $5.85, while its transcript (`070db0a6-….jsonl`) holds 103,326 output tokens over 65 main-thread message ids (each id's highest `output_tokens`). `stream.Tally` keeps each message id's last `usage` from the stream's `assistant` events (`internal/stream/stream.go:207-215`), and those carry the message's opening count, not its final one. No verdict reads `output` (cost comes from the result, context from input and cache), so only the ledger and report mislead. A fix: take `output` from the `result` event's `usage` when it lands, or name the field `output_start`. (the observer, from the ledger line and the transcript)
+- The row log ends at `turn 65` while the exit line and `status` read 70 turns: likely the last turns wrote text only, and a turn without a tool prints no row-log line. Cosmetic; one line naming the final count would close it.
