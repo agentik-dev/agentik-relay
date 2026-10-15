@@ -167,8 +167,11 @@ func TestAR78_2_TwoRootsNeverWait(t *testing.T) {
 }
 
 // TestAR78_3_MergeTakesNoGateLock (AR78 ruling 2): TestAR59_3_MergeNamesCut's
-// green gate, merged over `block 100` while h0 holds the root's gate
-// lock, lands in under 1 s: the merge keeps the root's lock alone.
+// green gate, merged over `block 100`, lands while h0 holds the root's
+// gate lock for the whole test: the merge keeps the root's lock alone. It
+// runs in a goroutine bounded at 30 s, so a merge that took the gate lock
+// fails the test instead of hanging it; the bound is no measure of the
+// merge's own git work (AR78's fix round, F1).
 func TestAR78_3_MergeTakesNoGateLock(t *testing.T) {
 	w, sh, st, root := ar78World(t)
 	green := Gather(w.fx, st, pk([]string{"a.txt"}), nil, seen)
@@ -176,13 +179,23 @@ func TestAR78_3_MergeTakesNoGateLock(t *testing.T) {
 		t.Fatalf("the gate is %s, want green", res)
 	}
 	ar78Hold(t, root)
-	start := time.Now()
-	sha, err := MergeIfGreen(w.fx, w.root, green, "a1", "block 100", nil)
-	if err != nil || sha == "" {
-		t.Fatalf("MergeIfGreen = %q, %v; want merged", sha, err)
+	type merged struct {
+		sha string
+		err error
 	}
-	if took := time.Since(start); took >= time.Second {
-		t.Fatalf("the merge took %s behind the gate lock, want under 1 s", took)
+	done := make(chan merged, 1)
+	go func() {
+		sha, err := MergeIfGreen(w.fx, w.root, green, "a1", "block 100", nil)
+		done <- merged{sha, err}
+	}()
+	var m merged
+	select {
+	case m = <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("the merge did not return in 30 s while h0 held the gate lock: it waited behind it")
+	}
+	if m.err != nil || m.sha == "" {
+		t.Fatalf("MergeIfGreen = %q, %v; want merged", m.sha, m.err)
 	}
 	if r := sh.runs(); len(r) != 1 {
 		t.Fatalf("the block runs %v, want the merge's one", r)
@@ -190,14 +203,16 @@ func TestAR78_3_MergeTakesNoGateLock(t *testing.T) {
 }
 
 // TestAR78_4_HandGateWaits (AR78 ruling 2): Hand's verify (nil Killed)
-// waits behind h0, freed 1.2 s after the row's acceptance line returns
-// (the last line before the verify), then runs: green, Wait 1.
+// waits behind h0, freed 1.5 s after the row's acceptance line returns
+// (the last line before the verify; the half second over the wait's
+// 1 s leaves room for the verify's own git under load), then runs:
+// green, Wait 1.
 func TestAR78_4_HandGateWaits(t *testing.T) {
 	w, sh, st, root := ar78World(t)
 	st.Unlock()
 	free := ar78Hold(t, root)
 	var once sync.Once
-	sh.after = func(blockCall) { once.Do(func() { time.AfterFunc(1200*time.Millisecond, free) }) }
+	sh.after = func(blockCall) { once.Do(func() { time.AfterFunc(1500*time.Millisecond, free) }) }
 	line := packet.Line{Shell: "block 1", Expect: "reads `ok`", Kind: packet.Reads, Value: "ok", N: 1}
 	row := queue.Row{ID: "a1", Base: "main", Verify: "block 100", Packet: pk([]string{"a.txt"}, line)}
 	res, why, g, err := Hand(w.fx, w.root, Verify{Limit: time.Second}, row)
