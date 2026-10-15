@@ -101,7 +101,7 @@ func (w *world) orchOpts(t *testing.T, q0 *queue.Queue, files string, env ...str
 		}
 		return []byte("prompt"), night.RunOptions{Context: r.Context, Transcripts: w.transcripts,
 			Env: w.env("ok.jsonl", append([]string{"FAKECLAUDE_FILES=" + files}, env...)...),
-			Gate: func(st *night.Staged, seen, isError bool) (relay.Result, relay.StopReason, relay.Gate) {
+			Gate: func(st *night.Staged, seen, isError bool, gw night.GateWait) (relay.Result, relay.StopReason, relay.Gate) {
 				res, why, g, _ := gate.Run(w.fx, st, pk, rp.Baseline, &gate.ExitFacts{Seen: seen, IsError: isError}, v)
 				return res, why, g
 			}}, nil

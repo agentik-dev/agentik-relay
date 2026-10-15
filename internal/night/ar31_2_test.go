@@ -22,8 +22,8 @@ func TestAR31_2_NightNamesLog(t *testing.T) {
 	o.Row = func(r queue.Row, rp *night.RowPlan) ([]byte, night.RunOptions, error) {
 		p, ro, err := row(r, rp)
 		if gate := ro.Gate; r.ID == "r1" {
-			ro.Gate = func(st *night.Staged, seen, isError bool) (relay.Result, relay.StopReason, relay.Gate) {
-				_, _, g := gate(st, seen, isError)
+			ro.Gate = func(st *night.Staged, seen, isError bool, gw night.GateWait) (relay.Result, relay.StopReason, relay.Gate) {
+				_, _, g := gate(st, seen, isError, gw)
 				if len(g.Lines) > 0 {
 					g.Lines[0].Status, g.Lines[0].BranchLog = relay.CheckRed, "/x/r1-line1.log"
 				}

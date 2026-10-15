@@ -47,6 +47,11 @@ type ExitFacts struct{ Seen, IsError bool }
 // effects.Config.VerifyLimit; AR59 act 2): 0 is effects.Timeout. The
 // gate's verify and the merge's (Gate.VerifySeconds) run under it; the
 // acceptance lines keep effects.Timeout.
+//
+// Killed is the row's kill channel, which the owner's kill closes (AR78):
+// a verify line waiting for its root's gate lock then never runs; nil (a
+// hand gate) never closes. Waiting is night.GateLock's mark of the wait
+// (nil: none).
 type Verify struct {
 	Name          string
 	Baseline      *relay.Check
@@ -56,6 +61,8 @@ type Verify struct {
 	Orchestrator  *Orchestrated
 	QueuePath     string
 	Limit         time.Duration
+	Killed        <-chan struct{}
+	Waiting       func(behind string, since time.Time)
 }
 
 // limit is v's verify limit: Limit, else effects.Timeout.
@@ -483,7 +490,7 @@ func gather(fx effects.Effects, st *night.Staged, p *packet.Packet, baseline []r
 		}
 		g.Lines = append(g.Lines, rerun(sh, at, l, b, nested, fmt.Sprintf("%s-line%d", st.Branch, i+1)))
 	}
-	g.Verify = verify(fx, vsh, st.Path, at, v, nested, st.Branch+"-verify")
+	g.Verify = verify(fx, vsh, st.Path, at, st.Branch, v, nested, st.Branch+"-verify")
 	// ADV11-6: a line that pushed by URL moved a remote; read them again.
 	if same, _, err := remotesSame(fx.Git, root, g.RemoteRefs, g.RemoteURLs); err != nil {
 		return stop("ls-remote", err)
@@ -895,8 +902,10 @@ func Fresh(fx effects.Effects, dir string, refs ...effects.Ref) (string, func(),
 // main (the root dir's repo has), never in the row's tree (ADV6-10): a
 // root with no `check:` is skipped, a probe that could not start unrun.
 // The line's log (AR31 act 2, label names it) is kept when it is not
-// green, else removed; the probe (through the memo) keeps none.
-func verify(fx effects.Effects, sh effects.Shell, dir, at string, v Verify, nested bool, label string) *relay.Check {
+// green, else removed; the probe (through the memo) keeps none. A line
+// that runs first takes its root's gate lock for holder (AR78): Wait the
+// seconds it waited; killed while waiting, unrun, never run.
+func verify(fx effects.Effects, sh effects.Shell, dir, at, holder string, v Verify, nested bool, label string) *relay.Check {
 	if nested && v.Name != "" {
 		return &relay.Check{Name: v.Name, Expect: "exit 0", MainExit: -1, BranchExit: -1,
 			BranchLast: effects.NestedReason, Status: relay.CheckUnrun}
@@ -923,9 +932,19 @@ func verify(fx effects.Effects, sh effects.Shell, dir, at string, v Verify, nest
 		c.MainExit, c.MainLast = b.MainExit, b.MainLast
 	}
 	limit := v.limit()
+	// AR78: one gate verify at a time per root; the clock starts once the
+	// lock is held, so the wait is not the line's. The owner's kill ends
+	// the wait: the line never runs.
+	unlock, waited, err := night.GateLock(root, holder, v.Killed, v.Waiting)
+	c.Wait = int(waited / time.Second)
+	if err != nil {
+		c.BranchExit, c.BranchLast, c.Status = -1, fmt.Sprintf("%s after %d s", err, c.Wait), relay.CheckUnrun
+		return c
+	}
 	start := time.Now() // real time: the deadline is (AR59 act 3)
 	exit, last, log, err := effects.RunLogged(sh, at, line, limit, label)
 	took := time.Since(start)
+	unlock()
 	c.BranchExit, c.BranchLast = exit, last
 	switch {
 	case err != nil:
@@ -1262,6 +1281,9 @@ func run(fx effects.Effects, st *night.Staged, p *packet.Packet, baseline []rela
 			}
 			if c.Cut > 0 { // cut at its limit (AR59 act 3)
 				m["cut"] = c.Cut
+			}
+			if c.Wait > 0 { // waited for the root's gate lock (AR78)
+				m["wait_s"] = c.Wait
 			}
 		}
 		paths := len(g.Outside) > 0 // the `touch` line goes ahead of the first line's check

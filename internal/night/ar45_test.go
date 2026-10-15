@@ -53,7 +53,7 @@ func ar45Row(t *testing.T, w *world, id string, c ar45) map[string]any {
 	}
 	night.RunRow(w.fx, effects.OSSpawner{}, st, rp, []byte("the prompt\n"), night.RunOptions{
 		Context: 130000, Wall: time.Minute, Env: env, Transcripts: w.transcripts,
-		Gate: func(st *night.Staged, seen, isError bool) (relay.Result, relay.StopReason, relay.Gate) {
+		Gate: func(st *night.Staged, seen, isError bool, gw night.GateWait) (relay.Result, relay.StopReason, relay.Gate) {
 			if c.dirty {
 				if err := os.WriteFile(filepath.Join(st.Path, "wip.txt"), []byte("wip\n"), 0o644); err != nil {
 					t.Error(err)

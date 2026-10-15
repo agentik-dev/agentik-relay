@@ -743,7 +743,7 @@ func TestAR10_6_WallNeverZero(t *testing.T) {
 
 // greenGate is a gathered green gate every invariant holds for over a
 // staged tree with no HeadBefore and a clean fake status.
-func greenGate(*Staged, bool, bool) (relay.Result, relay.StopReason, relay.Gate) {
+func greenGate(*Staged, bool, bool, GateWait) (relay.Result, relay.StopReason, relay.Gate) {
 	return relay.GreenResult, "", relay.Gate{Gathered: true, ResultSeen: true, ExitOK: true, Commit: true, Clean: true, OriginSame: true}
 }
 

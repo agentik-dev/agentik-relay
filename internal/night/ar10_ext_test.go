@@ -19,7 +19,7 @@ func TestAR10_7_InvariantStopsNight(t *testing.T) {
 	o.Row = func(r queue.Row, rp *night.RowPlan) ([]byte, night.RunOptions, error) {
 		p, ro, err := row(r, rp)
 		if r.ID == "r1" {
-			ro.Gate = func(*night.Staged, bool, bool) (relay.Result, relay.StopReason, relay.Gate) {
+			ro.Gate = func(*night.Staged, bool, bool, night.GateWait) (relay.Result, relay.StopReason, relay.Gate) {
 				return relay.GreenResult, "", relay.Gate{Gathered: true, ResultSeen: true, ExitOK: true,
 					Commit: false, Clean: true, OriginSame: true}
 			}

@@ -162,9 +162,9 @@ func (w *world) env(fixture string, extra ...string) []string {
 }
 
 // gateWith is A6's gate with one acceptance line that holds.
-func (w *world) gateWith() func(*night.Staged, bool, bool) (relay.Result, relay.StopReason, relay.Gate) {
+func (w *world) gateWith() func(*night.Staged, bool, bool, night.GateWait) (relay.Result, relay.StopReason, relay.Gate) {
 	p := &packet.Packet{ID: "a1", Acceptance: []packet.Line{{Shell: "echo ok", Expect: "reads `ok`", Kind: packet.Reads, Value: "ok", N: 1}}}
-	return func(st *night.Staged, seen, isError bool) (relay.Result, relay.StopReason, relay.Gate) {
+	return func(st *night.Staged, seen, isError bool, gw night.GateWait) (relay.Result, relay.StopReason, relay.Gate) {
 		res, why, g, _ := gate.Run(w.fx, st, p, nil, &gate.ExitFacts{Seen: seen, IsError: isError}, gate.Verify{})
 		return res, why, g
 	}

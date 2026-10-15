@@ -42,12 +42,12 @@ func ar70Gated(t *testing.T, w *world, o *night.NightOptions, release chan struc
 	o.Row = func(r queue.Row, rp *night.RowPlan) ([]byte, night.RunOptions, error) {
 		b, ro, err := row(r, rp)
 		if g := ro.Gate; r.ID == "r2" {
-			ro.Gate = func(st *night.Staged, seen, isError bool) (relay.Result, relay.StopReason, relay.Gate) {
+			ro.Gate = func(st *night.Staged, seen, isError bool, gw night.GateWait) (relay.Result, relay.StopReason, relay.Gate) {
 				once.Do(func() { close(release) })
 				for end := time.Now().Add(10 * time.Second); len(ar65Events(w.ledger.Written(), event)) == 0 && time.Now().Before(end); {
 					time.Sleep(5 * time.Millisecond)
 				}
-				return g(st, seen, isError)
+				return g(st, seen, isError, gw)
 			}
 		}
 		return b, ro, err
