@@ -62,13 +62,18 @@ func TestVerbs(t *testing.T) {
 }
 
 // TestDoctorTable runs doctor over a fake lookPath, a fake `claude
-// --max-turns 1 --version` probe and fake effects: all present, the probe
-// refused, tmux absent (a warning), claude absent, and a dirty root.
+// --max-turns 1 --version` probe, a present band (AR81; its other readings
+// are TestAR81_3's) and fake effects: all present, the probe refused, tmux
+// absent (a warning), claude absent, and a dirty root.
 func TestDoctorTable(t *testing.T) {
-	oldLook, oldProbe, oldWT := lookPath, claudeProbe, gitWorktree
-	defer func() { lookPath, claudeProbe, gitWorktree = oldLook, oldProbe, oldWT }()
+	oldLook, oldProbe, oldWT, oldBand, oldVersion := lookPath, claudeProbe, gitWorktree, bandFor, bandVersion
+	defer func() {
+		lookPath, claudeProbe, gitWorktree, bandFor, bandVersion = oldLook, oldProbe, oldWT, oldBand, oldVersion
+	}()
+	bandFor = func(string, func(string) string) (effects.Band, string) { return nil, "/fake/agentik-session" }
+	bandVersion = func(string) (string, error) { return "agentik-session 0.0.0", nil }
 	refused := errors.New("exit status 1")
-	names := "claude git git-worktree caffeinate tmux ntfy state queue root breaker template config"
+	names := "claude git git-worktree caffeinate band tmux ntfy state queue root breaker template config"
 	table := []struct {
 		name, missing string
 		probe         error
@@ -76,11 +81,11 @@ func TestDoctorTable(t *testing.T) {
 		code          int
 		oks, warns    string // one letter per check: y or n
 	}{
-		{"all present", "", nil, false, exitOK, "yyyyyyyyyyyy", "nnnnnnnnnnn"},
-		{"probe refused", "", refused, false, exitUnwell, "nyyyyyyyyyyy", "nnnnnnnnnnn"},
-		{"tmux absent", "tmux", nil, false, exitOK, "yyyyyyyyyyyy", "nnnnynnnnnn"},
-		{"claude absent", "claude", nil, false, exitUnwell, "nyyyyyyyyyyy", "nnnnnnnnnnn"},
-		{"root dirty", "", nil, true, exitUnwell, "yyyyyyyynyyy", "nnnnnnnnnnn"},
+		{"all present", "", nil, false, exitOK, "yyyyyyyyyyyyy", "nnnnnnnnnnnn"},
+		{"probe refused", "", refused, false, exitUnwell, "nyyyyyyyyyyyy", "nnnnnnnnnnnn"},
+		{"tmux absent", "tmux", nil, false, exitOK, "yyyyyyyyyyyyy", "nnnnnynnnnnn"},
+		{"claude absent", "claude", nil, false, exitUnwell, "nyyyyyyyyyyyy", "nnnnnnnnnnnn"},
+		{"root dirty", "", nil, true, exitUnwell, "yyyyyyyyynyyy", "nnnnnnnnnnnn"},
 	}
 	for _, r := range table {
 		t.Run(r.name, func(t *testing.T) {
