@@ -35,7 +35,8 @@ type Report struct {
 
 // BandHolds is the night's band holds and their wait (AR81 ruling 5): a
 // hold is a row's part with a `held` line; its wait is the first of its
-// end line's, its `unchecked` line's or its `sitting` line's band wait_s,
+// end line's, its `unchecked` line's or its `sitting` line's band wait_s
+// (a sitting line with no band key: from the held line's ts to its own),
 // and an open hold counts with no wait yet.
 type BandHolds struct {
 	Holds int `json:"holds"`
@@ -165,11 +166,25 @@ func BuildReport(lines []map[string]any, night string, g ...effects.Git) Report 
 		row string
 		n   int
 	}
-	holding := map[part]bool{} // the open band holds (AR81 ruling 5)
-	waited := func(k part, wait any) {
-		if holding[k] {
+	holding := map[part]string{} // the open band holds, each its held line's ts (AR81 ruling 5)
+	// waited closes k's hold: wait when its line gives one, else the time
+	// from the held line to this line's ts, as a part that never asked (a
+	// queued row a stop or kill cut) has no band key (the fix round's
+	// finding 2).
+	waited := func(k part, wait any, ts string) {
+		since, ok := holding[k]
+		if !ok {
+			return
+		}
+		delete(holding, k)
+		if wait != nil {
 			r.Band.WaitS += int(number(wait))
-			delete(holding, k)
+			return
+		}
+		from, err1 := time.Parse(time.RFC3339, since)
+		to, err2 := time.Parse(time.RFC3339, ts)
+		if err1 == nil && err2 == nil && to.After(from) {
+			r.Band.WaitS += int(to.Sub(from).Seconds())
 		}
 	}
 	for _, l := range lines {
@@ -184,12 +199,12 @@ func BuildReport(lines []map[string]any, night string, g ...effects.Git) Report 
 			root, opened = str("root"), true
 		case "band":
 			if str("state") == "held" {
-				if !holding[k] {
-					holding[k] = true
+				if _, ok := holding[k]; !ok {
+					holding[k] = str("ts")
 					r.Band.Holds++
 				}
 			} else { // admitted, reset or unchecked
-				waited(k, l["wait_s"])
+				waited(k, l["wait_s"], str("ts"))
 			}
 		case "stage":
 			stages[row] = staged{str("branch"), str("base")}
@@ -201,9 +216,11 @@ func BuildReport(lines []map[string]any, night string, g ...effects.Git) Report 
 				merged[row] = true
 			}
 		case "sitting": // its burn is nightBurn's, below
-			if b, ok := l["band"].(map[string]any); ok { // a hold a stop, a kill or a limit ended
-				waited(k, b["wait_s"])
+			var wait any // a hold a stop, a kill or a limit ended
+			if b, ok := l["band"].(map[string]any); ok {
+				wait = b["wait_s"]
 			}
+			waited(k, wait, str("ts"))
 			if !slices.Contains(sat, row) {
 				sat = append(sat, row)
 			}

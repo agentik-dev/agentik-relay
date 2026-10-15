@@ -119,7 +119,8 @@ func TestAR81_1_StatusHeld(t *testing.T) {
 }
 
 // TestAR81_2_ReportHolds (ruling 5): r1 held 120 s, then admitted; r2 held
-// queued, then skipped by a stop, its sitting's band.wait_s 30; r3
+// queued, then skipped by a stop 30 s on, its sitting line with no band
+// key, as AR80 writes a part that never asked; r3
 // `unchecked` at its first ask, no hold; r4 held (and denied) and open.
 // The report's band reads {3, 150} and its markdown `band: 3 holds, 2m30s
 // waited`; a night with no band line reads {0, 0} and no band line.
@@ -138,7 +139,7 @@ func TestAR81_2_ReportHolds(t *testing.T) {
 	open := map[string]any{"event": "night-open", "night": n, "root": "/r"}
 	lines := []map[string]any{open,
 		l("band", "r1", "part", 1, "state", "held", "verdict", "not-started", "peak", 115.0, "text", "no room"),
-		l("band", "r2", "part", 1, "state", "held", "verdict", "queued", "peak", nil, "text", "behind r1"),
+		l("band", "r2", "part", 1, "state", "held", "verdict", "queued", "peak", nil, "text", "behind r1", "ts", "2026-10-14T01:00:00Z"),
 		l("band", "r1", "part", 1, "state", "admitted", "asks", 3, "wait_s", 120),
 		l("spawn", "r1", "band", map[string]any{"verdict": "admitted", "peak": nil}),
 		l("band", "r3", "part", 1, "state", "unchecked", "error", "exit 3"),
@@ -146,7 +147,7 @@ func TestAR81_2_ReportHolds(t *testing.T) {
 		l("band", "r4", "part", 1, "state", "held", "verdict", "not-started", "peak", 90.0, "text", "no room"),
 		l("band", "r4", "part", 1, "state", "held", "verdict", "denied", "peak", 130.0, "text", "denied"),
 		l("sitting", "r1", "state", "green", "band", band(3, 120, "admitted")),
-		l("sitting", "r2", "state", "skipped", "reason", "owner-stop", "band", band(0, 30, "queued")),
+		l("sitting", "r2", "state", "skipped", "reason", "owner-stop", "ts", "2026-10-14T01:00:30Z"), // no ask: no band key (AR80)
 		l("sitting", "r3", "state", "green", "band", band(1, 0, "unchecked")),
 	}
 	r := night.BuildReport(lines, n)
@@ -198,5 +199,31 @@ func TestAR81_4_QueuedBehindNewHead(t *testing.T) {
 	ar65End(t, res)
 	if got := ar80Asks(band); got != "r1 +0s, r1 +60s, r2 +120s, r2 +180s, r3 +240s" {
 		t.Fatalf("asks %s", got)
+	}
+}
+
+// TestAR81_5_QueuedCutWait (the fix round's finding 2): r1 held and r2
+// queued at T; the owner's stop at +120 s writes r1's sitting line with
+// its band (1 ask, 120 s) and r2's with none, as AR80 writes a part that
+// never asked: the report reads {2, 240}. A kill at +60 s reads {2, 120}.
+func TestAR81_5_QueuedCutWait(t *testing.T) {
+	const n = "2026-10-14-1"
+	at := func(s int) string { return ar65T.Add(time.Duration(s) * time.Second).Format(time.RFC3339) }
+	for _, c := range []struct {
+		state, reason string
+		cut           int
+		want          string
+	}{{"skipped", "owner-stop", 120, `{"holds":2,"wait_s":240}`}, {"failed", "owner-kill", 60, `{"holds":2,"wait_s":120}`}} {
+		lines := []map[string]any{{"event": "night-open", "night": n, "root": "/r", "ts": at(0)},
+			{"event": "band", "night": n, "row": "r1", "part": 1, "state": "held", "verdict": "not-started", "peak": nil, "text": "no room", "ts": at(0)},
+			{"event": "band", "night": n, "row": "r2", "part": 1, "state": "held", "verdict": "queued", "peak": nil, "text": "behind r1", "ts": at(0)},
+			{"event": "sitting", "night": n, "row": "r1", "state": c.state, "reason": c.reason, "ts": at(c.cut),
+				"band": map[string]any{"asks": 1, "wait_s": c.cut, "verdict": "not-started"}},
+			{"event": "sitting", "night": n, "row": "r2", "state": c.state, "reason": c.reason, "ts": at(c.cut)},
+			{"event": "stop", "night": n, "state": "stopped", "reason": c.reason, "ts": at(c.cut)},
+		}
+		if b, _ := json.Marshal(night.BuildReport(lines, n).Band); string(b) != c.want {
+			t.Fatalf("%s at +%d s: the report's band %s, want %s", c.reason, c.cut, b, c.want)
+		}
 	}
 }
