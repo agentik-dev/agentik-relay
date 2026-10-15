@@ -34,11 +34,15 @@ import (
 // VerifySeconds is the repo's verify limit (key `verify_seconds`, AR59 act
 // 1, the settled entry 10): an integer from 1 to MaxVerifySeconds; 0 is
 // unset, and VerifyLimit is then Timeout.
+// Band is the session band's mode (key `band`, band-pacing-r1 §2.1; AR80):
+// BandPace, the default, or BandOff; any other value is an error naming its
+// line.
 type Config struct {
 	Ntfy          struct{ URL, Topic string }
 	Tmux          string
 	AllowedTools  string
 	Caffeinate    bool
+	Band          string
 	Queue, Merge  string
 	Packets       string
 	VerifySeconds int
@@ -109,7 +113,7 @@ func ConfigPaths(fs FS, env func(string) string, repo string) []string {
 // session layer sessionFresh does not pass is skipped whole with a warning
 // (session-layer-r1 §2.3).
 func LoadConfig(fs FS, env func(string) string, repo string) (Config, error) {
-	c := Config{Tmux: "auto", AllowedTools: DefaultAllowedTools, Caffeinate: true, Queue: DefaultQueue}
+	c := Config{Tmux: "auto", AllowedTools: DefaultAllowedTools, Caffeinate: true, Band: BandPace, Queue: DefaultQueue}
 	from := "defaults" // the layer that set the queue path
 	// c4: doctor flags the old repo file whenever it exists.
 	if old := filepath.Join(repo, oldRepoConfig); fs.Exists(old) {
@@ -327,6 +331,11 @@ func (c *Config) apply(p string, n yaml.Node) error {
 				return fmt.Errorf("line %d: caffeinate: want true or false", kv.Val.Line)
 			}
 			c.Caffeinate = b
+		case "band": // beside caffeinate (band-pacing-r1 §2.1; AR80 ruling 1)
+			if kv.Val.Kind != yaml.Scalar || (kv.Val.Str != BandPace && kv.Val.Str != BandOff) {
+				return fmt.Errorf("line %d: band: %q: want pace or off", kv.Val.Line, kv.Val.Str)
+			}
+			c.Band = kv.Val.Str
 		case "ntfy":
 			if kv.Val.Kind != yaml.Map {
 				return fmt.Errorf("line %d: ntfy: want a mapping", kv.Val.Line)

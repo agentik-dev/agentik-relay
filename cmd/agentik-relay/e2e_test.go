@@ -93,8 +93,9 @@ func fixture(t *testing.T) *fx {
 	f.setLoad(t, lowLoad)
 	must(t, os.WriteFile(filepath.Join(f.Home, ".gitconfig"), []byte("[user]\n\tname = E2E\n\temail = e2e@example.invalid\n"), 0o644))
 	// The fake must be the relay's direct child: caffeinate turns a signal
-	// into exit 137 (the charter's choice 1).
-	must(t, os.WriteFile(filepath.Join(f.Home, ".config", "agentik", "relay", "config.yaml"), []byte("caffeinate: false\n"), 0o644))
+	// into exit 137 (the charter's choice 1). The band is off: the built
+	// binary resolves agentik-session on PATH, the account's (AR80).
+	must(t, os.WriteFile(filepath.Join(f.Home, ".config", "agentik", "relay", "config.yaml"), []byte(e2eConfig), 0o644))
 	f.git(t, "init", "-q", "-b", "main")
 	must(t, os.WriteFile(filepath.Join(f.Root, "Makefile"), []byte("check: ; @test ! -e history/sessions/NEXT\n"), 0o644))
 	must(t, os.WriteFile(filepath.Join(f.Root, ".gitignore"), []byte(".claude/\n"), 0o644))

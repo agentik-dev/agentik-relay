@@ -115,6 +115,9 @@ type Effects struct {
 	Idle   Idle
 	Procs  Procs
 	Groups *Groups
+	// Band is the session band a row's first spawn asks (band-pacing-r1
+	// §2; AR80); nil asks nothing, every spawn as before.
+	Band Band
 	// Identity is the committer a merge commits as; nil is the package's
 	// Identity, read once at start (AR21 act 0, ADV12-1).
 	Identity func() (name, email string)

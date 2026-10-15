@@ -48,6 +48,9 @@ var noticeFields = map[string][]string{
 	// AR66 ruling 5 (usage-limit-resume r1 §2): the pause line's rows, kind,
 	// reset, wake and count, never its source.
 	"pause": {"rows", "kind", "resets_at", "wake", "count"},
+	// AR80 ruling 7 (band-pacing-r1 §2.4): a hold's `denied` line, its
+	// verdict and peak, never the band's text.
+	"band": {"verdict", "peak"},
 }
 
 // Notices maps a ledger event to its notice: night-open, sitting, ceiling,
@@ -55,10 +58,15 @@ var noticeFields = map[string][]string{
 // question, else 3, so quiet hours keep a pause's); every other event is
 // refused. A red or failed sitting's body ends with its resume line; a
 // paused sitting line (`limit: paused`) sends none, its pause line's
-// notice serves (AR65, AR66).
+// notice serves (AR65, AR66). A `band` line sends one only when it holds
+// on `denied` (AR80 ruling 7), priority 3, its body ending `; move
+// accounts`.
 func Notices(event string, fields map[string]any) (Notice, bool) {
 	keys, ok := noticeFields[event]
 	if !ok {
+		return Notice{}, false
+	}
+	if st, _ := fields["state"].(string); event == "band" && (st != "held" || fields["verdict"] != "denied") {
 		return Notice{}, false
 	}
 	if l, _ := fields["limit"].(string); event == "sitting" && l == "paused" {
@@ -79,6 +87,9 @@ func Notices(event string, fields map[string]any) (Notice, bool) {
 	suffix := ""
 	if st, _ := fields["state"].(string); event == "sitting" && (st == "red" || st == "failed") && n.Row != "" {
 		suffix = "; " + relay.ResumeLine(n.Row)
+	}
+	if event == "band" {
+		suffix = "; move accounts"
 	}
 	suffix = capText(suffix, NoticeCap)
 	n.Body = capText(strings.Join(parts, " "), NoticeCap-len(suffix)) + suffix
