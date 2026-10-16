@@ -144,14 +144,17 @@ func ar87Admitted(row string) *effects.FakeBand {
 }
 
 // TestAR87_1_NextWaitsForShown (rulings 1, 2, 5): r1 admitted at T; its
-// first message does not show it, so r2 has not asked 300 ms after it is
-// read; r2 asks at its second, the clock still, and r2's log says once
-// that it waits for r1.
+// first message does not show it, so r2, once its log says it waits for
+// r1, has not asked 300 ms on; r2 asks at its second, the clock still,
+// and r2's log says once that it waits for r1. Waiting for the sentence
+// first keeps a slow r2 from reaching its ask after r1 has shown (the
+// adversary's F1).
 func TestAR87_1_NextWaitsForShown(t *testing.T) {
 	c := newAR87Child()
 	band := &effects.FakeBand{}
 	_, o, clock, res := ar87Night(t, band, 2, c)
 	c.say(t, "m1")
+	ar65Until(t, "r2's wait for r1", func() bool { return ar87Waits(t, o, "r2", "r1") == 1 })
 	time.Sleep(300 * time.Millisecond)
 	if got := ar80Asks(band); got != "r1 +0s" {
 		t.Fatalf("asks %s 300 ms after r1's first message, want r1 +0s", got)
