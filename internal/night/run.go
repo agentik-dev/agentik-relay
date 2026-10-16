@@ -154,6 +154,12 @@ func (sp *spacer) wait(ctx context.Context) bool {
 // through the clock (band-pacing-r1 §2.4; AR80).
 var BandPoll = time.Minute
 
+// BandSettle is the longest a parallel night's next ask waits for the row
+// admitted ahead of it to show to the band, through the clock: twice the
+// worst second message seen after a spawn, with SpawnSpacing
+// (band-pacing-r1 §2.4; AR87 ruling 3).
+var BandSettle = 2 * time.Minute
+
 // The band's verdicts (band-pacing-r1 §2.3): these spawn, these hold; any
 // other is unchecked and spawns.
 var (
@@ -162,16 +168,19 @@ var (
 )
 
 // bandQueue is a night's rows asking the band, in launch order (AR80
-// ruling 6): only the head asks; the next asks at once after an unheld
-// head, one BandPoll after a held one, however it left. moved closes at
-// every change.
+// ruling 6): only the head asks; the next asks once a head that left on a
+// spawning verdict has shown to the band, exited, or waited BandSettle
+// (AR87), and no sooner than one BandPoll after a held one. moved closes
+// at every change.
 type bandQueue struct {
-	clock   effects.Clock
-	mu      sync.Mutex
-	rows    []string
-	holding map[string]bool // the rows whose hold is open, a queued one's too (the fix round's finding 3)
-	after   time.Time       // the head asks no sooner
-	moved   chan struct{}
+	clock    effects.Clock
+	mu       sync.Mutex
+	rows     []string
+	holding  map[string]bool // the rows whose hold is open, a queued one's too (the fix round's finding 3)
+	after    time.Time       // the head asks no sooner: one BandPoll after a held head's leave
+	settling string          // the head that left to spawn and has not shown (AR87 ruling 2; "": none)
+	settleBy time.Time       // its leave plus BandSettle
+	moved    chan struct{}
 }
 
 // join takes row's place at the back; launch calls it, so places keep the
@@ -183,18 +192,23 @@ func (q *bandQueue) join(row string) {
 }
 
 // place reads row's place: whether it heads the queue (a row with no place
-// does), whether the head holds and which it is, the head's earliest ask,
-// and the channel the next change closes.
-func (q *bandQueue) place(row string) (head, held bool, first string, after time.Time, moved <-chan struct{}) {
+// does), whether the head holds and which it is, the row that settles
+// when its cap is after the BandPoll mark ("": none), the head's earliest
+// ask (the later of the two), and the channel the next change closes.
+func (q *bandQueue) place(row string) (head, held bool, first, waits string, after time.Time, moved <-chan struct{}) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if q.moved == nil {
 		q.moved = make(chan struct{})
 	}
 	if len(q.rows) == 0 || !slices.Contains(q.rows, row) {
-		return true, false, row, time.Time{}, q.moved
+		return true, false, row, "", time.Time{}, q.moved
 	}
-	return q.rows[0] == row, q.holding[q.rows[0]], q.rows[0], q.after, q.moved
+	after = q.after
+	if q.settling != "" && q.settleBy.After(after) {
+		waits, after = q.settling, q.settleBy
+	}
+	return q.rows[0] == row, q.holding[q.rows[0]], q.rows[0], waits, after, q.moved
 }
 
 // changed wakes every waiter; under mu.
@@ -221,8 +235,10 @@ func (q *bandQueue) hold(row string) {
 }
 
 // leave gives up row's place; the head's leaving sets the next head's
-// earliest ask, now after an unheld head, one BandPoll on after a held one.
-func (q *bandQueue) leave(row string, held bool) {
+// earliest ask, now after an unheld head, one BandPoll on after a held one,
+// and a head that leaves to spawn settles until it shows or BandSettle
+// (AR87 ruling 2); a non-spawning leave settles nothing.
+func (q *bandQueue) leave(row string, held, spawns bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	for i, r := range q.rows {
@@ -230,9 +246,13 @@ func (q *bandQueue) leave(row string, held bool) {
 			continue
 		}
 		if i == 0 {
+			now := q.clock.Now()
 			q.after = time.Time{}
 			if held {
-				q.after = q.clock.Now().Add(BandPoll)
+				q.after = now.Add(BandPoll)
+			}
+			if spawns {
+				q.settling, q.settleBy = row, now.Add(BandSettle)
 			}
 		}
 		delete(q.holding, row)
@@ -240,6 +260,22 @@ func (q *bandQueue) leave(row string, held bool) {
 		q.changed()
 		return
 	}
+}
+
+// shown ends row's settle: it has shown to the band (its second
+// main-thread message), its child exited, or its part returned before a
+// spawn (AR87 ruling 2). A nil queue, or a row not settling: nothing.
+func (q *bandQueue) shown(row string) {
+	if q == nil {
+		return
+	}
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if row == "" || q.settling != row {
+		return
+	}
+	q.settling, q.settleBy = "", time.Time{}
+	q.changed()
 }
 
 // bandRecord is a part's band: its asks, its hold's wait and the verdict
@@ -283,6 +319,7 @@ func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptio
 	var since, reset, last time.Time // the hold's start (zero: unheld), its reset, the last ask
 	denied := false                  // the hold has a denied line
 	behind := ""                     // the head a queued row last read behind
+	said := ""                       // the settling row the log last named (AR87 ruling 5)
 	line := func(m map[string]any) {
 		m["row"], m["part"] = rp.ID, 1
 		fx.Ledger.Append("band", m)
@@ -293,10 +330,10 @@ func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptio
 		}
 		return int(clock.Now().Sub(since).Seconds())
 	}
-	leave := func() {
+	leave := func(spawns bool) {
 		r.waitS = waited()
 		if q != nil {
-			q.leave(rp.ID, !since.IsZero())
+			q.leave(rp.ID, !since.IsZero(), spawns)
 		}
 	}
 	ends := func(m map[string]any) {
@@ -306,7 +343,7 @@ func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptio
 		line(m)
 	}
 	unchecked := func(why string) (*bandRecord, bandEnd) {
-		leave()
+		leave(true)
 		r.verdict, r.peak = "unchecked", nil
 		ends(map[string]any{"state": "unchecked", "error": why})
 		fmt.Fprintf(log, "relay %s: the band unchecked: %s\n", rp.ID, why)
@@ -327,20 +364,20 @@ func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptio
 		now := clock.Now()
 		switch {
 		case ctx.Err() != nil:
-			leave()
+			leave(false)
 			return r, bandCut
 		case !opts.Until.IsZero() && !now.Before(opts.Until):
-			leave()
+			leave(false)
 			return r, bandUntil
 		case !since.IsZero() && !now.Before(reset):
-			leave()
+			leave(false)
 			r.verdict, r.peak = "reset", nil
 			ends(map[string]any{"state": "reset"})
 			return r, bandSpawn
 		}
-		head, headHeld, first, after, moved := true, false, rp.ID, time.Time{}, (<-chan struct{})(nil)
+		head, headHeld, first, waits, after, moved := true, false, rp.ID, "", time.Time{}, (<-chan struct{})(nil)
 		if q != nil {
-			head, headHeld, first, after, moved = q.place(rp.ID)
+			head, headHeld, first, waits, after, moved = q.place(rp.ID)
 		}
 		if !head && !since.IsZero() && behind != "" && first != behind { // a new head: status reads it (AR81 fix round, finding 1)
 			behind = first
@@ -366,6 +403,10 @@ func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptio
 			}
 		}
 		if !head || at.After(now) {
+			if head && waits != "" && at.Equal(after) && waits != said { // one sentence per settle it waits on (AR87 ruling 5)
+				said = waits
+				fmt.Fprintf(log, "relay %s: the band waits for %s to show\n", rp.ID, waits)
+			}
 			wake := at
 			for _, t := range []time.Time{reset, opts.Until} {
 				if !t.IsZero() && (wake.IsZero() || t.Before(wake)) {
@@ -404,7 +445,7 @@ func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptio
 			return unchecked(err.Error())
 		case bandSpawns[v.Verdict]:
 			held := !since.IsZero()
-			leave()
+			leave(true)
 			r.verdict, r.peak = v.Verdict, v.Peak
 			if held {
 				ends(map[string]any{"state": "admitted"})
@@ -519,6 +560,7 @@ func RunRow(fx effects.Effects, sp effects.Spawner, st *Staged, rp *RowPlan, pro
 	// row's first part asks, and holds while the band says no room; the
 	// sitting's clock starts after the hold.
 	var spawnBand map[string]any
+	defer opts.band.shown(rp.ID) // a part that returns ends its settle, a return before the spawn too (AR87 ruling 2)
 	if fx.Band != nil && opts.Part < 2 {
 		b, end := askBand(ctx, fx, rp, opts, log)
 		if b.asks > 0 { // a part that never asked has no band key (ruling 7; the fix round's finding 5)
@@ -705,6 +747,9 @@ func RunRow(fx effects.Effects, sp effects.Spawner, st *Staged, rp *RowPlan, pro
 			if ev.Type != "assistant" || ev.ParentToolUseID != "" {
 				return
 			}
+			if t.Turns >= 2 && lastTurns < 2 { // the second main-thread message: the row has shown to the band (AR87 ruling 1)
+				opts.band.shown(rp.ID)
+			}
 			z := zone(t.Context, opts.Context)
 			if (t.Turns != lastTurns && t.Turns%10 == 0) || z != lastZone {
 				put("turn", map[string]any{"turns": t.Turns, "context": t.Context, "cost": t.CostUSD, "usage": t.Usage,
@@ -736,6 +781,7 @@ func RunRow(fx effects.Effects, sp effects.Spawner, st *Staged, rp *RowPlan, pro
 	// The Wait returns at the child's exit (a kill's too: SIGKILL after
 	// KillGrace), whoever still holds its stream.
 	exit, werr := proc.Wait()
+	opts.band.shown(rp.ID) // the child's exit ends its settle (AR87 ruling 2)
 	gone()
 	close(done)
 	<-stalled

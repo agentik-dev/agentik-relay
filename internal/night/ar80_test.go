@@ -23,8 +23,10 @@ import (
 
 // ar80Spawner records each row's spawns on the clock: a row's first child
 // stalls until its kill when stall[row], else runs first[row] (exit 143)
-// or a clean stream, silent until wait[row] reads true when set; every
-// other child is clean.
+// or a clean stream, silent until wait[row] reads true when set; a
+// stalling or waiting child writes two main-thread messages first, so it
+// shows to the band before its silence (AR87 ruling 7); every other child
+// is clean.
 type ar80Spawner struct {
 	clock *effects.StepClock
 	first map[string][]byte
@@ -42,7 +44,10 @@ func (a *ar80Spawner) Start(sp effects.Spawn) (effects.Process, io.ReadCloser, e
 	a.mu.Unlock()
 	if k == 1 && a.stall[row] {
 		s := &ar65Stall{gone: make(chan struct{})}
-		return s, s, nil
+		return s, struct {
+			io.Reader
+			io.Closer
+		}{io.MultiReader(strings.NewReader(ar87Shown), s), s}, nil
 	}
 	run := &effects.FakeSpawner{Out: ar67Clean, PID: 4343}
 	if out, ok := a.first[row]; ok && k == 1 {
@@ -50,7 +55,11 @@ func (a *ar80Spawner) Start(sp effects.Spawn) (effects.Process, io.ReadCloser, e
 	}
 	p, rc, err := run.Start(sp)
 	if u := a.wait[row]; u != nil && k == 1 && err == nil {
-		rc = &ar69Silent{ReadCloser: rc, until: u}
+		silent := &ar69Silent{ReadCloser: rc, until: u}
+		rc = struct {
+			io.Reader
+			io.Closer
+		}{io.MultiReader(strings.NewReader(ar87Shown), silent), silent}
 	}
 	return p, rc, err
 }
