@@ -53,6 +53,16 @@ type Config struct {
 
 // The shipped defaults (§7's tools, §3's queue path).
 const (
+	// DefaultAllowedTools keeps its bare `Bash` (AR90 ruling 1). The docs
+	// say a run that starts in auto mode drops a bare `Bash` allow entry,
+	// the classifier judging each command; the probes of 2026-10-16 on CLI
+	// 2.1.302 (`-p --permission-mode auto`) could not measure that: `echo`,
+	// `sudo -n true` and `git push --dry-run` each ran, `permission_denials`
+	// empty, with the entry bare, as `Bash(<cmd>:*)` or absent, so nothing
+	// was refused. Where auto mode is unavailable the session falls back to
+	// Manual, and there the entry is what pre-allows a headless child's Bash
+	// calls, which would otherwise be denied. A configured `allowed_tools`
+	// passes as written.
 	DefaultAllowedTools = "Bash Edit Write MultiEdit NotebookEdit"
 	DefaultQueue        = "relay/queue.yaml"
 )
