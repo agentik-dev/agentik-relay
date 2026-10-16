@@ -231,6 +231,14 @@ func gather(fx effects.Effects, st *night.Staged, p *packet.Packet, baseline []r
 		f.err = fmt.Errorf("%s: %w", what, err)
 		return g, f
 	}
+	// AR88: a remote's read that failed names its reason, remote-timeout
+	// when its last try timed out, else remote-error.
+	remoteStop := func(err error) (relay.Gate, facts) {
+		if g.Remote = relay.RemoteError; errors.Is(err, effects.ErrLsRemoteTimeout) {
+			g.Remote = relay.RemoteTimeout
+		}
+		return stop("ls-remote", err)
+	}
 	w := fx.Git
 	nested := effects.Nested(fx.Getenv) // §15: a gate inside a measurement runs no line
 	if exit == nil {
@@ -335,7 +343,7 @@ func gather(fx effects.Effects, st *night.Staged, p *packet.Packet, baseline []r
 	}
 	same, skipped, err := remotesSame(fx.Git, root, g.RemoteRefs, g.RemoteURLs)
 	if err != nil {
-		return stop("ls-remote", err)
+		return remoteStop(err)
 	}
 	f.skipped["ls-remote"] = skipped
 	g.OriginSame = g.OriginSame && same
@@ -349,7 +357,7 @@ func gather(fx effects.Effects, st *night.Staged, p *packet.Packet, baseline []r
 		if len(st.OriginClaim) > 0 {
 			claimed, _, err := remotesSame(fx.Git, root, st.OriginClaim, g.RemoteURLs)
 			if err != nil {
-				return stop("ls-remote", err)
+				return remoteStop(err)
 			}
 			g.OriginSame = g.OriginSame && claimed
 		}
@@ -493,7 +501,7 @@ func gather(fx effects.Effects, st *night.Staged, p *packet.Packet, baseline []r
 	g.Verify = verify(fx, vsh, st.Path, at, st.Branch, v, nested, st.Branch+"-verify")
 	// ADV11-6: a line that pushed by URL moved a remote; read them again.
 	if same, _, err := remotesSame(fx.Git, root, g.RemoteRefs, g.RemoteURLs); err != nil {
-		return stop("ls-remote", err)
+		return remoteStop(err)
 	} else if !same {
 		g.OriginSame = false
 	}
@@ -520,6 +528,15 @@ func remotesOf(refs map[string]string) []string {
 	return out
 }
 
+// LsRemoteTries bounds one remote's read (AR88): a read that times out
+// (effects.ErrLsRemoteTimeout) is tried again after LsRemoteBackoff, up to
+// LsRemoteTries reads in all; another error is never retried. Variables so
+// a test can shorten them.
+var (
+	LsRemoteTries   = 3
+	LsRemoteBackoff = 5 * time.Second
+)
+
 // remotesSame reads what each remote in refs (stage's OriginRefs) holds
 // now at its first URL in urls and compares; skipped is refs empty or a
 // remote stage could not read, or one with no URL; an error is a remote
@@ -532,7 +549,7 @@ func remotesSame(git effects.Git, dir string, refs map[string]string, urls map[s
 			skipped = true
 			continue
 		}
-		got, err := git.LsRemote(dir, urls[r][0])
+		got, err := lsRemote(git, dir, urls[r][0])
 		if err != nil {
 			return false, skipped, err
 		}
@@ -545,6 +562,19 @@ func remotesSame(git effects.Git, dir string, refs map[string]string, urls map[s
 		}
 	}
 	return same, skipped, nil
+}
+
+// lsRemote is one remote's read (AR88): LsRemote again after
+// LsRemoteBackoff while it times out, up to LsRemoteTries reads; another
+// error, or the last try's timeout, is the read's error.
+func lsRemote(git effects.Git, dir, url string) (map[string]string, error) {
+	for try := 1; ; try++ {
+		got, err := git.LsRemote(dir, url)
+		if err == nil || try >= LsRemoteTries || !errors.Is(err, effects.ErrLsRemoteTimeout) {
+			return got, err
+		}
+		time.Sleep(LsRemoteBackoff)
+	}
 }
 
 // only is refs' entries for remote r.
@@ -1115,6 +1145,9 @@ func Red(g relay.Gate) []string {
 // the reason stays the stop reason.
 func Cause(g relay.Gate) string {
 	var parts []string
+	if g.Remote != "" { // AR88: the remote's read stopped the gate
+		parts = append(parts, "ls-remote: "+string(g.Remote))
+	}
 	named := map[string]bool{}
 	for _, check := range Red(g) {
 		if !named[check] {

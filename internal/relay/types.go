@@ -177,6 +177,13 @@ const (
 	// `stage` line names a base other than the queue row's (AR22 act 3,
 	// ADV13-5): the base is the queue's, and a ledger value only refuses.
 	LedgerBaseDiffers StopReason = "ledger-base-differs"
+	// RemoteTimeout and RemoteError are an unrun gate's reasons when a
+	// remote's ls-remote read failed (AR88): RemoteTimeout when its last of
+	// gate.LsRemoteTries reads timed out (effects.ErrLsRemoteTimeout),
+	// RemoteError any other failure, never retried. Packet failures, absent
+	// from StopReasons: the row is red with it.
+	RemoteTimeout StopReason = "remote-timeout"
+	RemoteError   StopReason = "remote-error"
 )
 
 // MergeRefused is a merge's error when the refusal turns the row red with
