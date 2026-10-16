@@ -88,6 +88,7 @@ internal/hooks/ar21_2_test.go: renamed
 internal/hooks/ar25_test.go: renamed
 internal/hooks/ar27b_test.go: renamed
 internal/hooks/ar40_test.go: renamed
+internal/hooks/ar89_test.go: renamed
 internal/hooks/public_r1_test.go: renamed
 
 # Tests that pin an old path's or section's fallback (§6.3: readers take the new path, else the old).
