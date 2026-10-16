@@ -96,8 +96,10 @@ func relayName(words []string, j int) (at int, ok bool) {
 // whose hook input carries an agent_id or agent_type (a subagent's, of any
 // session, in a row or out of one) builds no relay and runs no relay verb
 // that writes. It reads the argv as NestedRun does (relayBin), with plan
-// --rows denied too. preToolUse adds it; guards never does, since the
-// helper is named in the payload, not the env.
+// --rows denied too, and where relayBin names no binary it denies a
+// writing verb after a hidden command word (hiddenWrite) and a pkill or
+// killall of the relay (relaySignal) (AR89). preToolUse adds it; guards
+// never does, since the helper is named in the payload, not the env.
 var HelperRelay = Guard{"helper-relay", nil, "a helper never builds the relay, starts, gates, resumes, plans, stops, kills or cleans a night; the session that spawned it does", nil, helperRelay}
 
 // helperVerbs are the relay verbs that write a night: HelperRelay denies
@@ -147,11 +149,58 @@ func relayBin(words []string) (i, bin int, build bool) {
 
 func helperRelay(words []string) bool {
 	_, bin, build := relayBin(words)
-	if build || bin < 0 {
-		return build
+	if build {
+		return true
+	}
+	if bin < 0 {
+		return hiddenWrite(words) || relaySignal(words)
 	}
 	for _, w := range words[bin+1:] {
 		if helperVerbs[w] {
+			return true
+		}
+	}
+	return false
+}
+
+// hiddenWrite reports a segment whose command word, or the word after the
+// front door agentik, is not literal (AR89 ruling 2; the AR40 review's
+// F3): `$(which relay)`, `$r`, `${RELAY_BIN}` may be the relay under a name
+// relayBin cannot read, so a helperVerbs word after it is read as the
+// relay's. A hidden word with no such verb passes, and out of a row a
+// helper meets no literal guard, so `"$(go env GOPATH)/bin/x" ./...` does.
+func hiddenWrite(words []string) bool {
+	i := commandWord(words)
+	if i == len(words) {
+		return false
+	}
+	if literal(words[i]) && (filepath.Base(words[i]) != "agentik" || i+1 == len(words) || literal(words[i+1])) {
+		return false
+	}
+	for _, w := range words[i+1:] {
+		if helperVerbs[w] {
+			return true
+		}
+	}
+	return false
+}
+
+// relaySignal reports a pkill or killall one of whose operands (a word not
+// starting with -) holds relay (AR89 ruling 3; F3's `pkill -f 'relay
+// run'`): its pattern may match a night's relay, agentik relay or
+// agentik-relay process. pgrep and ps read and pass.
+func relaySignal(words []string) bool {
+	i := commandWord(words)
+	if i == len(words) {
+		return false
+	}
+	switch filepath.Base(words[i]) {
+	case "pkill", "killall":
+	default:
+		return false
+	}
+	for _, w := range words[i+1:] {
+		if !strings.HasPrefix(w, "-") && strings.Contains(w, "relay") {
 			return true
 		}
 	}
