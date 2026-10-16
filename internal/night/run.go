@@ -897,7 +897,8 @@ func RunRow(fx effects.Effects, sp effects.Spawner, st *Staged, rp *RowPlan, pro
 			s.Reason = why
 		}
 	case relay.GateUnrun:
-		if s.Reason = relay.GateUnrunReason; why == relay.GitStateMoved || why == relay.GitConfigProgram || why == relay.RefMoved {
+		if s.Reason = relay.GateUnrunReason; why == relay.GitStateMoved || why == relay.GitConfigProgram || why == relay.RefMoved ||
+			why == relay.RemoteTimeout || why == relay.RemoteError { // AR88
 			s.Reason = why
 		}
 	}

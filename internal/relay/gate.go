@@ -96,6 +96,9 @@ type Gate struct {
 	// changed since start (effects.Pinned.Moved; AR22 act 1): unrun,
 	// tool-moved.
 	ToolMoved bool `json:"-"`
+	// Remote is a gate whose ls-remote read of a remote failed (AR88):
+	// unrun, RemoteTimeout or RemoteError; "" none.
+	Remote StopReason `json:"-"`
 
 	// Harness is the verify line's harness the gate judged with (AR20 act
 	// 2: the make spellings and the row's queue `harness`); the merge lays
@@ -139,8 +142,8 @@ const (
 // reason is set with FailedResult, with RedResult only as MainMoved,
 // NoCharter, QueueInvalid or RowUnproven (AR32A act 3), or VerifyCut after
 // them, ahead of every red with no reason (AR59 act 3), and
-// with Unrun only as GitStateMoved, GitConfigProgram, RefMoved or
-// ToolMoved.
+// with Unrun only as GitStateMoved, GitConfigProgram, RefMoved,
+// ToolMoved, RemoteTimeout or RemoteError (AR88).
 func Decide(g Gate) (Result, StopReason) {
 	switch {
 	case g.ConfigProgram:
@@ -151,6 +154,8 @@ func Decide(g Gate) (Result, StopReason) {
 		return Unrun, RefMoved
 	case g.ToolMoved:
 		return Unrun, ToolMoved
+	case g.Remote != "":
+		return Unrun, g.Remote
 	case !g.Gathered:
 		return Unrun, ""
 	case !g.ResultSeen || !g.ExitOK:

@@ -154,6 +154,11 @@ func (OSGit) RevParseCommit(dir, ref string) (string, error) {
 // shorten it.
 var LsRemoteTimeout = 30 * time.Second
 
+// ErrLsRemoteTimeout is wrapped by LsRemote's error at LsRemoteTimeout, so
+// the gate retries a stalled read and names it remote-timeout (AR88); the
+// error's text stays `git ls-remote <url>: timed out after <d>`.
+var ErrLsRemoteTimeout = errors.New("timed out")
+
 // lsRemoteSSH is LsRemote's GIT_SSH_COMMAND, the one ssh it runs (never
 // this process's GIT_SSH_COMMAND: AR22 act 1); a variable so a test can
 // stall the transport.
@@ -192,7 +197,7 @@ func (OSGit) LsRemote(dir, url string) (map[string]string, error) {
 	out, err := cmd.Output()
 	if ctx.Err() == context.DeadlineExceeded {
 		syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) // whatever the group still holds
-		return nil, fmt.Errorf("git ls-remote %s: timed out after %s", url, LsRemoteTimeout)
+		return nil, fmt.Errorf("git ls-remote %s: %w after %s", url, ErrLsRemoteTimeout, LsRemoteTimeout)
 	}
 	if msg := strings.TrimSpace(stderr.String()); err != nil || msg != "" {
 		if msg == "" {
