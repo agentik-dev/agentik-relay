@@ -7,7 +7,7 @@
 | wall | this repo only; agentik-commons read-only (its `scripts/sync` writes here, once). No push, merge, `--amend`, rebase, `git stash`, network or install; no `claude` beyond `make check`'s; never build or run a relay binary or verb outside `make check`'s harness. Never write under `.venv`, `~/.local/state` or `~/.config`; one make at a time on the machine |
 | may touch | `scripts/agentik`, `scripts/hygiene`, `scripts/bounded`, `scripts/vendored.sha256` (by agentik-commons' `scripts/sync` only), `design/packets/sync-rf1.md`, `history/sittings/*.md`, `history/sessions/NEXT`, `internal/night/ar57_test.go` (its `boundedCanonical` pin and that pin's comment only). Nothing else |
 | acceptance | `grep -c -F -e '4cd780d9c66d996e58b217b39ee0679e426172ab9ad7bd4e17971b188e7e7600  scripts/agentik' -e '8ef611607c0fdc44703fa48c374ebc00edc1488da56292985380200d219eb2e9  scripts/hygiene' -e '188adff23545f99159a189174baf3771f7e790e5f1256958b0e3e3ac4ed11306  scripts/bounded' scripts/vendored.sha256` reads `3` (on main: `1`, the `agentik` pin alone); `git diff --name-only main \| grep -c '^scripts/'` reads `3` (on main: `0`); `grep -c -F '188adff23545f99159a189174baf3771f7e790e5f1256958b0e3e3ac4ed11306' internal/night/ar57_test.go` reads `1` (on main: `0`) |
-| budget | one helper sitting, 20 turns, checkpoint at 16; one commit per act |
+| budget | 20 turns, 80k context; one helper sitting, checkpoint at 16 turns; one commit per act |
 | verify | `make check` |
 
 ## 1. What the source says
