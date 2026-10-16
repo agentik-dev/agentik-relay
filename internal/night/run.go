@@ -624,7 +624,7 @@ func RunRow(fx effects.Effects, sp effects.Spawner, st *Staged, rp *RowPlan, pro
 	softPath := hooks.SoftPath(lookupEnv(childEnv), rp.SessionID) // where the child's hook reads it
 	proc, out, err := sp.Start(effects.Spawn{Dir: st.Path, Argv: rp.Spawn, Stdin: prompt, Env: childEnv})
 	if err != nil {
-		put("exit", map[string]any{"child_exit": -1, "error": err.Error(), "turns": 0})
+		put("exit", map[string]any{"child_exit": -1, "error": err.Error(), "turns": 0, "results": 0})
 		s.State, s.Reason = relay.Failed, relay.StreamError
 		sit.write()
 		return s, relay.Gate{}
@@ -828,7 +828,7 @@ func RunRow(fx effects.Effects, sp effects.Spawner, st *Staged, rp *RowPlan, pro
 	}
 	account := relay.AccountStop(killed)
 
-	line := map[string]any{"child_exit": exit, "turns": tally.Turns, "context": tally.Context,
+	line := map[string]any{"child_exit": exit, "turns": tally.Turns, "results": tally.Results, "context": tally.Context,
 		"usage": tally.Usage, "cost_read": tally.Result != nil, "non_json": tally.NonJSON, "duration_ms": fx.Clock.Now().Sub(sit.start).Milliseconds()}
 	if r := tally.Result; r != nil {
 		line["subtype"], line["is_error"], line["turns"] = r.Subtype, r.IsError, r.NumTurns

@@ -87,3 +87,17 @@ func lastModelUsage(t *testing.T) Usage {
 	}
 	return u
 }
+
+// TestAR90_3_ResultsCount (AR90 ruling 3): the tally counts the result
+// events it read, so a night's record tells a background wait's second
+// query from a sitting of one.
+func TestAR90_3_ResultsCount(t *testing.T) {
+	for _, c := range []struct {
+		file string
+		want int
+	}{{"noresult.jsonl", 0}, {"ok.jsonl", 1}, {"two-results.jsonl", 2}, {"bg-wait.jsonl", 2}} {
+		if tl := parseFile(t, filepath.Join(fixtures, c.file)); tl.Results != c.want {
+			t.Fatalf("%s: %d results; want %d", c.file, tl.Results, c.want)
+		}
+	}
+}

@@ -76,7 +76,9 @@ type ToolUse struct{ Name, Summary string }
 // stay the stream's (AR86). A turn line carries Usage as it stands at its
 // event: the streamed output before any result, after one the results' output
 // plus what streamed since. Result is every result event folded into the
-// first (AR83; Event.fold), CostUSD its cost.
+// first (AR83; Event.fold), CostUSD its cost; Results counts the result
+// events read, so a record tells a background wait's later query from a
+// sitting of one (AR90).
 type Tally struct {
 	Turns, Context int
 	CostUSD        float64
@@ -85,6 +87,7 @@ type Tally struct {
 	Builders       map[string]int
 	ResultSeen     bool
 	Result         *Event
+	Results        int
 	SessionID      string
 	Model          string
 	NonJSON        int
@@ -267,6 +270,7 @@ func (t *Tally) Add(ev Event) {
 			t.LastTool, t.LastSummary = ev.Tools[n-1].Name, ev.Tools[n-1].Summary
 		}
 	case "result":
+		t.Results++
 		r := ev
 		r.Raw = nil
 		if t.Result != nil { // a later query's result (AR83): fold it into the first
