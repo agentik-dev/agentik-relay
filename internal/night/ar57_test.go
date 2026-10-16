@@ -12,9 +12,9 @@ import (
 	"time"
 )
 
-// boundedCanonical is the sha256 of the one canonical scripts/bounded, the
-// session plugin's, byte-identical in every repo that carries a copy (AR57).
-const boundedCanonical = "4fdfdc1df94364d72fdc378acfade979f7be32342c262687931fe49752ac40b2"
+// boundedCanonical is the sha256 of the one canonical scripts/bounded,
+// agentik-commons', byte-identical in every repo that carries a copy (AR57).
+const boundedCanonical = "188adff23545f99159a189174baf3771f7e790e5f1256958b0e3e3ac4ed11306"
 
 // TestAR57_1_BoundedIsCanonical (AR57, ruling 1, 5): scripts/bounded is the
 // canonical copy byte for byte, and keeps its executable mode.
