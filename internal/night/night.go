@@ -1366,11 +1366,16 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 			// night (after the wake) takes the ordinary path: the pause's
 			// usage-limit mark kept, it fails usage-limit and stops the
 			// night, as before AR70 (the fix round's F1). A shelved row's
-			// lands shelved, its own hit not asked: it waits out the night
-			// (AR92 ruling 2); its verdict, as any. A sibling's own late
-			// wake shelves it and its model's rows.
+			// lands shelved: it waits out the night (AR92 ruling 2); its
+			// verdict, as any. Its own hit is asked, and only an every-row
+			// pause (the five-hour window, the relay's entry 12) acts: it
+			// pauses the night as a fresh hit does, or as a sibling's while
+			// paused, the shelve standing; a stop, a model's pause or a
+			// shelve it brings is set aside (ruling 4; AR92's hardening
+			// round). A sibling's own late wake shelves it and its model's
+			// rows.
 			if h := o.hold; h != nil && (n.State == relay.NightPaused || relay.NightTerminal(n.State) || onShelf[o.id]) {
-				if h.Limit.Kind != "" && o.s.Reason == relay.UsageLimit && !relay.NightTerminal(n.State) && !onShelf[o.id] { // a broken invariant: as before (F1)
+				if h.Limit.Kind != "" && o.s.Reason == relay.UsageLimit && !relay.NightTerminal(n.State) { // a broken invariant: as before (F1)
 					// Its count is its own pause's less one (AR69 ruling 5;
 					// a fresh hit since may have raised the night's), and
 					// the probe is armed only by a fallback wake (AR71's
@@ -1382,6 +1387,24 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 					}
 					pz := pauseFor(pauseIn{Limit: h.Limit, Now: fx.Clock.Now().Round(0), Until: until,
 						Draining: n.State == relay.Draining, Count: c - 1, Waited: waited, ProbePassed: probeOK || !fellBack})
+					switch shelved := onShelf[o.id]; {
+					case shelved && (pz.Stop || pz.Shelve || pz.Scope != ""): // set aside (AR92 ruling 4)
+						h.write(true)
+						heldSt[o.id] = o.st
+						return
+					case shelved && n.State != relay.NightPaused: // the window pauses the whole night, the shelve standing (entry 12)
+						widen(true, pz.Scope)
+						pauses++
+						paused := holdRunning([]string{}, inScope)
+						wake, keptReset = pz.Wake, h.Limit.Reset
+						step(relay.OnLimited, "")
+						put("pause", map[string]any{"rows": paused, "kind": h.Limit.Kind, "resets_at": h.Limit.Line()["resets_at"], "source": pz.Source,
+							"wake": wake.Format(time.RFC3339), "count": pauses, "scope": strings.Join(scope, " ")})
+						fmt.Fprintf(out, "relay: paused until %s (%s, %s): %s\n", wake.Format(time.RFC3339), h.Limit.Kind, pz.Source, strings.Join(paused, " "))
+						h.write(true)
+						heldSt[o.id] = o.st
+						return
+					}
 					if pz.Stop {
 						h.write(false)
 						o.st.Unlock()

@@ -307,3 +307,44 @@ func TestAR92_8_OrchestratorShelved(t *testing.T) {
 		t.Fatalf("o.1 spawned %d times, o.2's spawn lines %v; want once, none", len(o1.Spawns()), rowLines(w.ledger.Written(), "spawn", "o.2"))
 	}
 }
+
+// TestAR92_9_ShelvedSiblingFiveHour (the relay's entry 12; AR92's hardening
+// round, F1): r1 and r2 on opus, r3 on fable, --parallel 3. r1's
+// seven_day_opus 72 h on shelves opus, r2 killed; r2 comes back with its
+// own five_hour 1 h on, which is asked as any hit's: the five-hour window
+// pauses the whole night, the shelve standing. r3 is killed and paused (a
+// second pause line [r3], kind window, scope "", wake 02:02, count 2); at
+// 02:02 only r3 continues, green, and the night stops usage-limit on the
+// shelve's detail, shelved [r1 r2].
+func TestAR92_9_ShelvedSiblingFiveHour(t *testing.T) {
+	var released atomic.Bool
+	var w *world
+	pausedLine := func() bool { return w != nil && len(ar65Events(w.ledger.Written(), "pause")) > 0 }
+	w, q, o, sp, clock := ar92Rows(t, []string{"claude-opus-5-5", "claude-opus-5-5", "claude-fable-5-1"}, 3,
+		map[string]effects.FakeRun{"r1": {Out: ar65Event("seven_day_opus", ar65T.Add(72*time.Hour)), Exit: 143},
+			"r2": {Out: ar65Event("five_hour", ar65T.Add(time.Hour)), Exit: 143}, "r3": {Out: ar67Clean}},
+		map[string]func() bool{"r2": pausedLine, "r3": released.Load})
+	res := ar71Run(w, q, o, sp)
+	ar65Until(t, "r2's sitting line", func() bool { return len(rowLines(w.ledger.Written(), "sitting", "r2")) == 1 })
+	time.Sleep(200 * time.Millisecond)
+	all := w.ledger.Written()
+	ps := ar65Events(all, "pause")
+	if len(ps) != 2 || len(rowLines(all, "kill", "r3")) != 1 {
+		t.Fatalf("pause lines %v, r3's kill lines %v; want two, one: the five-hour window pauses the whole night", ps, rowLines(all, "kill", "r3"))
+	}
+	ar71Pause(t, ps[1], "[r3]", "window", "", "2026-10-11T02:02:00Z", 2)
+	if _, ok := ps[1]["shelved"]; ok || ar65Paused(o) == false {
+		t.Fatalf("the second pause line %v, the night not paused; want no shelved, paused", ps[1])
+	}
+	released.Store(true)
+	ar65Until(t, "r3's sitting line, paused", func() bool {
+		sl := rowLines(w.ledger.Written(), "sitting", "r3")
+		return len(sl) == 1 && sl[0]["limit"] == "paused"
+	})
+	ar69To(clock, ar65T.Add(time.Hour+2*time.Minute))
+	n := ar65End(t, res)
+	ar92Stop(t, w, n, "r1=failed r2=failed r3=green", ar92Until, "[r1 r2]")
+	if sp.spawns("r1") != 1 || sp.spawns("r2") != 1 || sp.spawns("r3") != 2 {
+		t.Fatalf("spawns r1 %d, r2 %d, r3 %d; want 1, 1, 2", sp.spawns("r1"), sp.spawns("r2"), sp.spawns("r3"))
+	}
+}
