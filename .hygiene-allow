@@ -95,3 +95,5 @@ internal/hooks/public_r1_test.go: renamed
 internal/effects/agentik_r1_test.go: renamed
 internal/effects/config_test.go: renamed
 internal/night/agentik_r1_test.go: renamed
+# AR95: the rendered decisions block names its plugin and old short name.
+CLAUDE.md: sibling,renamed
