@@ -761,6 +761,9 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 		wake      time.Time              // the paused night's wake (AR65)
 		scope     []string               // the paused scope's model words, sorted; nil: every row (AR71)
 		pauseOf   = map[string]int{}     // each killed paused row's pause, its number (AR71's fix round, F3)
+		shelf     []string               // the shelved models' words, sorted; nil: none (AR92 ruling 2)
+		onShelf   = map[string]bool{}    // the rows a shelve holds to the night's end (AR92)
+		shelfWhy  string                 // the first shelve's detail, the stop line's when only the shelved rows are left (AR92 ruling 3)
 		fellBack  bool                   // the night last woke from a fallback wait: the probe is armed (AR71's fix round, F2)
 		pauses    int                    // the night's pauses (AR65)
 		keptReset time.Time              // the pause's reset, zero for a fallback's (AR69 ruling 4)
@@ -1254,12 +1257,13 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 		}
 		return true
 	}
-	// holdRunning kills every running row of the scope not already
+	// holdRunning kills every running row of the scope in not already
 	// stopped, and pauses it at once (AR65 ruling 4; AR71: a model's
-	// scope, only its rows), adding it to paused, sorted.
-	holdRunning := func(paused []string) []string {
+	// scope, only its rows; AR92: a shelve's, shelfHolds), adding it to
+	// paused, sorted.
+	holdRunning := func(paused []string, in func(id string) bool) []string {
 		for id, h := range running {
-			if killedBy[id] || accountBy[id] != "" || !inScope(id) {
+			if killedBy[id] || accountBy[id] != "" || !in(id) {
 				continue
 			}
 			accountBy[id] = relay.UsageLimit
@@ -1274,6 +1278,57 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 		}
 		sort.Strings(paused)
 		return paused
+	}
+	// shelvedModel is whether a row on model waits on a shelve (AR92
+	// ruling 2), and shelfHolds whether row id does: both picks hold it.
+	shelvedModel := func(model string) bool {
+		for _, w := range shelf {
+			if ofModel(model, w) {
+				return true
+			}
+		}
+		return false
+	}
+	shelfHolds := func(id string) bool { return shelvedModel(rows[id].Model) }
+	// shelve is a model's late wake (AR92 rulings 1, 2): row id, already
+	// paused, and every running row of the scope are killed and paused as
+	// AR71 does it, held to the night's end with every row of the scope an
+	// earlier pause holds, its outcome in or still out (the fix round's
+	// F1); the night arms no wake and keeps its state. The `pause` line
+	// names them, `shelved: true`.
+	shelve := func(id string, pz pause, l stream.Limit) {
+		if !contains(shelf, pz.Scope) {
+			shelf = append(shelf, pz.Scope)
+			sort.Strings(shelf)
+		}
+		if shelfWhy == "" {
+			shelfWhy = pz.Detail
+		}
+		named := holdRunning([]string{id}, shelfHolds)
+		for _, r := range ids {
+			if s := n.Sittings[r]; s != nil && s.State == relay.Paused && shelfHolds(r) && !contains(named, r) {
+				named = append(named, r)
+			}
+		}
+		sort.Strings(named)
+		lg.mu.Lock()
+		for _, r := range named {
+			onShelf[r] = true
+			lg.rows[r].Shelved = pz.Wake.Format(time.RFC3339)
+		}
+		lg.mu.Unlock()
+		put("pause", map[string]any{"rows": named, "kind": l.Kind, "resets_at": l.Line()["resets_at"], "source": pz.Source,
+			"wake": pz.Wake.Format(time.RFC3339), "count": pauses, "scope": pz.Scope, "shelved": true})
+		fmt.Fprintf(out, "relay: shelved to the night's end (%s, wake %s): %s\n", l.Kind, pz.Wake.Format(time.RFC3339), strings.Join(named, " "))
+	}
+	// shelfStands is whether a row tonight still waits on a shelve.
+	shelfStands := func() bool {
+		for _, id := range ids {
+			if s := n.Sittings[id]; s != nil && !relay.Terminal(s.State) && shelfHolds(id) {
+				return true
+			}
+		}
+		return false
 	}
 	// accountKill is an account stop's (run 10 ruling 1): every other
 	// running row is killed and fails with the same reason; no worktree is
@@ -1310,8 +1365,16 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 			// paused for the halt. A held line collected on a running
 			// night (after the wake) takes the ordinary path: the pause's
 			// usage-limit mark kept, it fails usage-limit and stops the
-			// night, as before AR70 (the fix round's F1).
-			if h := o.hold; h != nil && (n.State == relay.NightPaused || relay.NightTerminal(n.State)) {
+			// night, as before AR70 (the fix round's F1). A shelved row's
+			// lands shelved: it waits out the night (AR92 ruling 2); its
+			// verdict, as any. Its own hit is asked, and only an every-row
+			// pause (the five-hour window, the relay's entry 12) acts: it
+			// pauses the night as a fresh hit does, or as a sibling's while
+			// paused, the shelve standing; a stop, a model's pause or a
+			// shelve it brings is set aside (ruling 4; AR92's hardening
+			// round). A sibling's own late wake shelves it and its model's
+			// rows.
+			if h := o.hold; h != nil && (n.State == relay.NightPaused || relay.NightTerminal(n.State) || onShelf[o.id]) {
 				if h.Limit.Kind != "" && o.s.Reason == relay.UsageLimit && !relay.NightTerminal(n.State) { // a broken invariant: as before (F1)
 					// Its count is its own pause's less one (AR69 ruling 5;
 					// a fresh hit since may have raised the night's), and
@@ -1324,6 +1387,24 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 					}
 					pz := pauseFor(pauseIn{Limit: h.Limit, Now: fx.Clock.Now().Round(0), Until: until,
 						Draining: n.State == relay.Draining, Count: c - 1, Waited: waited, ProbePassed: probeOK || !fellBack})
+					switch shelved := onShelf[o.id]; {
+					case shelved && (pz.Stop || pz.Shelve || pz.Scope != ""): // set aside (AR92 ruling 4)
+						h.write(true)
+						heldSt[o.id] = o.st
+						return
+					case shelved && n.State != relay.NightPaused: // the window pauses the whole night, the shelve standing (entry 12)
+						widen(true, pz.Scope)
+						pauses++
+						paused := holdRunning([]string{}, inScope)
+						wake, keptReset = pz.Wake, h.Limit.Reset
+						step(relay.OnLimited, "")
+						put("pause", map[string]any{"rows": paused, "kind": h.Limit.Kind, "resets_at": h.Limit.Line()["resets_at"], "source": pz.Source,
+							"wake": wake.Format(time.RFC3339), "count": pauses, "scope": strings.Join(scope, " ")})
+						fmt.Fprintf(out, "relay: paused until %s (%s, %s): %s\n", wake.Format(time.RFC3339), h.Limit.Kind, pz.Source, strings.Join(paused, " "))
+						h.write(true)
+						heldSt[o.id] = o.st
+						return
+					}
 					if pz.Stop {
 						h.write(false)
 						o.st.Unlock()
@@ -1332,9 +1413,15 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 						step(relay.OnSittingFailed, relay.UsageLimit)
 						return
 					}
+					if pz.Shelve { // its count stays (AR69 ruling 5)
+						shelve(o.id, pz, h.Limit)
+						h.write(true)
+						heldSt[o.id] = o.st
+						return
+					}
 					named, widened := []string{o.id}, widen(false, pz.Scope)
 					if widened {
-						named = holdRunning(named)
+						named = holdRunning(named, inScope)
 					}
 					// The line when the wake moves later or the scope
 					// widened, and for a model's hit at the wake (N1);
@@ -1383,6 +1470,12 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 			if o.hold == nil { // a verdict, not the pause's kill: its own reason (F1: a held line keeps the mark)
 				delete(accountBy, o.id)
 			}
+			if onShelf[o.id] { // a verdict ends its shelve (AR92)
+				delete(onShelf, o.id)
+				lg.mu.Lock()
+				lg.rows[o.id].Shelved = ""
+				lg.mu.Unlock()
+			}
 			if s.State, bug = stepSitting(s.State, ev, bug); bug != nil {
 				return
 			}
@@ -1409,6 +1502,16 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 			}
 		}
 		s.State, s.Reason = o.s.State, o.s.Reason
+		if !pz.Stop && pz.Shelve { // the shelve (AR92 rulings 1, 2): one pause, no wake, the night's state kept
+			s.State, bug = stepSitting(relay.Exited, relay.Limited, bug)
+			s.Reason = relay.UsageLimit
+			heldSt[o.id] = o.st
+			setRow(o.id, s)
+			pauses++
+			fmt.Fprintf(out, "relay %s: paused usage-limit\n", o.id)
+			shelve(o.id, pz, o.hold.Limit)
+			return
+		}
 		if !pz.Stop { // the pause (AR65 ruling 4)
 			// A model's pauses only its rows (AR71 ruling 3): the scope
 			// takes the hit's, and every running row of it is killed and
@@ -1422,7 +1525,7 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 			setRow(o.id, s)
 			widen(first, pz.Scope)
 			pauses++
-			paused := holdRunning([]string{o.id})
+			paused := holdRunning([]string{o.id}, inScope)
 			if first || pz.Wake.After(wake) {
 				wake, keptReset = pz.Wake, o.hold.Limit.Reset
 			}
@@ -1610,11 +1713,13 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 	// in queue order. A paused row whose outcome is still out (its gate
 	// outlasts the pause), the orchestrator's sitting included, is named
 	// by the `wake` line and neither halted, checked nor continued: it
-	// lands when collected (AR70 ruling 5).
+	// lands when collected (AR70 ruling 5). A shelved row, or one on a
+	// shelved model, is none of these: it waits out the night (AR92 ruling
+	// 2; the fix round's F1).
 	wakeUp := func(now time.Time) {
 		var paused []string
 		for _, id := range ids {
-			if s := n.Sittings[id]; s != nil && s.State == relay.Paused {
+			if s := n.Sittings[id]; s != nil && s.State == relay.Paused && !onShelf[id] && !shelfHolds(id) {
 				paused = append(paused, id)
 			}
 		}
@@ -1681,7 +1786,8 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 	// N2): as a running night's, but none once --until, --max-sittings or
 	// --max-usd is reached; busy the running and the paused rows, each
 	// keeping its slot and tree, so the wake's continuations stay within
-	// --parallel; the scope's rows held. It steps none of until, count,
+	// --parallel; the scope's rows held, and a shelve's, which keep no
+	// slot (AR92 ruling 2). It steps none of until, count,
 	// budget, queue-empty, blocked or an orchestrator's cut, and checks no
 	// window: the paused rows wait for the wake, which checks --until and
 	// --max-usd. It reports whether a row started.
@@ -1694,12 +1800,12 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 			busy = append(busy, id)
 		}
 		for _, id := range ids {
-			if s := n.Sittings[id]; running[id] == nil && s != nil && s.State == relay.Paused {
+			if s := n.Sittings[id]; running[id] == nil && s != nil && s.State == relay.Paused && !onShelf[id] {
 				busy = append(busy, id)
 			}
 		}
 		sort.Strings(busy)
-		next, _, err := PickIn(q, n.Sittings, busy, opts.Parallel, PickOptions{Satisfied: satisfiedAt, Refused: refused, Hold: inScope})
+		next, _, err := PickIn(q, n.Sittings, busy, opts.Parallel, PickOptions{Satisfied: satisfiedAt, Refused: refused, Hold: func(id string) bool { return inScope(id) || shelfHolds(id) }})
 		if err != nil { // the night's order, read before the pause: nothing starts
 			return false
 		}
@@ -1771,7 +1877,8 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 					busy = append(busy, id)
 				}
 				sort.Strings(busy)
-				next, blocked, err := PickIn(q, n.Sittings, busy, opts.Parallel, PickOptions{Satisfied: satisfiedAt, Refused: refused})
+				// A shelve's rows held (AR92 ruling 2).
+				next, blocked, err := PickIn(q, n.Sittings, busy, opts.Parallel, PickOptions{Satisfied: satisfiedAt, Refused: refused, Hold: shelfHolds})
 				if err != nil { // nothing can start: §1's no-progress, never blocked
 					stopWith(relay.NoProgress)
 					stopDetail = err.Error()
@@ -1799,6 +1906,9 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 					case orc.red:
 						stopWith(relay.OrchestratorRed)
 						stopDetail = "red: " + orc.current
+					case shelvedModel(orc.row.Model): // its next sitting would wait on the shelve (AR92 ruling 3)
+						step(relay.OnSittingFailed, relay.UsageLimit)
+						stopDetail = shelfWhy
 					case orc.hold:
 						stopWith(relay.StillWaiting)
 						stopDetail = "no build row ready: " + ActKey(orc.start.Act)
@@ -1828,7 +1938,10 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 					continue
 				}
 				if len(running) == 0 && n.State == relay.NightRunning {
-					if blocked {
+					if shelfStands() { // nothing outside the shelve runs or can start (AR92 ruling 3)
+						step(relay.OnSittingFailed, relay.UsageLimit)
+						stopDetail = shelfWhy
+					} else if blocked {
 						step(relay.OnBlocked, "")
 					} else {
 						step(relay.OnQueueEmpty, "")
@@ -1863,11 +1976,16 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 	}
 	// The halt (AR65 ruling 6): a night that ends paused fails each paused
 	// row usage-limit, unlocks its stage and keeps its tree; its sitting
-	// line is already written, so no second line and no notice.
+	// line is already written, so no second line and no notice. A shelved
+	// row halts so too, named by the stop line's `shelved` (AR92 ruling 3).
+	shelved := []string{}
 	for _, id := range ids {
 		s := n.Sittings[id]
 		if s == nil || s.State != relay.Paused {
 			continue
+		}
+		if onShelf[id] {
+			shelved = append(shelved, id)
 		}
 		s.State, bug = stepSitting(s.State, relay.Halt, bug)
 		s.Reason = relay.UsageLimit
@@ -1906,7 +2024,7 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 	}
 	put("stop", map[string]any{"reason": string(n.Reason), "detail": stopDetail, "state": string(n.State), "sittings": count,
 		"red": red, "cost_usd": lg.usd, "unread": unreadOf(lg.rows), "spent": lg.total(), "resume": resume, "unmerged": unmerged, "budget": p.Budget,
-		"root": p.Root}) // the ledger is the account's: the day's refusal matches on it (ar32a review round 2)
+		"root": p.Root, "shelved": shelved}) // the ledger is the account's: the day's refusal matches on it (ar32a review round 2)
 	put("night-close", map[string]any{"state": string(n.State),
 		"duration_ms": fx.Clock.Now().Sub(n.Started).Milliseconds()})
 	return n, nil

@@ -132,6 +132,7 @@ report stopped.rows.[]cause
 report stopped.rows.[]reason
 report stopped.rows.[]resume
 report stopped.rows.[]row
+report stopped.rows.[]shelved
 report stopped.rows.[]state
 report waiting
 run error
@@ -187,6 +188,7 @@ status rows.[]last_tool
 status rows.[]merge_sha
 status rows.[]reason
 status rows.[]resume
+status rows.[]shelved
 status rows.[]state
 status rows.[]turns
 status rows.[]unread

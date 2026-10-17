@@ -97,6 +97,9 @@ type StoppedRow struct {
 	Reason string `json:"reason"`
 	Resume string `json:"resume,omitempty"`
 	Cause  string `json:"cause"` // the `sitting` line's gate.cause (AR62 act 2)
+	// Shelved is a row the `stop` line's `shelved` names: its model's
+	// limit held it to the night's end (AR92 ruling 5).
+	Shelved bool `json:"shelved,omitempty"`
 }
 
 // Handover is a charter's `## Handover` section read from the row's branch.
@@ -138,7 +141,8 @@ var GitChanged = func(root, base, branch, dir string) ([]string, error) {
 // and holds its row, with no entry, until the row's next `spawn` or
 // `sitting`; the night's `stop` line halts each row still held, failed
 // usage-limit, with its resume line only when that line's `resume` names
-// it, so a sitting the wake halted has none, as `status`.
+// it, so a sitting the wake halted has none, as `status`, and Shelved when
+// its `shelved` does (AR92 ruling 5).
 func BuildReport(lines []map[string]any, night string, g ...effects.Git) Report {
 	r := Report{Night: night, Merged: []Merged{}, Sittings: []Burn{}, Waiting: []string{}, Resume: []string{},
 		Handovers: []Handover{}, Stopped: Stopped{Rows: []StoppedRow{}}}
@@ -242,7 +246,7 @@ func BuildReport(lines []map[string]any, night string, g ...effects.Git) Report 
 				green = append(green, row)
 			case "red", "failed":
 				r.Resume = append(r.Resume, resume)
-				stops = append(stops, stop{StoppedRow{row, state, reason, resume, cause}, true})
+				stops = append(stops, stop{StoppedRow{Row: row, State: state, Reason: reason, Resume: resume, Cause: cause}, true})
 			default:
 				stops = append(stops, stop{StoppedRow{Row: row, State: state, Reason: reason, Cause: cause}, true})
 			}
@@ -259,8 +263,10 @@ func BuildReport(lines []map[string]any, night string, g ...effects.Git) Report 
 					named[id] = true
 				}
 			}
+			shelved := stringsOf(l["shelved"])
 			for _, id := range held {
-				sr := StoppedRow{Row: id, State: string(relay.Failed), Reason: string(relay.UsageLimit), Cause: heldCause[id]}
+				sr := StoppedRow{Row: id, State: string(relay.Failed), Reason: string(relay.UsageLimit), Cause: heldCause[id],
+					Shelved: slices.Contains(shelved, id)}
 				if named[id] {
 					sr.Resume = relay.ResumeLine(id)
 					r.Resume = append(r.Resume, sr.Resume)
@@ -578,6 +584,9 @@ func Markdown(r Report, root, home string) []byte {
 		line := "- " + s.Row + ": " + s.State
 		if s.Reason != "" {
 			line += ", " + s.Reason
+		}
+		if s.Shelved { // AR92 ruling 5
+			line += ", shelved"
 		}
 		if s.Cause != "" {
 			// AR62: the cause alone is clipped, the line under 100 columns,

@@ -43,9 +43,13 @@ type pauseIn struct {
 // stop line's detail Detail), else pause it until Wake. Source is where
 // the wake came from: the Limit's (`event`, `text`) or `fallback`. Scope
 // is the rows it pauses (AR71 ruling 1): a model's word, the Limit's, on
-// a model's limit; "" every row.
+// a model's limit; "" every row. Shelve is a model's limit whose wake the
+// night will not reach (AR92 ruling 1): its Scope's rows wait out the
+// night, the others run on, and Detail is the stop's text it replaced,
+// the night's own if it ends with only the shelved rows left.
 type pause struct {
 	Stop   bool
+	Shelve bool
 	Detail string
 	Source string
 	Wake   time.Time
@@ -79,10 +83,12 @@ func ofModel(model, scope string) bool {
 // reset and the probe not passed (the probe refused again); with a Named
 // reset not after Waited;
 // at Count MaxPauses; then when the wake is at or past Until; with no
-// Until, when the wake is over PauseReach after Now. Else it pauses (a
-// model's limit with a reset too). Each stop but the model's keeps its
-// wake and source. A model's pause carries the Limit's Scope; any other,
-// "" (AR71 ruling 1).
+// Until, when the wake is over PauseReach after Now. Those two late wakes
+// shelve a model's limit instead (AR92 ruling 1; the relay's entry 12): a
+// family's weekly cap too, Shelve set, the stop's text in Detail. Else it
+// pauses (a model's limit with a reset too). Each stop but the model's
+// keeps its wake and source. A model's pause or shelve carries the
+// Limit's Scope; any other, "" (AR71 ruling 1).
 func pauseFor(in pauseIn) pause {
 	l := in.Limit
 	var p pause
@@ -92,6 +98,13 @@ func pauseFor(in pauseIn) pause {
 		p.Wake, p.Source = l.Reset.Add(WakeSlack), l.Source
 	}
 	stop := func(why string) pause { p.Stop, p.Detail = true, why; return p }
+	late := func(why string) pause { // a model's late wake shelves its rows (AR92 ruling 1)
+		if l.Kind != stream.KindModel {
+			return stop(why)
+		}
+		p.Shelve, p.Detail, p.Scope = true, why, l.Scope
+		return p
+	}
 	switch {
 	case in.Draining:
 		return stop("the night is draining")
@@ -109,9 +122,9 @@ func pauseFor(in pauseIn) pause {
 	case in.Count >= MaxPauses:
 		return stop(fmt.Sprintf("%d pauses tonight, the most a night takes", MaxPauses))
 	case !in.Until.IsZero() && !p.Wake.Before(in.Until):
-		return stop(fmt.Sprintf("the wake %s is at or past --until %s", p.Wake.Format(time.RFC3339), in.Until.Format(time.RFC3339)))
+		return late(fmt.Sprintf("the wake %s is at or past --until %s", p.Wake.Format(time.RFC3339), in.Until.Format(time.RFC3339)))
 	case in.Until.IsZero() && p.Wake.Sub(in.Now) > PauseReach:
-		return stop(fmt.Sprintf("the wake %s is over 6h away, and no --until", p.Wake.Format(time.RFC3339)))
+		return late(fmt.Sprintf("the wake %s is over 6h away, and no --until", p.Wake.Format(time.RFC3339)))
 	}
 	if l.Kind == stream.KindModel {
 		p.Scope = l.Scope

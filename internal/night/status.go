@@ -71,6 +71,10 @@ type RowStatus struct {
 	// ruling 1): State reads `held` and Reason the band's text then; nil
 	// when the row is not held.
 	Band *RowBand `json:"band"`
+	// Shelved is the row's wake (RFC 3339) once its model's limit shelved
+	// it to the night's end (AR92 ruling 5): State reads `paused` and
+	// Reason `usage-limit` until the night's end halts it; "" when not.
+	Shelved string `json:"shelved"`
 }
 
 // RowBand is a held row's band: the last verdict and its peak (null for
@@ -244,6 +248,8 @@ func nightBurn(lines []map[string]any, night string) (rows []Burn, total Burn) {
 // lines the night wrote (AR51); usd is the read costs and held the unread
 // sittings' spend (each at its row's usd), which --max-usd counts too; count
 // is the rows that staged (AR58 ruling 3), which --max-sittings compares.
+// While a row is shelved (AR92 ruling 5) the last stop is the usage-limit
+// end, not queue-empty: the night stops so once nothing else is left.
 func buildStatus(n *Night, ids []string, rows map[string]*RowStatus, burn Burn, usd, held float64, count int, o NightOptions, until time.Time) Status {
 	st := Status{Night: n.ID, State: string(n.State), Reason: string(n.Reason), Rows: []RowStatus{}, Resume: []string{}}
 	if n.Plan != nil {
@@ -273,7 +279,17 @@ func buildStatus(n *Night, ids []string, rows map[string]*RowStatus, burn Burn, 
 	if o.MaxUSD > 0 {
 		next = append(next, fmt.Sprintf("budget-reached at $%.2f ($%.2f so far)", o.MaxUSD, usd+held))
 	}
-	next = append(next, "queue-empty")
+	var shelved []string
+	for _, r := range st.Rows {
+		if r.Shelved != "" && r.State == string(relay.Paused) {
+			shelved = append(shelved, r.ID)
+		}
+	}
+	if len(shelved) > 0 {
+		next = append(next, "usage-limit once only the shelved rows are left ("+strings.Join(shelved, " ")+")")
+	} else {
+		next = append(next, "queue-empty")
+	}
 	if relay.NightTerminal(n.State) {
 		next = nil
 	} else if n.State == relay.Draining {
@@ -330,7 +346,8 @@ func bandClause(rows []RowStatus) string {
 // a row whose verify waits for its root's gate lock one cell past merge,
 // `verify waits behind <row> <m>m` (AR79); each row's acts
 // (AR30), one line each under 100 columns; each red or failed row's
-// `cause of <row>: <cause>`, clipped under 100 columns (AR62); the burn; the next
+// `cause of <row>: <cause>`, clipped under 100 columns (AR62); each shelved
+// row's `<row> shelved to the night's end, its wake <wake>` (AR92); the burn; the next
 // stop; and last, every red or failed row's `agentik-relay resume <row>` on a line
 // of its own. No colour, no cursor movement: it is read over ssh.
 func PrintStatus(w io.Writer, s Status) {
@@ -419,6 +436,11 @@ func PrintStatus(w io.Writer, s Status) {
 	for _, r := range s.Rows { // AR62 act 2: --json carries it whole
 		if r.Cause != "" {
 			fmt.Fprintln(w, clip("cause of "+r.ID+": "+r.Cause, 99))
+		}
+	}
+	for _, r := range s.Rows { // AR92 ruling 5: paused usage-limit, shelved
+		if r.Shelved != "" && r.State == string(relay.Paused) {
+			fmt.Fprintln(w, clip(r.ID+" shelved to the night's end, its wake "+r.Shelved, 99))
 		}
 	}
 	fmt.Fprintf(w, "burn: %s, %s, %s, %s\n", plural(s.Burn.Sittings, "sitting"), plural(s.Burn.Turns, "turn"),
