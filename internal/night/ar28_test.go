@@ -105,8 +105,13 @@ func TestAR28_1_SoftBeforeKill(t *testing.T) {
 // TestAR28_1_TuneOnExit: the exit line's tune. The request at turn 3, the
 // head moved before turn 5, the exit at 140k: {3, 5, 140000, false}. 116k
 // then 157k: the request and the kill on one message, no head move read,
-// killed.
-func TestAR28_1_TuneOnExit(t *testing.T) {
+// killed. The fake's commit waits for turn 4's head read (AR93): that
+// order, not the machine's load, puts the move at turn 5.
+func TestAR28_1_TuneOnExit(t *testing.T) { ar28TuneOnExit(t, 0) }
+
+// ar28TuneOnExit is TestAR28_1_TuneOnExit's table, each head read once
+// the soft line is written slow late, the fake's commit after it (AR93).
+func ar28TuneOnExit(t *testing.T, slow time.Duration) {
 	fakeClaude(t)
 	for _, c := range []struct {
 		name     string
@@ -122,11 +127,13 @@ func TestAR28_1_TuneOnExit(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			w := newWorld(t)
+			done := filepath.Join(t.TempDir(), "read")
+			w.fx.Git = &ar93SlowHead{w: w, slow: slow, done: done}
 			night.KillGrace = 300 * time.Millisecond
 			st, rp := w.stage(t, "a1")
 			s, _ := night.RunRow(w.fx, effects.OSSpawner{}, st, rp, nil, night.RunOptions{
 				Context: 130000, Wall: time.Minute, Transcripts: w.transcripts,
-				Env: w.envAt(streamOf(t, true, c.contexts...), append(c.extra, "FAKECLAUDE_DELAY_MS=150")...)})
+				Env: w.envAt(streamOf(t, true, c.contexts...), append(c.extra, "FAKECLAUDE_DELAY_MS=150", "FAKECLAUDE_COMMIT_AFTER="+done)...)})
 			if s.Reason != c.reason && !(c.reason == "" && s.Reason == relay.GateUnrunReason) {
 				t.Fatalf("sitting %+v", s)
 			}
