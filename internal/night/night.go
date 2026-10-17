@@ -1324,6 +1324,7 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 					}
 					pz := pauseFor(pauseIn{Limit: h.Limit, Now: fx.Clock.Now().Round(0), Until: until,
 						Draining: n.State == relay.Draining, Count: c - 1, Waited: waited, ProbePassed: probeOK || !fellBack})
+					pz.Stop = pz.Stop || pz.Shelve // the shelve lands in act 2 (AR92); till then a stop, as before
 					if pz.Stop {
 						h.write(false)
 						o.st.Unlock()
@@ -1401,6 +1402,7 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 			if h.Limit.Kind != "" && !killedBy[o.id] && accountBy[o.id] == "" && !relay.NightTerminal(n.State) {
 				pz = pauseFor(pauseIn{Limit: h.Limit, Now: fx.Clock.Now().Round(0), Until: until, Draining: n.State == relay.Draining,
 					Count: pauses, Waited: waited, ProbePassed: probeOK || !fellBack}) // the probe armed only by a fallback wake (F2)
+				pz.Stop = pz.Stop || pz.Shelve // the shelve lands in act 2 (AR92); till then a stop, as before
 			}
 			h.write(!pz.Stop)
 			if pz.Stop || o.s.Reason != relay.UsageLimit { // a broken invariant: no `limit` on the line, the part failed as before AR65 (F1)
