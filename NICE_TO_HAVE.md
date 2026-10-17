@@ -684,3 +684,10 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 - claude's own CPU during a wait was not sampled, so whether the stall rule reads a waiting child as idle is unmeasured.
 - A kill mid-wait leaves a background shell in its own group, which `Sweep` misses and `SweepEscaped` takes only if a 60 s sample saw it. Candidate: a session sweep, since the child leads its session.
 - A `ScheduleWakeup`, a background `Agent` or a `Monitor` can hold the exit to the wall.
+
+## AR90's review (2026-10-16, the hq sitting's adversary; PASS, 1 S4)
+- S4: neither night test guards ruling 3's "no rule reads the first result as the end". A `run.go` that kills the child at its first result under the wall's reason passes `TestAR90_3_WaitedChildGreen` and `TestAR90_3_WallBoundsWait` 5 of 5 (a `go test -overlay` mutant): the fake spawner's `Wait` returns before the stream is read, so a kill raised from the result callback is dropped, and the wall test asserts no timing. Fix: the wall test asserts the elapsed time is at least the wall; the green test uses a spawner whose `Wait` returns only once its stream is drained, and asserts `FakeSpawner.Signals()` empty.
+
+## The packet parser's allowlist and the budget row (2026-10-16, the sync-rf1 builder; S4)
+- The packet parser's acceptance allowlist admits neither `shasum` nor `cmp`, so a packet that verifies a vendored copy by hash or by byte compare has to spell it another way (sync-rf1 used `grep -qF` against `vendored.sha256`). Candidate: admit both, read-only as they are.
+- The budget row must open `<n> turns, <n>k context` for the parser to read it; a row that opens with the model or the acts reads red at the gate. GUIDE §9 could say so in its budget sentence.
