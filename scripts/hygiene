@@ -22,8 +22,9 @@ records) the `sibling` group is not evaluated; the rest still scan there.
 `secret` is matched case-sensitively, the others ignore case.
 
 The `renamed` group (agentik-r1 section 6.1) finds the names the tools had before
-agentik-r1, in the live files only: outside `design/`, `bugs/` and `history/`, and
-not a `NICE_TO_HAVE.md` or a `CHANGELOG*` at any depth. Under `history/` the
+agentik-r1 as whole names, never inside a longer word or slug (a URL that runs on
+past a tool name is not an old id), in the live files only: outside `design/`,
+`bugs/` and `history/`, and not a `NICE_TO_HAVE.md` or a `CHANGELOG*` at any depth. Under `history/` the
 live files are those a start line reads: `history/sessions/PROMPT-*`,
 `history/sessions/BRIEF-*`, and the newest charter of each running chain. A
 charter is `history/sittings/<YYYY-MM-DD>-<n>[-<chain>].md`. A repo declares its
@@ -82,7 +83,7 @@ GROUPS = (
                 r"github_pa[t]_[A-Za-z0-9_]{20,}", r"AGE-SECRET-KE[Y]-1[0-9A-Z]{20,}",
                 r"\bAKI[A][0-9A-Z]{16}\b", r"BEGI[N] [A-Z0-9 ]*PRIVATE KEY")),
     ("email", (r"\b[A-Za-z0-9._%+-]+[@][A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b",)),
-    ("renamed", (r"(?<![\w-])claude-cod[e]-(?:session|decision[s]|respea[k]|agents)",
+    ("renamed", (r"(?<![\w-])claude-cod[e]-(?:session|decision[s]|respea[k]|agents)(?![\w-])",
                  r"agent-rela[y]", r"claude-sessio[n]",
                  r"claude-(?:api-agent|local|fanout|costs|agents)\b",
                  r"\blocalri[g]\b", r"\bagentrout[e]\b",

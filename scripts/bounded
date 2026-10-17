@@ -9,14 +9,16 @@ Usage: bounded [--lock FILE] [--wall S] [--load N] -- cmd...
               A mkdir-era lock directory is removed when its owner pid is dead, else exit 2.
   --wall S    counted from bounded's start, the load wait included; at S seconds the
               command's group gets SIGTERM, then SIGKILL after a grace: exit 124.
-  --load N    while the 1-minute load average is above N x cores and the CPU confirms it
-              (its idle share is at or under the floor, 25%), poll every 30 s, up to 600 s
-              or the wall, whichever is first, then exit 2. Taken after the lock. The idle
-              share is read only above the load line, over one second: above the floor
-              one line says the load is not confirmed and there is no wait, and two polls
-              in a row above it end a wait. Unreadable, it leaves the load alone to decide.
-              A read never outlasts the wait or the wall, and its time comes out of the
-              poll's sleep.
+  --load N    the load rule (GUIDE.md §5 states it once, with N = 4): while the 1-minute
+              load is above N per core and the CPU's idle share is at or under the floor,
+              25%, hold the start, polling every 30 s, and after 600 s or at the wall,
+              whichever comes first, exit 2 without running the command; an idle share
+              above the floor at the first reading lets the command start at any load (two
+              readings in a row once it waits), and an unreadable one leaves the load alone
+              to decide. Taken after the lock. The idle share is read only above the
+              load line, over one second; above the floor one stderr line says the load
+              is not confirmed. A read never outlasts the wait or the wall, and its time
+              comes out of the poll's sleep.
 
 The lifeline (ADV10-1): bounded spawns a guardian (`python -B bounded --guard FD RFD -- cmd`)
 in a new session, holding the read end of a pipe and the lock. The guardian runs cmd in cmd's
