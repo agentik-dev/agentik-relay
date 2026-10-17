@@ -32,7 +32,7 @@ Standing rules: the charter, `history/sittings/<date>-<n>-sync-vc1.md` (`n` the 
 
 ## 3. Interfaces
 
-No Go code changes. `make hygiene`, and so `make check`, gain one step, `scripts/plugin-version-check` (exits 0, 1, 2); a red one stops `check-unlocked` before `validate`. `scripts/vendored.sha256` holds four lines. The plugin is `relay` at `0.2.0`, all else as on main.
+No Go code changes. The `plugin-version-check` target runs `scripts/plugin-version-check` (exits 0, 1, 2) inside `check-unlocked` after `hygiene`; red, it stops `validate`. `scripts/vendored.sha256` holds four lines. The plugin is `relay` at `0.2.0`, all else as on main.
 
 ## 4. Findings that name this row
 
