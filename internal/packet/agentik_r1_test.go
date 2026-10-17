@@ -10,7 +10,7 @@ import (
 )
 
 // TestAgentikR1_5_PluginIsRelay (agentik-r1 §5.1, D2; §6.3 c11; ruling 8):
-// the plugin is `relay` at 0.1.3, the repo holds no marketplace (the
+// the plugin is `relay` at 0.2.0, the repo holds no marketplace (the
 // commons' lists it), every command allows `Bash(agentik-relay *)`, and the
 // hook shim hands the event to $RELAY_BIN, else agentik-relay, else relay.
 func TestAgentikR1_5_PluginIsRelay(t *testing.T) {
@@ -20,9 +20,9 @@ func TestAgentikR1_5_PluginIsRelay(t *testing.T) {
 		t.Fatal(err)
 	}
 	var m struct{ Name, Version, Description string }
-	if err := json.Unmarshal(b, &m); err != nil || m.Name != "relay" || m.Version != "0.1.3" ||
+	if err := json.Unmarshal(b, &m); err != nil || m.Name != "relay" || m.Version != "0.2.0" ||
 		!strings.Contains(m.Description, "/relay:resume") {
-		t.Errorf("plugin.json = %+v, %v; want relay at 0.1.3 naming /relay:resume", m, err)
+		t.Errorf("plugin.json = %+v, %v; want relay at 0.2.0 naming /relay:resume", m, err)
 	}
 	if _, err := os.Stat(filepath.Join(root, ".claude-plugin", "marketplace.json")); !os.IsNotExist(err) {
 		t.Errorf("the repo's marketplace.json is still here (%v)", err)

@@ -1,6 +1,6 @@
 {
   "name": "relay",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "Resume a stopped sitting with /relay:resume; status, plan, gate, report and doctor over the relay binary, plus the guards: one commit per act, no remote writes.",
   "author": {"name": "Kevin Tegtmeier"},
   "homepage": "https://github.com/agentik-dev/agentik-relay",

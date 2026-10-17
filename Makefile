@@ -14,7 +14,7 @@ help:
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
 check:  ## the gate, bounded (conventions §5): one per tree (.check.lock), an 840 s wall, held above load 4 x cores only when the CPU confirms the load
 	$(PY) -B scripts/bounded --lock .check.lock --wall 840 --load 4 -- $(UNLOCKED) check-unlocked
-check-unlocked: test vet fmt doclint hygiene validate  ## the gate's body: test, vet, fmt, doclint, hygiene, validate, README freshness
+check-unlocked: test vet fmt doclint hygiene plugin-version-check validate  ## the gate's body: test, vet, fmt, doclint, hygiene, validate, README freshness
 	@if [ ! -f design/readme/source.md ]; then echo "readme: skipped, absent design/readme/source.md"; \
 	elif shasum -c --status design/readme/rendered.sha256; then echo "readme: fresh"; \
 	else echo "readme: stale, run make readme"; exit 2; fi
@@ -34,6 +34,8 @@ doclint:  ## the doc gate (conventions §5), its bytes pinned (conventions §6)
 hygiene:  ## the public-hygiene scan (conventions §6); scripts/{agentik,hygiene,bounded} pinned by scripts/vendored.sha256 (agentik-commons scripts/sync)
 	@shasum -a 256 -c --status scripts/vendored.sha256 || { echo "hygiene: scripts/{agentik,hygiene,bounded} are not agentik-commons' copies (scripts/vendored.sha256; run its scripts/sync)"; exit 2; }
 	$(PY) -B scripts/hygiene
+plugin-version-check:  ## the plugin's version check (agentik-commons GUIDE §7): red when a file under plugin/ changed after the commit that last set its version
+	$(PY) -B scripts/plugin-version-check
 validate:  ## claude plugin validate plugin/ (doclint's plugin rule runs in check's doclint step)
 	$(PY) -B scripts/bounded --wall 60 -- claude plugin validate plugin/
 build:  ## bin/agentik-relay
