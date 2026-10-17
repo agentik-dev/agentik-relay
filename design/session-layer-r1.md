@@ -1,6 +1,6 @@
 # agent-relay design: the session layer is read only while fresh (r1)
 
-**Status:** design r1, 2026-10-14, written before code and revised once after its one refuter round (§7), which passed with nine notes; the revision takes four of them. AR75 built §5 item 1; AR76 took three notes of its review (§2.4 for the relay's own state dir and the hooks', a moved config folder's reason, a null `inputs`). It amends relay-r1 §9 (configuration). The settled entry 10 (the repo's verify limit) is what this record makes reach a night; no entry of `DECISIONS.md` covers the session layer, and GUIDE §3 (agentik-commons; portfolio entry 26) puts it above the repo's files and leaves room for a further condition. The finding is `NICE_TO_HAVE.md`'s "A night takes a frozen session layer through tmux".
+**Status:** design r1, 2026-10-14, written before code and revised once after its one refuter round (§7), which passed with nine notes; the revision takes four of them. AR75 built §5 item 1; AR76 took three notes of its review (§2.4 for the relay's own state dir and the hooks', a moved config folder's reason, a null `inputs`). It amends relay-r1 §9 (configuration). The settled entry 10 (the repo's verify limit) is what this record makes reach a night; no entry of `DECISIONS.md` covers the session layer, and GUIDE §3 (agentik-commons; agentik-hq entry 6) puts it above the repo's files and leaves room for a further condition. The finding is `NICE_TO_HAVE.md`'s "A night takes a frozen session layer through tmux".
 
 ## 1. The problem
 

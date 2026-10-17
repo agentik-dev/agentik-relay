@@ -461,7 +461,7 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 
 ## Packets AR67 and AR68, refuted (2026-10-11): notes left out of the folds
 - AR67's interim orchestrator stop is acceptable only because AR65 to AR68 install together; the wake also waits for packet 5 (the guards), since without it nothing caps the pauses. (AR69)
-- Portfolio entry 23 (example-ops DECISIONS.md) still says a usage limit stops the whole run. The owner's word of 2026-10-10 21:06 (pause until the reset, then resume the same row) is not yet in the ledger, and the AR65 to AR68 behavior follows his word. The amendment is owed by example-ops.
+- Portfolio entry 23 (example-ops DECISIONS.md) still says a usage limit stops the whole run. The owner's word of 2026-10-10 21:06 (pause until the reset, then resume the same row) is not yet in the ledger, and the AR65 to AR68 behavior follows his word. The amendment is owed by example-ops. (AR95: entry 15)
 
 ## AR67 rounds one and two (2026-10-11): notes, no block (F1, the frozen elapsed, fixed at 28b5583)
 - Packet 5 owns these. Re-pauses are unbounded until the pause count lands, so install AR67 and AR68 with packet 5. (AR69) A killed sibling continues with the full budget (probe: r2 turns=100, usd=5); its remainders should come from its part 1. (Left by AR69 ruling 8, neither AR70 nor AR71: its part 1's tally and `spawn` line's `usd` stand.) A sibling whose outcome is still uncollected at the pause is stopped as "killed in its gate" even when it was not in its gate (not reproduced; timing). (AR70) The floor can exceed the row's budget. (AR69)
@@ -493,7 +493,7 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 - `relay run --json` adds `relay resume` for any failed sitting without reading `Woken` (cmd/relay/main.go:1333), and `report.go:151` prints `relay resume o.1` for a woken sitting: packet 6's readers.
 - The RESUME block keeps porcelain's quoting and renames (`"b c.txt"`, `a -> b`, internal/night/wake.go:91), and a failed git read prints the whole git error. `resumeStdin` turns a prompt ending in a blank line into two blank lines, and an empty prompt into a leading blank line.
 - relay-r1 says "staged and spawned", but the code marks a sitting woken at launch, before the spawn. No test covers a second halt (o.2 halted, then o.3's cut failing).
-- Portfolio entry 23 still says a usage limit stops the whole run; the owner's 10-10 amendment is owed by example-ops.
+- Portfolio entry 23 still says a usage limit stops the whole run; the owner's 10-10 amendment is owed by example-ops. (AR95: entry 15)
 
 ## AR69 rounds one and two (2026-10-11): notes, no block (F1, the probe guard's scope, fixed at 4b423b0)
 - A sibling's reset that moves a 30-minute fallback wake lets the probe be refused again with no reset and wait another 30 minutes instead of stopping (§2 says stop); the 12-pause cap bounds it. (round one, design N1)
@@ -720,3 +720,7 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 
 ## AR94's build (2026-10-17): what it leaves (S4)
 - The mark (`ar94Absent`) proves the cut's kill came before the line's `sleep 3` ended, not that it came at the limit: a cut up to about 2 s late passes. The refuter's mutant (AR94 fix round 1), the shell's timeout plus 1700 ms (`internal/effects/shell.go:101`), left all four tests green, where the pin's 3 s wall read 3.25 s and 3.20 s. Left as it is: a tighter sleep brings the load sensitivity back (AR35's ruling 2), and the cut's timeliness is the shell's own claim (`effects.Cut`, `TestAR59_3_Cut`); relay-r1 §11 states the slack.
+
+## AR95's build (2026-10-17): what it leaves (S4)
+- The old numbers, for a reader of the records: portfolio entry 21 is entry 13 here, entry 22's relay share is entry 14 (its helpers clause stays in the portfolio ledger (agentik-hq entry 4)), 23 is entry 15, 24 is entry 16, and 26 is agentik-hq entry 6. A record (what a packet, a round or a proposal read) keeps the number it read; the live citations, entry 12 and the Status lines of `design/session-layer-r1.md` and `design/relay-orchestrator-r1.md`, take the new ones (AR95 ruling 5).
+- relay-r1 §4's "(agent-relay today)", a ledger with no rendered block, lapsed: `CLAUDE.md` now holds the block, so a row cut after AR95's merge reads it from `CLAUDE.md at <sha12>`. relay-r1 lies outside AR95's may-touch; the next packet that touches §4 drops the parenthesis.

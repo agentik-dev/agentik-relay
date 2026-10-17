@@ -3,6 +3,7 @@
 ## Decided without asking
 
 - A night run without `--until` caps a usage-limit pause at 6 h and stops past it, as design/usage-limit-resume-r1.md §8 Q2 proposes; reversible, decided by the observer, 2026-10-10.
+- The portfolio's relay entries 21 to 24 came home as entries 13 to 16, numbered after entry 12, under their areas, with The night a new first section for 13 and 16 since no section held the night's shape; entry 22's helpers clause stays in the portfolio ledger (agentik-hq entry 4) and entry 26 is agentik-hq entry 6, since they bind more than this repo; reversible, decided by packet AR95 under agentik-hq entry 4, 2026-10-17.
 
 ## Answered
 
