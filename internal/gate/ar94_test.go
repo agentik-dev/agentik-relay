@@ -56,3 +56,9 @@ func ar94Forced(t *testing.T, slow, took time.Duration) {
 // the old bound: the cut still reads red, exit 124, Cut 1, and its mark
 // never lands.
 func TestAR94_1_GateCutUnderSlowGit(t *testing.T) { ar59GateCut(t, 2*time.Second) }
+
+// TestAR94_2_MergeCutUnderSlowGit is AR94 act 2:
+// TestAR59_3_MergeNamesCut's body with each Clone 2 s late, so the merge's
+// cut verify takes 3 s or more, past the old bound: the refusal still
+// names the cut, the root unmoved, and the mark never lands.
+func TestAR94_2_MergeCutUnderSlowGit(t *testing.T) { ar59MergeCut(t, 2*time.Second) }
