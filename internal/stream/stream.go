@@ -78,7 +78,8 @@ type ToolUse struct{ Name, Summary string }
 // plus what streamed since. Result is every result event folded into the
 // first (AR83; Event.fold), CostUSD its cost; Results counts the result
 // events read, so a record tells a background wait's later query from a
-// sitting of one (AR90).
+// sitting of one (AR90); Errors counts those read with is_error true, so a
+// child that recovered from an erring result still says it erred (AR91).
 type Tally struct {
 	Turns, Context int
 	CostUSD        float64
@@ -88,6 +89,7 @@ type Tally struct {
 	ResultSeen     bool
 	Result         *Event
 	Results        int
+	Errors         int
 	SessionID      string
 	Model          string
 	NonJSON        int
@@ -271,6 +273,9 @@ func (t *Tally) Add(ev Event) {
 		}
 	case "result":
 		t.Results++
+		if ev.IsError {
+			t.Errors++
+		}
 		r := ev
 		r.Raw = nil
 		if t.Result != nil { // a later query's result (AR83): fold it into the first
@@ -302,9 +307,12 @@ func (t *Tally) total() Usage {
 // num_turns, duration_ms, the denials and the usage are per query and sum;
 // the cost is the process's running total, so the highest any result read,
 // never a sum.
-// The end is the last result's (its tail and session), an error kept:
-// IsError when any result erred, Subtype the last erring result's, else the
-// last's.
+// The end is the last result's: its tail and session, IsError and Subtype
+// (AR91), so a child that recovered from an erring result ended in its
+// success. One error is kept (AR83 ruling 4): an erring cap (`error_max…`,
+// the sitting's own turn or budget cap, as Account reads it) holds through
+// every later result, its subtype with it, since a wait's turn after the
+// cut does not un-cut the sitting.
 func (r *Event) fold(ev Event) {
 	r.NumTurns += ev.NumTurns
 	r.DurationMS += ev.DurationMS
@@ -318,10 +326,9 @@ func (r *Event) fold(ev Event) {
 		r.Usage = &u
 	}
 	r.CostUSD = max(r.CostUSD, ev.CostUSD)
-	if ev.IsError || !r.IsError {
-		r.Subtype = ev.Subtype
+	if !r.IsError || !strings.HasPrefix(r.Subtype, "error_max") {
+		r.IsError, r.Subtype = ev.IsError, ev.Subtype
 	}
-	r.IsError = r.IsError || ev.IsError
 	r.ResultTail, r.SessionID = ev.ResultTail, ev.SessionID
 }
 
