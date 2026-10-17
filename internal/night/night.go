@@ -1292,8 +1292,10 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 	shelfHolds := func(id string) bool { return shelvedModel(rows[id].Model) }
 	// shelve is a model's late wake (AR92 rulings 1, 2): row id, already
 	// paused, and every running row of the scope are killed and paused as
-	// AR71 does it, held to the night's end; the night arms no wake and
-	// keeps its state. The `pause` line names them, `shelved: true`.
+	// AR71 does it, held to the night's end with every row of the scope an
+	// earlier pause holds, its outcome in or still out (the fix round's
+	// F1); the night arms no wake and keeps its state. The `pause` line
+	// names them, `shelved: true`.
 	shelve := func(id string, pz pause, l stream.Limit) {
 		if !contains(shelf, pz.Scope) {
 			shelf = append(shelf, pz.Scope)
@@ -1303,6 +1305,12 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 			shelfWhy = pz.Detail
 		}
 		named := holdRunning([]string{id}, shelfHolds)
+		for _, r := range ids {
+			if s := n.Sittings[r]; s != nil && s.State == relay.Paused && shelfHolds(r) && !contains(named, r) {
+				named = append(named, r)
+			}
+		}
+		sort.Strings(named)
 		lg.mu.Lock()
 		for _, r := range named {
 			onShelf[r] = true
@@ -1682,12 +1690,13 @@ func Run(fx effects.Effects, sp effects.Spawner, q *queue.Queue, opts NightOptio
 	// in queue order. A paused row whose outcome is still out (its gate
 	// outlasts the pause), the orchestrator's sitting included, is named
 	// by the `wake` line and neither halted, checked nor continued: it
-	// lands when collected (AR70 ruling 5). A shelved row is none of
-	// these: it waits out the night (AR92 ruling 2).
+	// lands when collected (AR70 ruling 5). A shelved row, or one on a
+	// shelved model, is none of these: it waits out the night (AR92 ruling
+	// 2; the fix round's F1).
 	wakeUp := func(now time.Time) {
 		var paused []string
 		for _, id := range ids {
-			if s := n.Sittings[id]; s != nil && s.State == relay.Paused && !onShelf[id] {
+			if s := n.Sittings[id]; s != nil && s.State == relay.Paused && !onShelf[id] && !shelfHolds(id) {
 				paused = append(paused, id)
 			}
 		}
