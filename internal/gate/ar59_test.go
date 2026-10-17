@@ -3,6 +3,7 @@ package gate
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -14,24 +15,38 @@ import (
 // TestAR59_2_GateUsesLimit is AR59 act 2: the gate's verify line runs
 // under Verify.Limit: `sleep 3` under 1 s is red, cut at 1 s, and the gate
 // carries the limit for the merge; with no limit (effects.Timeout) it is
-// green.
-func TestAR59_2_GateUsesLimit(t *testing.T) {
+// green. The cut is proved by its outcome (AR94).
+func TestAR59_2_GateUsesLimit(t *testing.T) { ar59GateCut(t, 0) }
+
+// ar59GateCut is TestAR59_2_GateUsesLimit's body over a git whose Clone
+// sleeps slow (ar94SlowClone): `sleep 3 && touch <mark>` under 1 s is red,
+// exit 124, Cut 1, VerifySeconds 1, and its mark never lands (ar94Absent),
+// the call bounded only by ar94Bound, a hang guard (AR94); with no limit,
+// `sleep 3` is green, VerifySeconds 900.
+func ar59GateCut(t *testing.T, slow time.Duration) {
+	t.Helper()
 	w := newWorld(t)
+	fx := w.fx
+	fx.Git = ar94SlowClone{slow: slow}
 	st := w.stage(t, "a.txt")
 	p := pk([]string{"a.txt"})
+	mark := filepath.Join(t.TempDir(), "mark")
 	start := time.Now()
-	res, _, g, err := Run(w.fx, st, p, nil, seen, Verify{Name: "sleep 3", Limit: time.Second})
+	res, _, g, err := Run(fx, st, p, nil, seen, Verify{Name: fmt.Sprintf("sleep 3 && touch '%s'", mark), Limit: time.Second})
+	back := time.Now()
 	if err != nil || res != relay.RedResult || g.Verify == nil || g.Verify.Status != relay.CheckRed ||
 		g.Verify.Cut != 1 || g.Verify.BranchExit != 124 || g.VerifySeconds != 1 {
 		t.Fatalf("under 1 s: %s, %v; verify %+v, gate's limit %d", res, err, g.Verify, g.VerifySeconds)
 	}
-	if took := time.Since(start); took >= 3*time.Second {
-		t.Fatalf("the cut gate took %s: the line ran past its limit", took)
+	if took := back.Sub(start); took >= ar94Bound {
+		t.Fatalf("the cut gate took %s: a hang, past the %s guard", took, ar94Bound)
 	}
-	res, why, g, err := Run(w.fx, st, p, nil, seen, Verify{Name: "sleep 3"})
+	ar94Forced(t, slow, back.Sub(start))
+	res, why, g, err := Run(fx, st, p, nil, seen, Verify{Name: "sleep 3"})
 	if err != nil || res != relay.GreenResult || why != "" || g.Verify.Cut != 0 || g.VerifySeconds != 900 {
 		t.Fatalf("no limit: %s %s, %v; verify %+v, gate's limit %d", res, why, err, g.Verify, g.VerifySeconds)
 	}
+	ar94Absent(t, mark, back)
 }
 
 // TestAR59_2_HandTakesLimit is AR59 act 2: Hand reads v.Limit, so a hand
