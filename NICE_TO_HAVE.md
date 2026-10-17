@@ -695,3 +695,7 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 ## AR91's build (2026-10-16): what it leaves (S4)
 - What the CLI exits with after an erring first result and a successful second is unmeasured, and the gate's exit fact also reads a non-zero exit (`run.go`, `tally.Result.IsError || exit != 0`), so a real recovered child may still read `stream-error`. A probe needs a forced API error (a 529 or a 500) mid-run, then a background command's wait, the exit code read.
 - The result's `api_error_status` (`internal/stream/testdata/real.jsonl` line 9) stays unread: the fold keeps no erred result's status, so a record says how many results erred (`errors`) but not with what.
+
+## AR91's review (2026-10-16, the hq sitting's adversary; PASS, 2 S4)
+- S4: no test checks that every `exit` line carries `errors` as 0: dropping it from the spawn-failure line (`run.go:627`), or writing it only when non-zero (`:831`), still passes every AR91, AR90 and AR83 test. Fix: the AR90 and AR91 night tests assert `errors` present and 0 on the lines where nothing erred, and the spawn-failure test reads it.
+- S4: `TestAR91_2_RecoveredGreen` does not say it assumes the child exits 0 after a recovered result; with `FAKECLAUDE_EXIT=1` the row fails `stream-error` while its `exit` line reads `is_error false`, since the gate's exit fact also reads the child's exit code. Fix: the test names the assumption, and the probe filed by AR91 (the CLI's exit after a recovered result) settles it.
