@@ -10,10 +10,26 @@ import (
 	"github.com/agentik-dev/agentik-relay/internal/effects"
 )
 
-// ar94Bound is the hang guard over a cut call (AR78's 30 s): the cut is
-// proved by its outcome (ar94Absent), never by the call's wall, which
-// holds the fresh tree's git beside the line (AR35's ruling 2).
+// ar94Bound is the hang guard over a cut call (AR78's 30 s, ar94Guard):
+// the cut is proved by its outcome (ar94Absent), never by the call's wall,
+// which holds the fresh tree's git beside the line (AR35's ruling 2).
 const ar94Bound = 30 * time.Second
+
+// ar94Guard runs call in a goroutine and waits at most ar94Bound for it
+// (AR78's device): a call that blocks fails the test naming the guard, not
+// go's package timeout. took and back are the call's own wall and return.
+func ar94Guard(t *testing.T, what string, call func()) (took time.Duration, back time.Time) {
+	t.Helper()
+	done := make(chan struct{})
+	start := time.Now()
+	go func() { call(); back = time.Now(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(ar94Bound):
+		t.Fatalf("%s did not return in ar94Bound (%s): a hang", what, ar94Bound)
+	}
+	return back.Sub(start), back
+}
 
 // ar94SlowClone is the gate's own git (effects.OSGit) with each Clone
 // slow late: the fresh tree's git, inside the call, outruns the 1 s cut
@@ -31,6 +47,8 @@ func (g ar94SlowClone) Clone(dir, path string, refs ...effects.Ref) error {
 // ar94Absent fails when path exists 4 s after back, the cut call's return.
 // The cut line `sleep 3 && touch <path>` began before back, so a shell the
 // cut left alive has touched path by back plus 3 s; 1 s is the margin.
+// The mark proves the kill came before the sleep's end, so a cut up to 2 s
+// late passes: the cut's timeliness is the shell's claim (effects.Cut).
 func ar94Absent(t *testing.T, path string, back time.Time) {
 	t.Helper()
 	time.Sleep(time.Until(back.Add(4 * time.Second)))

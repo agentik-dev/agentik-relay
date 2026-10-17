@@ -21,7 +21,7 @@ func TestAR59_2_GateUsesLimit(t *testing.T) { ar59GateCut(t, 0) }
 // ar59GateCut is TestAR59_2_GateUsesLimit's body over a git whose Clone
 // sleeps slow (ar94SlowClone): `sleep 3 && touch <mark>` under 1 s is red,
 // exit 124, Cut 1, VerifySeconds 1, and its mark never lands (ar94Absent),
-// the call bounded only by ar94Bound, a hang guard (AR94); with no limit,
+// the call under ar94Guard's 30 s hang guard (AR94); with no limit,
 // `sleep 3` is green, VerifySeconds 900.
 func ar59GateCut(t *testing.T, slow time.Duration) {
 	t.Helper()
@@ -31,18 +31,19 @@ func ar59GateCut(t *testing.T, slow time.Duration) {
 	st := w.stage(t, "a.txt")
 	p := pk([]string{"a.txt"})
 	mark := filepath.Join(t.TempDir(), "mark")
-	start := time.Now()
-	res, _, g, err := Run(fx, st, p, nil, seen, Verify{Name: fmt.Sprintf("sleep 3 && touch '%s'", mark), Limit: time.Second})
-	back := time.Now()
+	var res relay.Result
+	var g relay.Gate
+	var err error
+	took, back := ar94Guard(t, "the cut gate", func() {
+		res, _, g, err = Run(fx, st, p, nil, seen, Verify{Name: fmt.Sprintf("sleep 3 && touch '%s'", mark), Limit: time.Second})
+	})
 	if err != nil || res != relay.RedResult || g.Verify == nil || g.Verify.Status != relay.CheckRed ||
 		g.Verify.Cut != 1 || g.Verify.BranchExit != 124 || g.VerifySeconds != 1 {
 		t.Fatalf("under 1 s: %s, %v; verify %+v, gate's limit %d", res, err, g.Verify, g.VerifySeconds)
 	}
-	if took := back.Sub(start); took >= ar94Bound {
-		t.Fatalf("the cut gate took %s: a hang, past the %s guard", took, ar94Bound)
-	}
-	ar94Forced(t, slow, back.Sub(start))
-	res, why, g, err := Run(fx, st, p, nil, seen, Verify{Name: "sleep 3"})
+	ar94Forced(t, slow, took)
+	var why relay.StopReason
+	ar94Guard(t, "the unlimited gate", func() { res, why, g, err = Run(fx, st, p, nil, seen, Verify{Name: "sleep 3"}) })
 	if err != nil || res != relay.GreenResult || why != "" || g.Verify.Cut != 0 || g.VerifySeconds != 900 {
 		t.Fatalf("no limit: %s %s, %v; verify %+v, gate's limit %d", res, why, err, g.Verify, g.VerifySeconds)
 	}
@@ -123,8 +124,8 @@ func TestAR59_3_MergeNamesCut(t *testing.T) { ar59MergeCut(t, 0) }
 // ar59MergeCut is TestAR59_3_MergeNamesCut's body over a git whose Clone
 // sleeps slow (ar94SlowClone), Gather's too: the merge's verify line
 // `sleep 3 && touch <mark>` under the gate's 1 s is refused verify-cut, and
-// its mark never lands (ar94Absent), the call bounded only by ar94Bound, a
-// hang guard (AR94).
+// its mark never lands (ar94Absent), the call under ar94Guard's 30 s hang
+// guard (AR94).
 func ar59MergeCut(t *testing.T, slow time.Duration) {
 	t.Helper()
 	w := newWorld(t)
@@ -132,22 +133,21 @@ func ar59MergeCut(t *testing.T, slow time.Duration) {
 	fx.Git = ar94SlowClone{slow: slow}
 	st := w.stage(t, "a.txt")
 	before := gitIn(t, w.root, "rev-parse", "HEAD")
-	green := Gather(fx, st, pk([]string{"a.txt"}), nil, seen)
+	var green relay.Gate
+	ar94Guard(t, "the gather", func() { green = Gather(fx, st, pk([]string{"a.txt"}), nil, seen) })
 	if res, _ := relay.Decide(green); res != relay.GreenResult {
 		t.Fatalf("the gate is %s, want green", res)
 	}
 	green.VerifySeconds = 1
 	mark := filepath.Join(t.TempDir(), "mark")
-	start := time.Now()
-	_, err := MergeIfGreen(fx, w.root, green, "a1", fmt.Sprintf("sleep 3 && touch '%s'", mark), nil)
-	back := time.Now()
+	var err error
+	took, back := ar94Guard(t, "the cut merge", func() {
+		_, err = MergeIfGreen(fx, w.root, green, "a1", fmt.Sprintf("sleep 3 && touch '%s'", mark), nil)
+	})
 	if err == nil || !strings.Contains(err.Error(), `merge a1: verify cut at 1 s, last ""`) {
 		t.Fatalf("MergeIfGreen = %v, want the cut named", err)
 	}
-	if took := back.Sub(start); took >= ar94Bound {
-		t.Fatalf("the cut merge took %s: a hang, past the %s guard", took, ar94Bound)
-	}
-	ar94Forced(t, slow, back.Sub(start))
+	ar94Forced(t, slow, took)
 	l := w.ledger.Written()
 	if m := l[len(l)-1]; m["event"] != "merge" || m["result"] != string(relay.VerifyCut) || !strings.Contains(fmt.Sprint(m["detail"]), "verify cut at 1 s") {
 		t.Fatalf("the merge line %v, want verify-cut naming the cut", m)
