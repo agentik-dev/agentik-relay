@@ -175,7 +175,8 @@ func TestAR81_2_ReportHolds(t *testing.T) {
 func TestAR81_4_QueuedBehindNewHead(t *testing.T) { ar81QueuedBehindNewHead(t, 0) }
 
 // ar81QueuedBehindNewHead is TestAR81_4_QueuedBehindNewHead's night, the
-// band answering each ask lag after its record (AR93).
+// band answering each ask lag after its record (AR93), r1's and r2's
+// children silent until r3 has asked.
 func ar81QueuedBehindNewHead(t *testing.T, lag time.Duration) {
 	ad := effects.FakeAnswer{BandVerdict: effects.BandVerdict{Verdict: "admitted"}}
 	ns := func(text string) effects.FakeAnswer {
@@ -184,6 +185,10 @@ func ar81QueuedBehindNewHead(t *testing.T, lag time.Duration) {
 	band := &effects.FakeBand{Answers: map[string][]effects.FakeAnswer{"r1": {ns("r1 no room"), ad}, "r2": {ns("r2 no room"), ad}}}
 	w, q, o, sp, clock := ar80World(t, band, "r1", "r2", "r3")
 	w.fx.Band = &ar93LateBand{FakeBand: band, lag: lag}
+	// A failed sitting stops the night: r1's and r2's children hold until
+	// r3 has asked (AR93 fix round 1, F1).
+	r3Asked := func() bool { return strings.Contains(ar80Asks(band), "r3 ") }
+	sp.wait["r1"], sp.wait["r2"] = r3Asked, r3Asked
 	o.Parallel = 3
 	res := ar71Run(w, q, o, sp)
 	T := ar65T.Format(time.RFC3339)

@@ -131,16 +131,17 @@ func ar28TuneOnExit(t *testing.T, slow time.Duration) {
 			w.fx.Git = &ar93SlowHead{w: w, slow: slow, done: done}
 			night.KillGrace = 300 * time.Millisecond
 			st, rp := w.stage(t, "a1")
-			s, _ := night.RunRow(w.fx, effects.OSSpawner{}, st, rp, nil, night.RunOptions{
+			sp := &ar93Spawner{}
+			s, _ := night.RunRow(w.fx, sp, st, rp, nil, night.RunOptions{
 				Context: 130000, Wall: time.Minute, Transcripts: w.transcripts,
 				Env: w.envAt(streamOf(t, true, c.contexts...), append(c.extra, "FAKECLAUDE_DELAY_MS=150", "FAKECLAUDE_COMMIT_AFTER="+done)...)})
 			if s.Reason != c.reason && !(c.reason == "" && s.Reason == relay.GateUnrunReason) {
-				t.Fatalf("sitting %+v", s)
+				t.Fatalf("sitting %+v; the child: %s", s, sp.child())
 			}
 			exit := lastOf(w.ledger.Written(), "exit")
 			tune, _ := exit["tune"].(map[string]any)
 			if fmt.Sprint(tune) != fmt.Sprint(c.tune) {
-				t.Fatalf("tune %v, want %v", exit["tune"], c.tune)
+				t.Fatalf("tune %v, want %v; the child: %s", exit["tune"], c.tune, sp.child())
 			}
 			if n := len(linesOf(w.ledger.Written(), "soft")); n != 1 {
 				t.Fatalf("soft lines %d", n)
