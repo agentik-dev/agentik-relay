@@ -10,9 +10,9 @@ import (
 	"testing"
 )
 
-// TestAgentikR1_2_VendoredPinned (agentik-r1 §8.2, §7.3): the three files
+// TestAgentikR1_2_VendoredPinned (agentik-r1 §8.2, §7.3): the four files
 // vendored from agentik-commons are the bytes scripts/vendored.sha256 pins,
-// as `make hygiene` checks them: `shasum -a 256 -c` reads three OK lines.
+// as `make hygiene` checks them: `shasum -a 256 -c` reads four OK lines.
 func TestAgentikR1_2_VendoredPinned(t *testing.T) {
 	sum, err := exec.LookPath("shasum")
 	if err != nil {
@@ -29,13 +29,13 @@ func TestAgentikR1_2_VendoredPinned(t *testing.T) {
 		t.Fatalf("shasum -c scripts/vendored.sha256: %v\n%s", err, out)
 	}
 	ok := 0
-	for _, name := range []string{"agentik", "hygiene", "bounded"} {
+	for _, name := range []string{"agentik", "hygiene", "bounded", "plugin-version-check"} {
 		if strings.Contains(string(out), "scripts/"+name+": OK\n") {
 			ok++
 		}
 	}
-	if ok != 3 || strings.Count(string(out), "\n") != 3 {
-		t.Errorf("shasum -c read %d of 3 OK lines:\n%s", ok, out)
+	if ok != 4 || strings.Count(string(out), "\n") != 4 {
+		t.Errorf("shasum -c read %d of 4 OK lines:\n%s", ok, out)
 	}
 }
 

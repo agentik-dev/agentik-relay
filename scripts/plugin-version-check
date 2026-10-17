@@ -1,0 +1,151 @@
+#!/usr/bin/env python3
+"""plugin-version-check: did plugin/ change after its version last moved? (GUIDE §7)
+
+Usage: plugin-version-check [--json] [--repo DIR]
+
+Claude Code refreshes an installed plugin only when `plugin.json`'s `version`
+changes, so a change under `plugin/` that keeps the version never reaches an
+install. Run from a plugin repo's root (or name it with --repo), the check finds
+`since`, the last commit on the first-parent line that changed the `version` value
+of `plugin/.claude-plugin/plugin.json`: each commit of `git log --first-parent --
+<file>`, newest first, against its first parent, an absent file or unreadable JSON
+reading as no value (so a version that never changed takes the file's first
+commit). It then lists the files under `plugin/` changed since: `git diff
+<since> HEAD -- plugin/`, plus the uncommitted ones `git status` shows, untracked
+files included and ignored ones not, each path from the checkout's top level.
+
+A working tree whose `version` differs from HEAD's holds a bump in flight, which
+covers every change: the check passes, `since` null and nothing listed.
+
+Output: on 0 one stdout line; on 1 one stderr line per changed file; under --json
+one stdout object, `{"version": ..., "since": "<sha>" or null, "changed": [...]}`,
+with the same exit.
+
+Exit codes report the task, not the content: 0 nothing under plugin/ changed since
+the version did, 1 a file did (a check said no), 2 usage, not inside a git work
+tree, git missing or failing, or no readable string `version` in the working
+tree's plugin.json. Stdlib only. Canonical in agentik-commons, vendored into each
+plugin repo's scripts/ by its `scripts/sync`.
+"""
+import json
+import os
+import subprocess
+import sys
+
+PLUGIN = "plugin/"
+MANIFEST = "plugin/.claude-plugin/plugin.json"
+USAGE = "usage: plugin-version-check [--json] [--repo DIR]"
+# the user's git config must not change what the walk sees
+GIT = ["git", "-c", "log.follow=false", "-c", "log.showSignature=false",
+       "-c", "diff.relative=false", "-c", "core.quotePath=false"]
+ABSENT = object()  # no file, unreadable JSON, or no `version` key at a revision
+
+
+class Failed(Exception):
+    """A git call failed, or git is not on PATH."""
+
+
+def git(repo, *args, ok=(0,)):
+    try:
+        p = subprocess.run(GIT + ["-C", repo, *args], capture_output=True)
+    except OSError as exc:
+        raise Failed("git: %s" % exc)
+    if p.returncode not in ok:
+        raise Failed("git %s: %s" % (args[0], p.stderr.decode("utf-8", "replace").strip()))
+    return p.returncode, p.stdout
+
+
+def version_of(data):
+    """The `version` value of plugin.json bytes, or ABSENT."""
+    try:
+        doc = json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return ABSENT
+    return doc.get("version", ABSENT) if isinstance(doc, dict) else ABSENT
+
+
+def version_at(repo, rev):
+    """The `version` value at `rev` (a missing revision or file reads ABSENT)."""
+    code, out = git(repo, "cat-file", "blob", "%s:./%s" % (rev, MANIFEST), ok=(0, 128))
+    return version_of(out) if code == 0 else ABSENT
+
+
+def find_since(repo):
+    """The newest first-parent commit that changed the version, else the file's first."""
+    _, out = git(repo, "log", "--first-parent", "--format=%H", "--", MANIFEST)
+    shas = out.decode("ascii").split()
+    for sha in shas:
+        if version_at(repo, sha) != version_at(repo, sha + "^1"):
+            return sha
+    return shas[-1] if shas else None
+
+
+def changed_since(repo, since):
+    paths = set()
+    if since is not None:
+        _, out = git(repo, "diff", "--name-only", "--no-renames", "-z", since, "HEAD",
+                     "--", PLUGIN)
+        paths.update(p for p in out.decode("utf-8", "replace").split("\0") if p)
+    _, out = git(repo, "status", "--porcelain=v1", "-z", "--untracked-files=all",
+                 "--no-renames", "--", PLUGIN)
+    paths.update(r[3:] for r in out.decode("utf-8", "replace").split("\0") if len(r) > 3)
+    return sorted(paths)
+
+
+def run(repo):
+    """(version, since, changed): since None for a bump in flight."""
+    code, out = git(repo, "rev-parse", "--is-inside-work-tree", ok=(0, 128))
+    if code != 0 or out.strip() != b"true":
+        raise Failed("%s is not inside a git work tree" % repo)
+    try:
+        with open(os.path.join(repo, MANIFEST), "rb") as fh:
+            version = version_of(fh.read())
+    except OSError as exc:
+        raise Failed("no %s: %s" % (MANIFEST, exc.strerror or exc))
+    if not isinstance(version, str):
+        raise Failed("%s holds no readable string version" % MANIFEST)
+    has_head = git(repo, "rev-parse", "--verify", "-q", "HEAD^{commit}", ok=(0, 1))[0] == 0
+    if not has_head or version_at(repo, "HEAD") != version:
+        return version, None, []
+    since = find_since(repo)
+    return version, since, changed_since(repo, since)
+
+
+def main(argv):
+    args, as_json, repo = argv[1:], False, "."
+    if args in (["-h"], ["--help"]):
+        print(USAGE)
+        return 0
+    while args:
+        a = args.pop(0)
+        if a == "--json" and not as_json:
+            as_json = True
+        elif a == "--repo" and repo == "." and args and not args[0].startswith("-"):
+            repo = args.pop(0)
+        else:
+            sys.stderr.write(USAGE + "\n")
+            return 2
+    if not os.path.isdir(repo):
+        sys.stderr.write("plugin-version-check: %s is not a directory\n" % repo)
+        return 2
+    try:
+        version, since, changed = run(repo)
+    except Failed as exc:
+        sys.stderr.write("plugin-version-check: %s\n" % exc)
+        return 2
+    if as_json:
+        print(json.dumps({"version": version, "since": since, "changed": changed}))
+    elif since is None:
+        print("plugin-version-check: version %s is uncommitted; the bump in flight "
+              "covers every change under %s" % (version, PLUGIN))
+    elif not changed:
+        print("plugin-version-check: version %s, set at %s; nothing under %s changed since"
+              % (version, since[:12], PLUGIN))
+    for path in changed if not as_json else ():
+        sys.stderr.write("plugin-version-check: %s: changed since %s set version %s; "
+                         "bump plugin.json's version\n" % (path, since[:12], version))
+    return 1 if changed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

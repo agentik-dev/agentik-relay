@@ -724,3 +724,13 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 ## AR95's build (2026-10-17): what it leaves (S4)
 - The old numbers, for a reader of the records: portfolio entry 21 is entry 13 here, entry 22's relay share is entry 14 (its helpers clause stays in the portfolio ledger (agentik-hq entry 4)), 23 is entry 15, 24 is entry 16, and 26 is agentik-hq entry 6. A record (what a packet, a round or a proposal read) keeps the number it read; the live citations, entry 12 and the Status lines of `design/session-layer-r1.md` and `design/relay-orchestrator-r1.md`, take the new ones (AR95 ruling 5).
 - relay-r1 §4's "(agent-relay today)", a ledger with no rendered block, lapsed: `CLAUDE.md` now holds the block, so a row cut after AR95's merge reads it from `CLAUDE.md at <sha12>`. relay-r1 lies outside AR95's may-touch; the next packet that touches §4 drops the parenthesis.
+
+## sync-vc1's build (2026-10-17): what it leaves (S4)
+- `plugin-version-check` is not in `.PHONY`, so a stray root file of that name makes `make plugin-version-check` print "is up to date" and skip the check. It rides the next packet that touches the Makefile.
+- `check-unlocked`'s `##` help line lists six steps and leaves out the version check; the same packet.
+- `hygiene`'s help line and its sha-check failure message name three vendored copies, while `scripts/vendored.sha256` pins four; the same packet.
+- README.md line 91's `make check` step list leaves out the version check, and line 105's Status line still reads `0.1.3`; the next `make readme` sitting.
+- The packet's §1 last bullet says `make hygiene` prints the version line; under ruling 2 `make plugin-version-check` does. It is a record line, left as it is.
+- GUIDE §7 ties a release tag to the version, and there is no `v0.2.0` tag; the tag is the owner's to make.
+
+From now on any relay packet that edits `plugin/` lists `plugin/.claude-plugin/plugin.json` in its may-touch row and bumps the version, or the gate reads red (GUIDE §7).
