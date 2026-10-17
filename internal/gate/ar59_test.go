@@ -3,6 +3,7 @@ package gate
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -14,24 +15,39 @@ import (
 // TestAR59_2_GateUsesLimit is AR59 act 2: the gate's verify line runs
 // under Verify.Limit: `sleep 3` under 1 s is red, cut at 1 s, and the gate
 // carries the limit for the merge; with no limit (effects.Timeout) it is
-// green.
-func TestAR59_2_GateUsesLimit(t *testing.T) {
+// green. The cut is proved by its outcome (AR94).
+func TestAR59_2_GateUsesLimit(t *testing.T) { ar59GateCut(t, 0) }
+
+// ar59GateCut is TestAR59_2_GateUsesLimit's body over a git whose Clone
+// sleeps slow (ar94SlowClone): `sleep 3 && touch <mark>` under 1 s is red,
+// exit 124, Cut 1, VerifySeconds 1, and its mark never lands (ar94Absent),
+// the call under ar94Guard's 30 s hang guard (AR94); with no limit,
+// `sleep 3` is green, VerifySeconds 900.
+func ar59GateCut(t *testing.T, slow time.Duration) {
+	t.Helper()
 	w := newWorld(t)
+	fx := w.fx
+	fx.Git = ar94SlowClone{slow: slow}
 	st := w.stage(t, "a.txt")
 	p := pk([]string{"a.txt"})
-	start := time.Now()
-	res, _, g, err := Run(w.fx, st, p, nil, seen, Verify{Name: "sleep 3", Limit: time.Second})
+	mark := filepath.Join(t.TempDir(), "mark")
+	var res relay.Result
+	var g relay.Gate
+	var err error
+	took, back := ar94Guard(t, "the cut gate", func() {
+		res, _, g, err = Run(fx, st, p, nil, seen, Verify{Name: fmt.Sprintf("sleep 3 && touch '%s'", mark), Limit: time.Second})
+	})
 	if err != nil || res != relay.RedResult || g.Verify == nil || g.Verify.Status != relay.CheckRed ||
 		g.Verify.Cut != 1 || g.Verify.BranchExit != 124 || g.VerifySeconds != 1 {
 		t.Fatalf("under 1 s: %s, %v; verify %+v, gate's limit %d", res, err, g.Verify, g.VerifySeconds)
 	}
-	if took := time.Since(start); took >= 3*time.Second {
-		t.Fatalf("the cut gate took %s: the line ran past its limit", took)
-	}
-	res, why, g, err := Run(w.fx, st, p, nil, seen, Verify{Name: "sleep 3"})
+	ar94Forced(t, slow, took)
+	var why relay.StopReason
+	ar94Guard(t, "the unlimited gate", func() { res, why, g, err = Run(fx, st, p, nil, seen, Verify{Name: "sleep 3"}) })
 	if err != nil || res != relay.GreenResult || why != "" || g.Verify.Cut != 0 || g.VerifySeconds != 900 {
 		t.Fatalf("no limit: %s %s, %v; verify %+v, gate's limit %d", res, why, err, g.Verify, g.VerifySeconds)
 	}
+	ar94Absent(t, mark, back)
 }
 
 // TestAR59_2_HandTakesLimit is AR59 act 2: Hand reads v.Limit, so a hand
@@ -102,23 +118,36 @@ func TestAR59_3_CutReason(t *testing.T) {
 // TestAR59_3_MergeNamesCut is AR59 act 3: a green gate built by hand with
 // VerifySeconds 1, merged over `sleep 3`: the error and the `merge` line
 // (verify-cut, a MergeRefused) name the cut, and the root is where it was.
-func TestAR59_3_MergeNamesCut(t *testing.T) {
+// The cut is proved by its outcome (AR94).
+func TestAR59_3_MergeNamesCut(t *testing.T) { ar59MergeCut(t, 0) }
+
+// ar59MergeCut is TestAR59_3_MergeNamesCut's body over a git whose Clone
+// sleeps slow (ar94SlowClone), Gather's too: the merge's verify line
+// `sleep 3 && touch <mark>` under the gate's 1 s is refused verify-cut, and
+// its mark never lands (ar94Absent), the call under ar94Guard's 30 s hang
+// guard (AR94).
+func ar59MergeCut(t *testing.T, slow time.Duration) {
+	t.Helper()
 	w := newWorld(t)
+	fx := w.fx
+	fx.Git = ar94SlowClone{slow: slow}
 	st := w.stage(t, "a.txt")
 	before := gitIn(t, w.root, "rev-parse", "HEAD")
-	green := Gather(w.fx, st, pk([]string{"a.txt"}), nil, seen)
+	var green relay.Gate
+	ar94Guard(t, "the gather", func() { green = Gather(fx, st, pk([]string{"a.txt"}), nil, seen) })
 	if res, _ := relay.Decide(green); res != relay.GreenResult {
 		t.Fatalf("the gate is %s, want green", res)
 	}
 	green.VerifySeconds = 1
-	start := time.Now()
-	_, err := MergeIfGreen(w.fx, w.root, green, "a1", "sleep 3", nil)
+	mark := filepath.Join(t.TempDir(), "mark")
+	var err error
+	took, back := ar94Guard(t, "the cut merge", func() {
+		_, err = MergeIfGreen(fx, w.root, green, "a1", fmt.Sprintf("sleep 3 && touch '%s'", mark), nil)
+	})
 	if err == nil || !strings.Contains(err.Error(), `merge a1: verify cut at 1 s, last ""`) {
 		t.Fatalf("MergeIfGreen = %v, want the cut named", err)
 	}
-	if took := time.Since(start); took >= 3*time.Second {
-		t.Fatalf("the merge's verify ran %s, past its 1 s limit", took)
-	}
+	ar94Forced(t, slow, took)
 	l := w.ledger.Written()
 	if m := l[len(l)-1]; m["event"] != "merge" || m["result"] != string(relay.VerifyCut) || !strings.Contains(fmt.Sprint(m["detail"]), "verify cut at 1 s") {
 		t.Fatalf("the merge line %v, want verify-cut naming the cut", m)
@@ -133,4 +162,5 @@ func TestAR59_3_MergeNamesCut(t *testing.T) {
 	if s := gitIn(t, w.root, "status", "--porcelain", "--untracked-files=no"); s != "" {
 		t.Fatalf("the root is dirty: %q", s)
 	}
+	ar94Absent(t, mark, back)
 }
