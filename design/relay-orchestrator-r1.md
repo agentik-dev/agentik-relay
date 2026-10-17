@@ -1,6 +1,6 @@
 # agent-relay design: orchestrator rows (r1)
 
-**Status:** design r1, 2026-09-29, by a helper in sitting example-mac 2026-09-28-6. It is revised once after its refuter round: each blocking finding was checked against the code at `9d20a0e`, the two briefs and the ledgers before it was fixed. ar32a is built (2026-09-29), and so is ar32b, less the two parts §11 names; ar32c is not. Inputs: the owner's ask of 2026-09-29, relay-r1 §1 and §3 to §9, the example-app and example-ops briefs of 2026-09-29, and the ledger entries it names. The portfolio's relay entries now live in example-ops's `DECISIONS.md`, so this record names them by title.
+**Status:** design r1, 2026-09-29, by a helper in sitting example-mac 2026-09-28-6. It is revised once after its refuter round: each blocking finding was checked against the code at `9d20a0e`, the two briefs and the ledgers before it was fixed. ar32a is built (2026-09-29), and so is ar32b, less the two parts §11 names; ar32c is not. Inputs: the owner's ask of 2026-09-29, relay-r1 §1 and §3 to §9, the example-app and example-ops briefs of 2026-09-29, and the ledger entries it names. The relay entries it names by title live in this repo's `DECISIONS.md` since 2026-10-17, as entries 13 to 16.
 
 ## 1. The problem and the design
 
