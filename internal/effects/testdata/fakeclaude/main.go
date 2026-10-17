@@ -20,6 +20,10 @@
 // FAKECLAUDE_RESULT_DELAY_MS (AR35) is a further wait before the
 // fixture's result event: a kill that lands in it leaves no result, so a
 // test of a kill before the result holds however slow the relay is.
+// FAKECLAUDE_COMMIT_AT=n (AR28) makes an empty commit before fixture line
+// n; FAKECLAUDE_COMMIT_AFTER (AR93) names a path that commit waits for,
+// 30 s at most, so a test orders it after the relay's read of the head; a
+// path not there by then exits 3 with one stderr line and no commit.
 package main
 
 import (
@@ -52,6 +56,19 @@ func envInt(name string, def int) int {
 		fail(2, "%s: %v", name, err)
 	}
 	return n
+}
+
+// waitFor reports whether path exists within limit; "" is true at once.
+func waitFor(path string, limit time.Duration) bool {
+	if path == "" {
+		return true
+	}
+	for end := time.Now().Add(limit); time.Now().Before(end); time.Sleep(10 * time.Millisecond) {
+		if _, err := os.Stat(path); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 func writeTranscript(dir, session string) {
@@ -118,6 +135,9 @@ func main() {
 	commitAt := envInt("FAKECLAUDE_COMMIT_AT", 0) // a commit before that line (AR28's head move)
 	for i, line := range lines {
 		if commitAt > 0 && i == commitAt {
+			if after := os.Getenv("FAKECLAUDE_COMMIT_AFTER"); !waitFor(after, 30*time.Second) {
+				fail(3, "FAKECLAUDE_COMMIT_AFTER: %s not there after 30 s, no commit", after)
+			}
 			if msg, err := exec.Command("git", "commit", "--allow-empty", "-qm", "fake mid act").CombinedOutput(); err != nil {
 				fail(3, "git commit: %v: %s", err, msg)
 			}

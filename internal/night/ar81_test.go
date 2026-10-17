@@ -172,18 +172,39 @@ func TestAR81_2_ReportHolds(t *testing.T) {
 // r1 held then admitted at +60 s; r2, the new head, asks at +120 s and
 // holds; r3, queued behind r1 at T, now reads `behind r2`, still queued
 // with no ask, its since T.
-func TestAR81_4_QueuedBehindNewHead(t *testing.T) {
+func TestAR81_4_QueuedBehindNewHead(t *testing.T) { ar81QueuedBehindNewHead(t, 0) }
+
+// ar81QueuedBehindNewHead is TestAR81_4_QueuedBehindNewHead's night, the
+// band answering each ask lag after its record (AR93), r1's and r2's
+// children silent until r3 has asked.
+func ar81QueuedBehindNewHead(t *testing.T, lag time.Duration) {
 	ad := effects.FakeAnswer{BandVerdict: effects.BandVerdict{Verdict: "admitted"}}
 	ns := func(text string) effects.FakeAnswer {
 		return effects.FakeAnswer{BandVerdict: effects.BandVerdict{Verdict: "not-started", Text: text}}
 	}
 	band := &effects.FakeBand{Answers: map[string][]effects.FakeAnswer{"r1": {ns("r1 no room"), ad}, "r2": {ns("r2 no room"), ad}}}
 	w, q, o, sp, clock := ar80World(t, band, "r1", "r2", "r3")
+	w.fx.Band = &ar93LateBand{FakeBand: band, lag: lag}
+	// A failed sitting stops the night: r1's and r2's children hold until
+	// r3 has asked (AR93 fix round 1, F1).
+	r3Asked := func() bool { return strings.Contains(ar80Asks(band), "r3 ") }
+	sp.wait["r1"], sp.wait["r2"] = r3Asked, r3Asked
 	o.Parallel = 3
 	res := ar71Run(w, q, o, sp)
 	T := ar65T.Format(time.RFC3339)
+	admitted := func(row string) { // its leave read the clock: the step may follow (AR93 ruling 3)
+		ar65Until(t, row+"'s admitted line", func() bool {
+			for _, l := range rowLines(w.ledger.Written(), "band", row) {
+				if l["state"] == "admitted" {
+					return true
+				}
+			}
+			return false
+		})
+	}
 	ar65Until(t, "r3's queued line", func() bool { return len(rowLines(w.ledger.Written(), "band", "r3")) == 1 })
 	ar80Ask(t, band, 1, clock, 60*time.Second)
+	admitted("r1")
 	ar80Ask(t, band, 2, clock, 120*time.Second)
 	_, by := ar81Rows(t, o, "r2's ask", func(_ night.Status, by map[string]night.RowStatus) bool {
 		return by["r2"].Band != nil && by["r2"].Band.Asks == 1
@@ -195,6 +216,7 @@ func TestAR81_4_QueuedBehindNewHead(t *testing.T) {
 		t.Fatalf("r3 at +120 s: %s, %q, %s", r.State, r.Reason, ar81Band(r.Band))
 	}
 	ar80Ask(t, band, 3, clock, 180*time.Second)
+	admitted("r2")
 	ar80Ask(t, band, 4, clock, 240*time.Second)
 	ar65End(t, res)
 	if got := ar80Asks(band); got != "r1 +0s, r1 +60s, r2 +120s, r2 +180s, r3 +240s" {
