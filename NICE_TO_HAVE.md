@@ -734,3 +734,8 @@ The packet ran as is; N5 (§1's actions sentence names paused) was folded in act
 - GUIDE §7 ties a release tag to the version, and there is no `v0.2.0` tag; the tag is the owner's to make.
 
 From now on any relay packet that edits `plugin/` lists `plugin/.claude-plugin/plugin.json` in its may-touch row and bumps the version, or the gate reads red (GUIDE §7).
+
+## AR97's build (2026-10-30): what it leaves (S4, seen by the AR97 refuter)
+- relay-r1 §5 (line 110) and §11 (line 564) still end the `denied` notice's body `; move accounts`, while the code and the tests pin `; move accounts, or band: off in the relay config stops the hold` (`effects.BandLever`). relay-r1 lies outside AR97's may-touch past §15; the next packet that touches relay-r1 moves both lines.
+- Four forms the grammar refuses that should pass as ruling 2 is written: `git log -- ':/'` (git's pathspec for the repo's top), `HEAD^{/a..:/b}` (the `..` split reads `:/b}` as a side), `-S :/x` and `--grep :/x` (the search text is a flag's value, not a revision, but a separate value is read as an operand). A packet that reads each option's arity would pass them.
+- Not probed: a `go test -C` dir that is a symlink out of the worktree passes, since `goTestDir` reads the text only, as the other readers do; a check that resolves the path would close it.
