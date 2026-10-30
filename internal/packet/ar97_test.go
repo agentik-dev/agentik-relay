@@ -28,7 +28,7 @@ func TestAR97_3_LoudFormPasses(t *testing.T) {
 			t.Errorf("Unbounded(%q) = %q, want \"\"", l, why)
 		}
 	}
-	if err := withLine(t, "ar97-x", "git log -1 ':/qzvq' | grep -c x"); err == nil || !strings.Contains(err.Error(), "HEAD^{/") {
+	if err := withLine(t, "ar97-x", "git log -1 ':/qzvq' --oneline"); err == nil || !strings.Contains(err.Error(), "HEAD^{/") {
 		t.Errorf("Parse of a `:/` line = %v; want a refusal naming HEAD^{/", err)
 	}
 }
