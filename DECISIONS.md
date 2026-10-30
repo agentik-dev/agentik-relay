@@ -1,6 +1,6 @@
 ---
 status: current
-updated: 2026-10-17
+updated: 2026-10-30
 ---
 # agentik-relay: what is settled
 
@@ -20,7 +20,7 @@ The closed choices of this repository: one numbered entry each, one paragraph, i
 
 2. **Packets are written before their rows and copied in at act 0.** A packet is written before its row runs, by the sitting that cuts it or by a helper agent that sitting spawns; no row gets a packet-writer sitting, since those sittings took 58 of run 13's 183 sittings and $261 of its $653. The Go queue's `packet` lies inside the repository (relay-r1 §3), so the cutting sitting commits the packet at `design/packets/<row>.md` on main, with its queue row, before the night. Act 0 comes before any other act: a packet that lies outside the repository is copied verbatim into `design/packets/<row>.md` and committed alone, so the history shows what each row was asked. `internal/prompt/rules.txt` carries act 0 and the headless sentences, and the CONTEXT line names the packet. A packet that needs the target repository's toolchain before it can be written keeps its packet-writer sitting. Every packet follows relay-r1 §2, its writer's appended notes included: under 9,216 bytes, six sections, and acceptance on the allowlist. (2026-09-24, run 13, the owner's option A on the orchestrator's cost read; rows standin-13 and ar26-packet-rule, whose act 0 found the verbatim copy did not parse; folded 2026-09-28 from record 0001, which left with the `decisions/` directory; amended 2026-09-28, the example-mac stand-in's retirement, example-mac DECISIONS.md entry 5 as amended by the owner's answer 5 of 2026-09-28: the helper's batches into example-mac `relay/prompts/` and the byte-for-byte parity with the stand-in's RULES lapse, charter example-mac 2026-09-28-6)
 
-14. **A packet is a slice that fits one sitting.** A packet is a small, finishable slice with an acceptance table; about four acts fit one builder. Each target repo is the home of its own queue and its own packets, as the Go relay is designed. The builder's copy-in at its first act, the skipped copy-in a row may declare, and the one packet-writer sitting left, for a packet that needs the target repo's toolchain first, are entries 2 and 1. (2026-09-24; portfolio entry 22 from 2026-09-29 until 2026-10-17, its relay share moved under agentik-hq entry 4, its helpers clause kept in the portfolio ledger)
+14. **A packet is a slice that fits one sitting.** A packet is a small, finishable slice with an acceptance table; about four acts fit one builder. Each target repo is the home of its own queue and its own packets, as the Go relay is designed. The builder's copy-in at its first act, the skipped copy-in a row may declare, and the one packet-writer sitting left, for a packet that needs the target repo's toolchain first, are entries 2 and 1. (2026-09-24; portfolio entry 22 from 2026-09-29 until 2026-10-17, its relay share moved under agentik-hq entry 4, its helpers clause merged into a private ledger's entry 9)
 
 ### The orchestrator row
 
