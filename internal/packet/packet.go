@@ -483,8 +483,10 @@ func sedPrint(args []string) string {
 }
 
 // gitRead is why `git <args>` is not a read-only verb, "" when it is:
-// log, show, diff or rev-parse with no global option before it, and never
-// an output file or an external diff.
+// log, show, diff or rev-parse with no global option before it, never an
+// output file or an external diff, and no operand naming a commit by
+// `:/<text>` (AR97 ruling 2), by a brace the shell expands, from the input
+// (`--stdin`) or after `--ancestry-path=` (AR97 Amendment 1).
 func gitRead(args []string) string {
 	if len(args) == 0 {
 		return "`git` wants a verb: log, show, diff or rev-parse"
@@ -498,8 +500,69 @@ func gitRead(args []string) string {
 		if strings.HasPrefix(a, "--output") || a == "--ext-diff" || a == "--textconv" {
 			return "`git " + args[0] + " " + a + "` writes a file or runs a program"
 		}
+		if a == "--stdin" {
+			// AR97 Amendment 1: the revisions come from the input, which
+			// the line's reader never sees
+			return "`git " + args[0] + " --stdin` reads its revisions from the input, which the line does not name: give them as operands"
+		}
+		if v, ok := strings.CutPrefix(a, "--ancestry-path="); ok && (braced(v) || colonSlash(v)) {
+			// AR97 Amendment 1: the flag's value is a commit, read as an
+			// operand is
+			return "`git " + args[0] + " " + a + "` names its commit by `:/<text>` or a brace: give a hash or a ref"
+		}
+		if strings.HasPrefix(a, "-") {
+			continue
+		}
+		if braced(a) {
+			// AR97 Amendment 1: `{:/x,HEAD}` is two words to the shell, and
+			// one of them a search the line never spells
+			return "`git " + args[0] + " " + a + "` has a brace the shell may expand into words the line does not show: name each one"
+		}
+		if colonSlash(a) {
+			// AR97 ruling 2: `:/<text>` searches every ref, not the row's
+			// history, and after `--` it is a path that matches nothing and
+			// exits 0; a separate option's value (`--grep :/x`) is read as an
+			// operand too, so it is refused with them
+			return "`git " + args[0] + " " + a + "` names a commit by `:/<text>`, which searches every ref and is a path after `--`: write `HEAD^{/<text>}`"
+		}
 	}
 	return ""
+}
+
+// braced reports whether a git operand holds a brace the shell may expand
+// (AR97 Amendment 1): a `{` not after `^`, or one whose span to its `}`
+// holds a `,` or a `..`. The peel and the search forms after `^` pass;
+// the words reach here unquoted, so a quoted brace is refused too.
+func braced(w string) bool {
+	for i := 0; i < len(w); i++ {
+		if w[i] != '{' {
+			continue
+		}
+		if i == 0 || w[i-1] != '^' {
+			return true
+		}
+		span := w[i+1:]
+		if j := strings.IndexByte(span, '}'); j >= 0 {
+			span = span[:j]
+		}
+		if strings.Contains(span, ",") || strings.Contains(span, "..") {
+			return true
+		}
+	}
+	return false
+}
+
+// colonSlash reports whether a git operand names a commit by `:/<text>`:
+// any side of its `...` or `..`, after one leading `^`, that begins `:/`.
+func colonSlash(w string) bool {
+	for _, three := range strings.Split(w, "...") {
+		for _, side := range strings.Split(three, "..") {
+			if strings.HasPrefix(strings.TrimPrefix(side, "^"), ":/") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // goTestValued and goTestBool are the `go test` flags an acceptance line
@@ -509,12 +572,27 @@ var (
 	goTestValued = map[string]bool{"run": true, "count": true, "timeout": true}
 	goTestBool   = map[string]bool{"v": true, "race": true, "short": true, "failfast": true, "cover": true, "json": true}
 	varRE        = regexp.MustCompile(`\$[A-Za-z_{0-9?@*#!-]`)
+	goTestDirRE  = regexp.MustCompile(`^[A-Za-z0-9_.][A-Za-z0-9_./-]*$`)
 )
+
+// goTestDir is why `go test -C <dir>` leaves the worktree, "" when dir is a
+// relative path of plain words with no `..` part (AR97 ruling 3).
+func goTestDir(dir string) string {
+	bad := !goTestDirRE.MatchString(dir)
+	for _, part := range strings.Split(dir, "/") {
+		bad = bad || part == ".."
+	}
+	if bad {
+		return "`go test -C " + dir + "` leaves the worktree or names a variable: want a relative path with no `..`"
+	}
+	return ""
+}
 
 // goTest is why `go test <toks>` is not targeted, "" when it is: exactly
 // one named package (never `...`, all, std, cmd or a variable), a -run
 // that matches no test named at random, and flags off goTestValued and
-// goTestBool.
+// goTestBool, after an optional first `-C <dir>` inside the worktree (AR97
+// ruling 3).
 func goTest(toks []string) string {
 	pkgs, runs := 0, 0
 	for k := 0; k < len(toks); k++ {
@@ -533,6 +611,20 @@ func goTest(toks []string) string {
 		}
 		name, val, hasVal := strings.Cut(strings.TrimLeft(tok, "-"), "=")
 		switch {
+		case name == "C" && !strings.HasPrefix(tok, "---"):
+			if k != 0 {
+				return "`go test -C` must be the first flag (go's own rule)"
+			}
+			if !hasVal {
+				if k+1 == len(toks) {
+					return "`go test -C` wants a value"
+				}
+				k++
+				val = toks[k]
+			}
+			if why := goTestDir(val); why != "" {
+				return why
+			}
 		case goTestBool[name]:
 		case goTestValued[name]:
 			if !hasVal {
@@ -549,7 +641,7 @@ func goTest(toks []string) string {
 				runs++
 			}
 		default:
-			return "`go test " + tok + "` is off the allowlist (-run, -count, -timeout, -v, -race, -short, -failfast, -cover, -json)"
+			return "`go test " + tok + "` is off the allowlist (-C, -run, -count, -timeout, -v, -race, -short, -failfast, -cover, -json)"
 		}
 	}
 	if pkgs == 0 || runs == 0 {

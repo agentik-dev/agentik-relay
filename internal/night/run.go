@@ -465,7 +465,11 @@ func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptio
 			if q != nil {
 				q.hold(rp.ID)
 			}
-			fmt.Fprintf(log, "relay %s: the band holds it: %s\n", rp.ID, v.Verdict)
+			if v.Peak != nil { // AR97 ruling 1: the peak and the owner's lever
+				fmt.Fprintf(log, "relay %s: the band holds it: %s (peak %s%%); %s\n", rp.ID, v.Verdict, strconv.FormatFloat(*v.Peak, 'f', -1, 64), effects.BandLever)
+			} else {
+				fmt.Fprintf(log, "relay %s: the band holds it: %s; %s\n", rp.ID, v.Verdict, effects.BandLever)
+			}
 			continue
 		}
 		if opts.asked != nil { // status counts the ask (AR81 ruling 2)

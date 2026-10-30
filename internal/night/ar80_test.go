@@ -352,7 +352,7 @@ func TestAR80_7_Unchecked(t *testing.T) {
 
 // TestAR80_8_DeniedNotice (rulings 4, 7): denied twice holds with one
 // held line and one notice; not-started then denied writes a second held
-// line, denied, and one notice; each body ends "; move accounts".
+// line, denied, and one notice; each body ends "; move accounts, or <lever>".
 func TestAR80_8_DeniedNotice(t *testing.T) {
 	peak := 131.0
 	dn := effects.FakeAnswer{BandVerdict: effects.BandVerdict{Verdict: "denied", Text: "the week", Peak: &peak}}
@@ -379,7 +379,7 @@ func TestAR80_8_DeniedNotice(t *testing.T) {
 				bands = append(bands, nt)
 			}
 		}
-		if got := ar80Band(t, w.ledger.Written(), "r1"); got != c.want || len(bands) != 1 || bands[0].Body != "verdict=denied peak=131; move accounts" || bands[0].Priority != 3 {
+		if got := ar80Band(t, w.ledger.Written(), "r1"); got != c.want || len(bands) != 1 || bands[0].Body != "verdict=denied peak=131; move accounts, or band: off in the relay config stops the hold" || bands[0].Priority != 3 {
 			t.Fatalf("band lines %s (want %s), band notices %+v", got, c.want, bands)
 		}
 	}
