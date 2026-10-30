@@ -485,7 +485,8 @@ func sedPrint(args []string) string {
 // gitRead is why `git <args>` is not a read-only verb, "" when it is:
 // log, show, diff or rev-parse with no global option before it, never an
 // output file or an external diff, and no operand naming a commit by
-// `:/<text>` (AR97 ruling 2).
+// `:/<text>` (AR97 ruling 2), by a brace the shell expands, from the input
+// (`--stdin`) or after `--ancestry-path=` (AR97 Amendment 1).
 func gitRead(args []string) string {
 	if len(args) == 0 {
 		return "`git` wants a verb: log, show, diff or rev-parse"
@@ -499,7 +500,25 @@ func gitRead(args []string) string {
 		if strings.HasPrefix(a, "--output") || a == "--ext-diff" || a == "--textconv" {
 			return "`git " + args[0] + " " + a + "` writes a file or runs a program"
 		}
-		if !strings.HasPrefix(a, "-") && colonSlash(a) {
+		if a == "--stdin" {
+			// AR97 Amendment 1: the revisions come from the input, which
+			// the line's reader never sees
+			return "`git " + args[0] + " --stdin` reads its revisions from the input, which the line does not name: give them as operands"
+		}
+		if v, ok := strings.CutPrefix(a, "--ancestry-path="); ok && (braced(v) || colonSlash(v)) {
+			// AR97 Amendment 1: the flag's value is a commit, read as an
+			// operand is
+			return "`git " + args[0] + " " + a + "` names its commit by `:/<text>` or a brace: give a hash or a ref"
+		}
+		if strings.HasPrefix(a, "-") {
+			continue
+		}
+		if braced(a) {
+			// AR97 Amendment 1: `{:/x,HEAD}` is two words to the shell, and
+			// one of them a search the line never spells
+			return "`git " + args[0] + " " + a + "` has a brace the shell may expand into words the line does not show: name each one"
+		}
+		if colonSlash(a) {
 			// AR97 ruling 2: `:/<text>` searches every ref, not the row's
 			// history, and after `--` it is a path that matches nothing and
 			// exits 0; a separate option's value (`--grep :/x`) is read as an
@@ -508,6 +527,29 @@ func gitRead(args []string) string {
 		}
 	}
 	return ""
+}
+
+// braced reports whether a git operand holds a brace the shell may expand
+// (AR97 Amendment 1): a `{` not after `^`, or one whose span to its `}`
+// holds a `,` or a `..`. The peel and the search forms after `^` pass;
+// the words reach here unquoted, so a quoted brace is refused too.
+func braced(w string) bool {
+	for i := 0; i < len(w); i++ {
+		if w[i] != '{' {
+			continue
+		}
+		if i == 0 || w[i-1] != '^' {
+			return true
+		}
+		span := w[i+1:]
+		if j := strings.IndexByte(span, '}'); j >= 0 {
+			span = span[:j]
+		}
+		if strings.Contains(span, ",") || strings.Contains(span, "..") {
+			return true
+		}
+	}
+	return false
 }
 
 // colonSlash reports whether a git operand names a commit by `:/<text>`:
