@@ -227,6 +227,10 @@ const (
 	BandOff  = "off"
 )
 
+// BandLever is the owner's lever (band-pacing-r1 §6) as a hold's log line
+// and its `denied` notice spell it (AR97 ruling 1).
+const BandLever = "band: off in the relay config stops the hold"
+
 // FakeAnswer is one scripted answer: the verdict, or Err.
 type FakeAnswer struct {
 	BandVerdict

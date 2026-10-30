@@ -128,7 +128,7 @@ func TestAR80_1_OSBand(t *testing.T) {
 
 	// The notice: a held denied line only (ruling 7).
 	n, ok := Notices("band", map[string]any{"night": "n", "row": "r1", "part": 1, "state": "held", "verdict": "denied", "peak": 131.0, "text": "SECRET"})
-	if !ok || n.Priority != 3 || n.Body != "verdict=denied peak=131; move accounts" {
+	if !ok || n.Priority != 3 || n.Body != "verdict=denied peak=131; move accounts, or band: off in the relay config stops the hold" {
 		t.Fatalf("the denied notice %+v, %v", n, ok)
 	}
 	for _, f := range []map[string]any{{"state": "held", "verdict": "not-started"}, {"state": "admitted", "verdict": "denied"}, {"state": "unchecked"}} {

@@ -60,7 +60,7 @@ var noticeFields = map[string][]string{
 // paused sitting line (`limit: paused`) sends none, its pause line's
 // notice serves (AR65, AR66). A `band` line sends one only when it holds
 // on `denied` (AR80 ruling 7), priority 3, its body ending `; move
-// accounts`.
+// accounts, or ` and the lever, BandLever (AR97 ruling 1).
 func Notices(event string, fields map[string]any) (Notice, bool) {
 	keys, ok := noticeFields[event]
 	if !ok {
@@ -89,7 +89,7 @@ func Notices(event string, fields map[string]any) (Notice, bool) {
 		suffix = "; " + relay.ResumeLine(n.Row)
 	}
 	if event == "band" {
-		suffix = "; move accounts"
+		suffix = "; move accounts, or " + BandLever
 	}
 	suffix = capText(suffix, NoticeCap)
 	n.Body = capText(strings.Join(parts, " "), NoticeCap-len(suffix)) + suffix
