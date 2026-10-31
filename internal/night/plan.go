@@ -63,6 +63,9 @@ type Plan struct {
 	Skipped      int               `json:"skipped"`
 	Budget       int               `json:"budget"`
 	Breaker      BreakerStats      `json:"breaker"`
+	// Band is band.json's top level on a login with no five-hour window
+	// (AR98 ruling 6); nil on any other, so the JSON is as before.
+	Band *effects.BandFile `json:"band,omitempty"`
 	// MeasureSeconds is the measure's budget the plan used, and
 	// MeasureFrom where it came from: flag, queue or default (AR38 act 1).
 	MeasureSeconds int    `json:"measure_seconds"`
