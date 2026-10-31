@@ -739,3 +739,7 @@ From now on any relay packet that edits `plugin/` lists `plugin/.claude-plugin/p
 - relay-r1 §5 (line 110) and §11 (line 564) still end the `denied` notice's body `; move accounts`, while the code and the tests pin `; move accounts, or band: off in the relay config stops the hold` (`effects.BandLever`). relay-r1 lies outside AR97's may-touch past §15; the next packet that touches relay-r1 moves both lines.
 - Four forms the grammar refuses that should pass as ruling 2 is written: `git log -- ':/'` (git's pathspec for the repo's top), `HEAD^{/a..:/b}` (the `..` split reads `:/b}` as a side), `-S :/x` and `--grep :/x` (the search text is a flag's value, not a revision, but a separate value is read as an operand). A packet that reads each option's arity would pass them.
 - Not probed: a `go test -C` dir that is a symlink out of the worktree passes, since `goTestDir` reads the text only, as the other readers do; a check that resolves the path would close it.
+
+## AR98's build (2026-10-30): what it leaves (S4)
+- The relay's `status` does not read band.json: on a `none` login only `plan` prints the band and its end (AR98 ruling 7). A line in `status` would show it during a night.
+- A row queued behind a head that holds on its answer's `resume_at`, with band.json's `Reset` erring, goes `unchecked` and spawns (AR98 ruling 4, pinned in `TestAR98_5`); the head's own reset is not handed to the queue. Handing it on would close the one-spawn gate there too; a lead, not seen in a night.
