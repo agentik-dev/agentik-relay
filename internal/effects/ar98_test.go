@@ -88,7 +88,7 @@ func TestAR98_2_ResetReadsAnswerResumeAt(t *testing.T) {
 	}
 	// Amendment 1, ruling 4: a `demand` of the wrong shape is dropped, and the
 	// file's window still reads.
-	for _, demand := range []string{`"weird"`, `[]`, `5`, `true`, `null`, `{"until": 5}`, `{"band": 5, "until": "2026-10-30T11:00:00-07:00"}`, `{"band": "avoid", "until": []}`} {
+	for _, demand := range []string{`"weird"`, `[]`, `5`, `true`, `null`, `{"until": 5}`, `{"band": 5, "until": "2026-10-30T11:00:00-07:00"}`, `{"band": "avoid", "until": []}`, `{"band":null,"until":null}`, `{"band":null,"until":"2026-10-30T11:00:00-07:00"}`, `{"band":"avoid","until":null}`} {
 		put(BandTool, `{"window":"none","demand":`+demand+`}`)
 		f, err = ReadBandFile(OSFS{}, env)
 		if err != nil || f.Window != "none" || f.Demand != nil {
