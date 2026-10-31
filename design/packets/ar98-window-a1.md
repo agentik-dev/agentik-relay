@@ -22,6 +22,8 @@ The refuter's round 1 on 0b495d6: FAIL on F1, with F2, F3 and F4 as S4s; the coo
 4. **F4, taken.** `ReadBandFile` reads `demand` as a raw message and drops it when it is not an object, or when `band` or `until` is not a string: `window: none` then prints `band: no 5h window`, never nothing. Pinned in effects' `TestAR98_` with `"weird"`, `[]`, `{"until": 5}`.
 5. **Pins for the surviving mutants that matter:** a row arriving after a bare queued row is promoted; the weekly end's `leave` and its log line; the weekly end's `sit.stop` value, whichever the existing weekly path writes; plan's clock regex anchored; a non-ENOENT read error on the plan's file reads as no line. The rest are equivalent or out of scope.
 
+**Amendment 2.** For ruling 2's sentence "A row queued behind a head that holds with a zero reset holds bare, as today", read: a row behind a bare head stays bare until the head's verdict moves, `--until` or a stop, deliberately; "as today" was wrong for it, since at 0b495d6 such a row read `Reset` and took it when it answered. The carried reset is for a head that named a window: the queue carries a head's reset only when that head's opening answer named one, and a row behind a head that named none reads `Reset` as at 0b495d6.
+
 ## 3. Interfaces
 
 No exported signature moves; `effects.BandFile` is unchanged.

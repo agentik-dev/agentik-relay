@@ -742,3 +742,6 @@ From now on any relay packet that edits `plugin/` lists `plugin/.claude-plugin/p
 
 ## AR98's build (2026-10-30): what it leaves (S4)
 - The relay's `status` does not read band.json: on a `none` login only `plan` prints the band and its end (AR98 ruling 7). A line in `status` would show it during a night.
+- A head sitting in an Ask across its reset lets a row launched then spawn `unchecked` up to `BandTimeout` early: the reset it carries is past when the row opens (AR98 Amendment 2).
+- A row behind a bare head can hold with no `--until` while the verdict never moves: it stays bare though `Reset` answers again, until the head's verdict moves, `--until` or a stop (AR98 Amendment 2).
+- A hold's reset never moves after it opens, so a head later `denied` to the week still spawns at its first reset, with its row (AR98 Amendment 2).
