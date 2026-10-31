@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -25,15 +26,52 @@ func ar98Answers(vs ...effects.BandVerdict) *effects.FakeBand {
 	return &effects.FakeBand{Answers: map[string][]effects.FakeAnswer{"r1": as}}
 }
 
+// ar98Spawner is ar71Spawner's children, a clean one committing so its end is
+// green and frees its slot, with each row's spawn times as ar80Spawner reads
+// them.
+type ar98Spawner struct {
+	ar71 *ar71Spawner
+	at   *ar80Spawner
+}
+
+func ar98Green(w *world, clock *effects.StepClock) *ar98Spawner {
+	return &ar98Spawner{
+		ar71: &ar71Spawner{w: w, n: map[string]int{}, first: map[string]effects.FakeRun{}, until: map[string]func() bool{}},
+		at:   &ar80Spawner{clock: clock, at: map[string][]time.Time{}},
+	}
+}
+
+func (a *ar98Spawner) Start(sp effects.Spawn) (effects.Process, io.ReadCloser, error) {
+	a.at.mu.Lock()
+	row := filepath.Base(sp.Dir)
+	a.at.at[row] = append(a.at.at[row], a.at.clock.Now())
+	a.at.mu.Unlock()
+	return a.ar71.Start(sp)
+}
+
+func (a *ar98Spawner) spawns(row string) []string { return a.at.spawns(row) }
+
 // TestAR98_1_NoneDeniedStopsAsWeekly (ruling 2): `denied` on window `none`,
 // on the first ask and on an ask inside a hold, spawns nothing and stops the
 // night `usage-limit` with detail `a weekly limit`, as TestAR65_4's weekly
 // case reads it: the end line, no denied notice, no pause or wake, the
-// sitting line with no `limit`. Any other window holds as today.
+// sitting line with no `limit`, its `stop` what a weekly refusal in the stream
+// writes, the row's log naming the end. Any other window holds as today.
 func TestAR98_1_NoneDeniedStopsAsWeekly(t *testing.T) {
 	week := effects.BandVerdict{Verdict: "denied", Text: "the week", Window: "none", ResumeAt: ar65T.Add(72 * time.Hour).Format(time.RFC3339)}
 	ad := effects.BandVerdict{Verdict: "admitted"}
-	weekly := func(t *testing.T, w *world, n *night.Night, sp *ar80Spawner, notes *effects.FakeNotify, wantBand string) {
+	// The stop the existing weekly path writes on the sitting line.
+	cw, cq, co, csp, _ := ar80World(t, &effects.FakeBand{}, "r1")
+	csp.first["r1"] = ar65Event("seven_day", ar65T.Add(48*time.Hour))
+	cn := ar65End(t, ar71Run(cw, cq, co, csp))
+	if cn.State != relay.Stopped(relay.UsageLimit) {
+		t.Fatalf("the weekly control: night %s", cn.State)
+	}
+	weeklyStop := ar80One(t, cw.ledger.Written(), "sitting", "r1")["stop"]
+	if weeklyStop != string(relay.UsageLimit) {
+		t.Fatalf("the weekly control's stop %v", weeklyStop)
+	}
+	weekly := func(t *testing.T, w *world, o night.NightOptions, n *night.Night, sp *ar80Spawner, notes *effects.FakeNotify, wantBand string) {
 		t.Helper()
 		all := w.ledger.Written()
 		stop := lastOf(all, "stop")
@@ -53,6 +91,18 @@ func TestAR98_1_NoneDeniedStopsAsWeekly(t *testing.T) {
 		if sit["state"] != "failed" || sit["reason"] != "usage-limit" || sit["limit"] != nil {
 			t.Fatalf("the sitting line %v; want failed usage-limit with no limit", sit)
 		}
+		if sit["stop"] != weeklyStop {
+			t.Fatalf("the sitting's stop %v, want the weekly path's %v", sit["stop"], weeklyStop)
+		}
+		logged, err := os.ReadFile(night.RowLog(o.State, n.ID, "r1"))
+		for _, want := range []string{
+			"relay r1: the band denies it on a login with no 5h window: a weekly limit\n",
+			"relay r1: usage-limit before the spawn\n",
+		} {
+			if err != nil || !strings.Contains(string(logged), want) {
+				t.Fatalf("the row's log %q, %v; want %q", logged, err, want)
+			}
+		}
 		for _, nt := range notes.Notices() {
 			if nt.Event == "band" {
 				t.Fatalf("a band notice: %+v", nt)
@@ -65,7 +115,7 @@ func TestAR98_1_NoneDeniedStopsAsWeekly(t *testing.T) {
 		notes := &effects.FakeNotify{}
 		o.Notify = notes
 		n := ar65End(t, ar71Run(w, q, o, sp))
-		weekly(t, w, n, sp, notes, "weekly")
+		weekly(t, w, o, n, sp, notes, "weekly")
 		if states(n) != "r1=failed r2=skipped" || fmt.Sprint(sp.spawns("r2")) != "[]" {
 			t.Fatalf("states %s, r2's spawns %v", states(n), sp.spawns("r2"))
 		}
@@ -86,7 +136,7 @@ func TestAR98_1_NoneDeniedStopsAsWeekly(t *testing.T) {
 		res := ar71Run(w, q, o, sp)
 		ar80Ask(t, band, 1, clock, 60*time.Second)
 		n := ar65End(t, res)
-		weekly(t, w, n, sp, notes, "held not-started; weekly 2/60s")
+		weekly(t, w, o, n, sp, notes, "held not-started; weekly 2/60s")
 	})
 	t.Run("a held row behind it stops with it", func(t *testing.T) {
 		band := ar98Answers(effects.BandVerdict{Verdict: "not-started"}, week)
@@ -98,6 +148,9 @@ func TestAR98_1_NoneDeniedStopsAsWeekly(t *testing.T) {
 		n := ar65End(t, res)
 		if n.State != relay.Stopped(relay.UsageLimit) || len(sp.spawns("r1"))+len(sp.spawns("r2")) != 0 || ar80Asks(band) != "r1 +0s, r1 +60s" {
 			t.Fatalf("night %s, spawns %v %v, asks %s", n.State, sp.spawns("r1"), sp.spawns("r2"), ar80Asks(band))
+		}
+		if logged, _ := os.ReadFile(night.RowLog(o.State, n.ID, "r2")); strings.Contains(string(logged), "waits for r1") {
+			t.Fatalf("r2 waits on a row that never spawned: %q", logged)
 		}
 	})
 	for _, c := range []struct{ name, window string }{{"window five_hour", "five_hour"}, {"no window", ""}} {
@@ -204,6 +257,10 @@ func TestAR98_4_PlanShowsBand(t *testing.T) {
 		{"a null demand", `{"window":"none","demand":null}`, "band: no 5h window", ""},
 		{"an until with no digits", `{"window":"none","demand":{"band":"avoid","until":"soon"}}`, "band: no 5h window", `"demand":{"band":"avoid","until":"soon"}`},
 		{"a demand with no band", `{"window":"none","demand":{"until":"2026-10-30T11:00:00-07:00"}}`, "band: no 5h window", `"demand":{"band":"","until":"2026-10-30T11:00:00-07:00"}`},
+		{"an until with its date not first", `{"window":"none","demand":{"band":"avoid","until":"by 2026-10-30T11:00:00-07:00"}}`, "band: no 5h window", `"demand":{"band":"avoid","until":"by 2026-10-30T11:00:00-07:00"}`},
+		{"a demand that is a string", `{"window":"none","demand":"weird"}`, "band: no 5h window", ""},
+		{"a demand that is a list", `{"window":"none","demand":[]}`, "band: no 5h window", ""},
+		{"an until that is a number", `{"window":"none","demand":{"until":5}}`, "band: no 5h window", ""},
 	} {
 		put(effects.BandTool, c.body)
 		out, js, p := build(env)
@@ -231,6 +288,20 @@ func TestAR98_4_PlanShowsBand(t *testing.T) {
 		}
 	}
 
+	// A read error other than no file reads as no line, and never falls through
+	// to the older folder's file.
+	put("claude-code-session", `{"window":"none"}`)
+	unread := filepath.Join(state, effects.BandTool, "admission", "band.json")
+	if err := os.Remove(unread); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(unread, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	same("a read error")
+	os.Remove(unread)
+	os.RemoveAll(filepath.Join(state, "claude-code-session"))
+
 	// `band: off`, on the same file: today's.
 	put(effects.BandTool, `{"window":"none"}`)
 	cfg := filepath.Join(w.root, effects.RepoConfigFile)
@@ -250,10 +321,10 @@ func TestAR98_4_PlanShowsBand(t *testing.T) {
 
 // TestAR98_5_WaitWithoutResetHolds (rulings 3, 4): a `wait` with no
 // `resume_at` and a Reset that errs holds with no reset, re-asking each
-// BandPoll to its verdict; a row behind it holds; a row behind any other
-// head and every other verdict stay `unchecked` on Reset's error. The
-// answer's `resume_at` is the hold's reset; one past or not RFC 3339 falls
-// to Reset.
+// BandPoll to its verdict; a row behind it holds, one arriving after it came
+// to the head too; a `wait` with no `window` and every other verdict stay
+// `unchecked` on Reset's error (Amendment 1, ruling 1). The answer's
+// `resume_at` is the hold's reset; one past or not RFC 3339 falls to Reset.
 func TestAR98_5_WaitWithoutResetHolds(t *testing.T) {
 	noReset := errors.New("band.json: no resetsAt")
 	wait := effects.BandVerdict{Verdict: "wait", Text: "one at a time", Window: "five_hour"}
@@ -372,17 +443,23 @@ func TestAR98_5_WaitWithoutResetHolds(t *testing.T) {
 			t.Fatalf("asks %s", got)
 		}
 	})
-	t.Run("a row behind any other head stays unchecked", func(t *testing.T) {
-		held := effects.BandVerdict{Verdict: "not-started", ResumeAt: ar65T.Add(time.Hour).Format(time.RFC3339)}
-		band := ar98Answers(held)
+	t.Run("a row arriving after a bare queued row is promoted holds", func(t *testing.T) {
+		band := ar98Answers(wait, ad)
+		band.Answers["r2"] = []effects.FakeAnswer{{BandVerdict: wait}}
 		band.ResetErr = noReset
-		w, q, o, sp, _ := ar80World(t, band, "r1", "r2")
+		w, q, o, _, clock := ar80World(t, band, "r1", "r2", "r3")
+		sp := ar98Green(w, clock)
 		o.Parallel = 2
 		res := ar71Run(w, q, o, sp)
-		ar65Until(t, "r2's line", func() bool { return len(rowLines(w.ledger.Written(), "band", "r2")) == 1 })
-		line := rowLines(w.ledger.Written(), "band", "r2")[0]
-		if e, _ := line["error"].(string); line["state"] != "unchecked" || !strings.Contains(e, "no resetsAt") {
-			t.Fatalf("r2's line %v", line)
+		ar65Until(t, "r2's queued line", func() bool { return len(rowLines(w.ledger.Written(), "band", "r2")) == 1 })
+		ar80Ask(t, band, 1, clock, 60*time.Second)
+		ar65Until(t, "r3's line", func() bool { return len(rowLines(w.ledger.Written(), "band", "r3")) == 1 })
+		all := w.ledger.Written()
+		if got := ar80Band(t, all, "r3"); got != "held queued" || len(sp.spawns("r3")) != 0 {
+			t.Fatalf("r3's band %q, spawns %v", got, sp.spawns("r3"))
+		}
+		if line := rowLines(all, "band", "r3")[0]; line["text"] != "behind r2" {
+			t.Fatalf("r3's line %v", line)
 		}
 		if err := night.WriteControl(effects.OSFS{}, night.ControlPath(o.State, o.PlanOptions.Night), "stop"); err != nil {
 			t.Fatal(err)
@@ -394,6 +471,7 @@ func TestAR98_5_WaitWithoutResetHolds(t *testing.T) {
 		v    effects.BandVerdict
 		want string
 	}{
+		{"a wait with no window", effects.BandVerdict{Verdict: "wait"}, "no resetsAt"},
 		{"not-started", effects.BandVerdict{Verdict: "not-started"}, "no resetsAt"},
 		{"deferred", effects.BandVerdict{Verdict: "deferred"}, "no resetsAt"},
 		{"denied", effects.BandVerdict{Verdict: "denied", Window: "five_hour"}, "no resetsAt"},
@@ -448,4 +526,106 @@ func TestAR98_5_WaitWithoutResetHolds(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestAR98_6_QueuedTakesHeadReset (Amendment 1, ruling 2): a row queued behind
+// a held head takes the head's reset and never asks Reset, so it neither goes
+// `unchecked` on Reset's error nor overtakes a head held to the week's reset.
+func TestAR98_6_QueuedTakesHeadReset(t *testing.T) {
+	noReset := errors.New("band.json: no resetsAt")
+	week := 7 * 24 * time.Hour
+	weekS := int(week.Seconds())
+	onWeek := effects.BandVerdict{Verdict: "denied", Text: "the week", Window: "five_hour", ResumeAt: ar65T.Add(week).Format(time.RFC3339)}
+	for _, c := range []struct {
+		name     string
+		resetAt  time.Time
+		resetErr error
+	}{
+		{"Reset errs", time.Time{}, noReset},
+		{"Reset answers a five-hour reset", ar65T.Add(150 * time.Second), nil},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			band := ar98Answers(onWeek)
+			band.ResetAt, band.ResetErr = c.resetAt, c.resetErr
+			w, q, o, _, clock := ar80World(t, band, "r1", "r2")
+			sp := ar98Green(w, clock)
+			o.Parallel = 2
+			res := ar71Run(w, q, o, sp)
+			ar65Until(t, "r2's queued line", func() bool { return len(rowLines(w.ledger.Written(), "band", "r2")) == 1 })
+			if got := ar80Band(t, w.ledger.Written(), "r2"); got != "held queued" {
+				t.Fatalf("r2's band %q", got)
+			}
+			ar80Ask(t, band, 1, clock, 60*time.Second)
+			ar80Ask(t, band, 2, clock, 120*time.Second)
+			ar80Ask(t, band, 3, clock, 180*time.Second) // past the five-hour reset
+			ar80Ask(t, band, 4, clock, week-time.Second)
+			ar80Ask(t, band, 5, clock, week)
+			ar65Until(t, "the spawns", func() bool { return len(sp.spawns("r1")) == 1 && len(sp.spawns("r2")) == 1 })
+			ar65End(t, res)
+			all := w.ledger.Written()
+			if got, want := ar80Band(t, all, "r2"), fmt.Sprintf("held queued; reset 0/%ds", weekS); got != want {
+				t.Fatalf("r2's band %q, want %q", got, want)
+			}
+			at := fmt.Sprintf("[+%ds]", weekS)
+			if fmt.Sprint(sp.spawns("r1")) != at || fmt.Sprint(sp.spawns("r2")) != at {
+				t.Fatalf("spawns r1 %v, r2 %v; want %s each", sp.spawns("r1"), sp.spawns("r2"), at)
+			}
+		})
+	}
+	t.Run("a head's reset read from Reset passes on as read", func(t *testing.T) {
+		band := ar98Answers(effects.BandVerdict{Verdict: "not-started"})
+		band.ResetAt = ar65T.Add(150 * time.Second)
+		w, q, o, sp, clock := ar80World(t, band, "r1", "r2")
+		o.Parallel = 2
+		res := ar71Run(w, q, o, sp)
+		ar65Until(t, "r2's queued line", func() bool { return len(rowLines(w.ledger.Written(), "band", "r2")) == 1 })
+		ar80Ask(t, band, 1, clock, 60*time.Second)
+		ar80Ask(t, band, 2, clock, 120*time.Second)
+		ar80Ask(t, band, 3, clock, 150*time.Second)
+		ar65End(t, res)
+		if got := ar80Band(t, w.ledger.Written(), "r2"); got != "held queued; reset 0/150s" || fmt.Sprint(sp.spawns("r2")) != "[+150s]" {
+			t.Fatalf("r2's band %q, spawns %v", got, sp.spawns("r2"))
+		}
+	})
+	t.Run("a row arriving after a queued row is promoted takes the same reset", func(t *testing.T) {
+		held := effects.BandVerdict{Verdict: "not-started", ResumeAt: ar65T.Add(time.Hour).Format(time.RFC3339)}
+		band := ar98Answers(held, effects.BandVerdict{Verdict: "admitted"})
+		band.Answers["r2"] = []effects.FakeAnswer{{BandVerdict: effects.BandVerdict{Verdict: "not-started"}}}
+		band.ResetErr = noReset
+		w, q, o, _, clock := ar80World(t, band, "r1", "r2", "r3")
+		sp := ar98Green(w, clock)
+		o.Parallel = 2
+		res := ar71Run(w, q, o, sp)
+		ar65Until(t, "r2's queued line", func() bool { return len(rowLines(w.ledger.Written(), "band", "r2")) == 1 })
+		ar80Ask(t, band, 1, clock, 60*time.Second)
+		ar65Until(t, "r3's line", func() bool { return len(rowLines(w.ledger.Written(), "band", "r3")) == 1 })
+		ar69To(clock, ar65T.Add(time.Hour))
+		ar65End(t, res)
+		all := w.ledger.Written()
+		if got, want := ar80Band(t, all, "r3"), "held queued; reset 0/3540s"; got != want || fmt.Sprint(sp.spawns("r3")) != "[+3600s]" {
+			t.Fatalf("r3's band %q, want %q; spawns %v", got, want, sp.spawns("r3"))
+		}
+	})
+	t.Run("a head's later hold moves it for a row that opens after", func(t *testing.T) {
+		first := effects.BandVerdict{Verdict: "not-started", ResumeAt: ar65T.Add(time.Hour).Format(time.RFC3339)}
+		later := effects.BandVerdict{Verdict: "not-started", ResumeAt: ar65T.Add(2 * time.Hour).Format(time.RFC3339)}
+		band := ar98Answers(first)
+		band.Answers["r3"] = []effects.FakeAnswer{{BandVerdict: later}}
+		band.ResetErr = noReset
+		w, q, o, _, clock := ar80World(t, band, "r1", "r2", "r3", "r4")
+		sp := ar98Green(w, clock)
+		o.Parallel = 2
+		res := ar71Run(w, q, o, sp)
+		ar65Until(t, "r2's queued line", func() bool { return len(rowLines(w.ledger.Written(), "band", "r2")) == 1 })
+		ar80Ask(t, band, 1, clock, 60*time.Second)
+		ar80Ask(t, band, 2, clock, time.Hour)
+		ar65Until(t, "r3's place", func() bool { return len(sp.spawns("r1")) == 1 && len(sp.spawns("r2")) == 1 })
+		ar69To(clock, ar65T.Add(time.Hour+60*time.Second))
+		ar65Until(t, "r4's queued line", func() bool { return len(rowLines(w.ledger.Written(), "band", "r4")) == 1 })
+		ar69To(clock, ar65T.Add(2*time.Hour))
+		ar65End(t, res)
+		if got, want := ar80Band(t, w.ledger.Written(), "r4"), "held queued; reset 0/3540s"; got != want || fmt.Sprint(sp.spawns("r4")) != "[+7200s]" {
+			t.Fatalf("r4's band %q, want %q; spawns %v", got, want, sp.spawns("r4"))
+		}
+	})
 }

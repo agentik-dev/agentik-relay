@@ -86,6 +86,23 @@ func TestAR98_2_ResetReadsAnswerResumeAt(t *testing.T) {
 	if _, err := rb.Reset(); err == nil || !strings.Contains(err.Error(), "no resetsAt") {
 		t.Fatalf("Reset on a `none` file: %v, want no resetsAt", err)
 	}
+	// Amendment 1, ruling 4: a `demand` of the wrong shape is dropped, and the
+	// file's window still reads.
+	for _, demand := range []string{`"weird"`, `[]`, `5`, `true`, `null`, `{"until": 5}`, `{"band": 5, "until": "2026-10-30T11:00:00-07:00"}`, `{"band": "avoid", "until": []}`} {
+		put(BandTool, `{"window":"none","demand":`+demand+`}`)
+		f, err = ReadBandFile(OSFS{}, env)
+		if err != nil || f.Window != "none" || f.Demand != nil {
+			t.Fatalf("demand %s: read %+v, %v; want window none, no demand", demand, f, err)
+		}
+	}
+	put(BandTool, `{"window":"none","demand":{"until":"2026-10-30T11:00:00-07:00"}}`)
+	if f, err = ReadBandFile(OSFS{}, env); err != nil || f.Demand == nil || f.Demand.Band != "" || f.Demand.Until != "2026-10-30T11:00:00-07:00" {
+		t.Fatalf("a demand with no band: %+v, %v", f, err)
+	}
+	put(BandTool, `{"window":5}`)
+	if _, err := ReadBandFile(OSFS{}, env); err == nil {
+		t.Fatal("ReadBandFile read a window that is not a string")
+	}
 	put(BandTool, `not json`)
 	if _, err := ReadBandFile(OSFS{}, env); err == nil {
 		t.Fatal("ReadBandFile read a file that is not JSON")
