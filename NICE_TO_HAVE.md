@@ -745,3 +745,4 @@ From now on any relay packet that edits `plugin/` lists `plugin/.claude-plugin/p
 - A head sitting in an Ask across its reset lets a row launched then spawn `unchecked` up to `BandTimeout` early: the reset it carries is past when the row opens (AR98 Amendment 2).
 - A row behind a bare head can hold with no `--until` while the verdict never moves: it stays bare though `Reset` answers again, until the head's verdict moves, `--until` or a stop (AR98 Amendment 2).
 - A hold's reset never moves after it opens, so a head later `denied` to the week still spawns at its first reset, with its row (AR98 Amendment 2).
+- The plan's band line draws a past `demand.until`, which the session plugin's line drops, and omits the weekday past 24 hours (AR98, from S44's round 2; S4). `internal/night/plan.go`, `bandLine`.
