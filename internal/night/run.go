@@ -291,13 +291,15 @@ type bandRecord struct {
 	peak        *float64
 }
 
-// How a band hold ended: the row spawns, the context cut it, or --until.
+// How a band hold ended: the row spawns, the context cut it, --until, or a
+// `denied` on a login with no five-hour window, the week's (AR98 ruling 2).
 type bandEnd int
 
 const (
 	bandSpawn bandEnd = iota
 	bandCut
 	bandUntil
+	bandWeekly
 )
 
 // peakOf is a line's peak: the number, or null.
@@ -320,8 +322,9 @@ func peakOf(p *float64) any {
 // opened, whose Reset errs: that hold opens with no reset and re-asks each
 // BandPoll, its verdict, --until or the context ending it (AR98 ruling 4). A
 // verdict's `resume_at` after now is its hold's reset, before Reset (AR98
-// ruling 3). A re-ask writes no line but a hold's first `denied` that did not
-// open it.
+// ruling 3). A `denied` on window `none`, at any ask, ends it `weekly`, the
+// row unspawned (AR98 ruling 2). A re-ask writes no line but a hold's first
+// `denied` that did not open it.
 func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptions, log io.Writer) (*bandRecord, bandEnd) {
 	q, clock := opts.band, fx.Clock
 	r := &bandRecord{}
@@ -468,6 +471,12 @@ func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptio
 				ends(map[string]any{"state": "admitted"})
 			}
 			return r, bandSpawn
+		case v.Verdict == "denied" && v.Window == "none": // the week's: no window to wait out (AR98 ruling 2)
+			leave(false)
+			r.verdict, r.peak = v.Verdict, v.Peak
+			ends(map[string]any{"state": "weekly"})
+			fmt.Fprintf(log, "relay %s: the band denies it on a login with no 5h window: a weekly limit\n", rp.ID)
+			return r, bandWeekly
 		case !bandHolds[v.Verdict]:
 			return unchecked(fmt.Sprintf("verdict %q", v.Verdict))
 		}
@@ -561,12 +570,18 @@ func RunRow(fx effects.Effects, sp effects.Spawner, st *Staged, rp *RowPlan, pro
 		ctx = context.Background()
 	}
 	// unspawned is a row never spawned (R6 §4): the owner's stop or kill, or an
-	// account's stop, during a wait, or --until reached in a band hold.
-	unspawned := func(until bool) (*relay.Sitting, relay.Gate) {
+	// account's stop, during a wait, --until reached in a band hold, or the
+	// band's weekly denial, whose held line the night decides as any weekly
+	// hit (pauseFor; AR98 ruling 2).
+	unspawned := func(end bandEnd) (*relay.Sitting, relay.Gate) {
 		s.State, s.Reason, sit.stop = relay.Skipped, "", relay.OwnerStop
 		var as accountCause
+		var limit stream.Limit
 		switch {
-		case until:
+		case end == bandWeekly:
+			s.State, s.Reason, sit.stop = relay.Failed, relay.UsageLimit, relay.UsageLimit
+			limit = stream.Limit{Reason: relay.UsageLimit, Kind: stream.KindWeekly}
+		case end == bandUntil:
 			sit.stop = relay.UntilReached
 		case errors.Is(context.Cause(ctx), ErrOwnerKill):
 			s.State, s.Reason, sit.stop = relay.Failed, relay.OwnerKill, relay.OwnerKill
@@ -574,7 +589,7 @@ func RunRow(fx effects.Effects, sp effects.Spawner, st *Staged, rp *RowPlan, pro
 			s.State, s.Reason, sit.stop = relay.Failed, relay.StopReason(as), relay.StopReason(as)
 		}
 		fmt.Fprintf(log, "relay %s: %s before the spawn\n", rp.ID, sit.stop)
-		sit.end(opts.hold, stream.Limit{})
+		sit.end(opts.hold, limit)
 		return s, relay.Gate{}
 	}
 	// The band before the breaker (band-pacing-r1 §2.2; AR80 ruling 3): a
@@ -590,7 +605,7 @@ func RunRow(fx effects.Effects, sp effects.Spawner, st *Staged, rp *RowPlan, pro
 		}
 		if end != bandSpawn {
 			sit.start = fx.Clock.Now()
-			return unspawned(end == bandUntil)
+			return unspawned(end)
 		}
 	}
 	sit.start = fx.Clock.Now()
@@ -606,7 +621,7 @@ func RunRow(fx effects.Effects, sp effects.Spawner, st *Staged, rp *RowPlan, pro
 		ok = opts.space.wait(ctx)
 	}
 	if !ok && ctx.Err() != nil {
-		return unspawned(false)
+		return unspawned(bandCut)
 	}
 	if !ok {
 		fmt.Fprintf(log, "relay %s: load %.2f over %d cores: the breaker still open after %d s; not spawned\n", rp.ID, brk.last, brk.cores, brk.WaitS)

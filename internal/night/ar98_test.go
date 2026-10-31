@@ -65,7 +65,7 @@ func TestAR98_1_NoneDeniedStopsAsWeekly(t *testing.T) {
 		notes := &effects.FakeNotify{}
 		o.Notify = notes
 		n := ar65End(t, ar71Run(w, q, o, sp))
-		weekly(t, w, n, sp, notes, "weekly denied")
+		weekly(t, w, n, sp, notes, "weekly")
 		if states(n) != "r1=failed r2=skipped" || fmt.Sprint(sp.spawns("r2")) != "[]" {
 			t.Fatalf("states %s, r2's spawns %v", states(n), sp.spawns("r2"))
 		}
@@ -86,7 +86,7 @@ func TestAR98_1_NoneDeniedStopsAsWeekly(t *testing.T) {
 		res := ar71Run(w, q, o, sp)
 		ar80Ask(t, band, 1, clock, 60*time.Second)
 		n := ar65End(t, res)
-		weekly(t, w, n, sp, notes, "held not-started; weekly denied 2/60s")
+		weekly(t, w, n, sp, notes, "held not-started; weekly 2/60s")
 	})
 	t.Run("a held row behind it stops with it", func(t *testing.T) {
 		band := ar98Answers(effects.BandVerdict{Verdict: "not-started"}, week)
