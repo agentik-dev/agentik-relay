@@ -72,14 +72,16 @@ func (f *limitFacts) add(m map[string]any) {
 
 // eventKinds maps a refused event's rateLimitType to its kind and scope
 // (AR82): the five values the Agent SDK references document, a model
-// family's weekly cap a model's limit scoped to the family's word. Any
-// other type, or none, falls to the text's kind.
+// family's weekly cap a model's limit scoped to the family's word, and
+// `seven_day_overage_included` Fable's, mode free (AR98 ruling 5). Any other
+// type, or none, falls to the text's kind.
 var eventKinds = map[string]struct{ kind, scope string }{
-	"five_hour":        {KindWindow, ""},
-	"seven_day":        {KindWeekly, ""},
-	"seven_day_opus":   {KindModel, "opus"},
-	"seven_day_sonnet": {KindModel, "sonnet"},
-	"overage":          {KindOverage, ""},
+	"five_hour":                  {KindWindow, ""},
+	"seven_day":                  {KindWeekly, ""},
+	"seven_day_opus":             {KindModel, "opus"},
+	"seven_day_sonnet":           {KindModel, "sonnet"},
+	"overage":                    {KindOverage, ""},
+	"seven_day_overage_included": {KindModel, "fable"},
 }
 
 // modelWords are the words `hit your <word> limit` and `reached your <word>

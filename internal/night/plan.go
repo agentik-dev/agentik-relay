@@ -11,6 +11,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -63,6 +64,9 @@ type Plan struct {
 	Skipped      int               `json:"skipped"`
 	Budget       int               `json:"budget"`
 	Breaker      BreakerStats      `json:"breaker"`
+	// Band is band.json's top level on a login with no five-hour window
+	// (AR98 ruling 6); nil on any other, so the JSON is as before.
+	Band *effects.BandFile `json:"band,omitempty"`
 	// MeasureSeconds is the measure's budget the plan used, and
 	// MeasureFrom where it came from: flag, queue or default (AR38 act 1).
 	MeasureSeconds int    `json:"measure_seconds"`
@@ -248,6 +252,7 @@ func BuildPlan(fx effects.Effects, q *queue.Queue, opts Options) (*Plan, error) 
 		return nil, fmt.Errorf("the root: %w", err)
 	}
 	p.Root = root
+	p.Band = planBand(fx, root)
 	if p.Origin, err = fx.Git.RemoteRefs(root); err != nil {
 		return nil, fmt.Errorf("origin: %w", err)
 	}
@@ -1132,6 +1137,9 @@ func Print(w io.Writer, p *Plan) {
 			fmt.Fprintln(w, l)
 		}
 	}
+	if p.Band != nil {
+		fmt.Fprintln(w, bandLine(p.Band))
+	}
 	fmt.Fprintln(w, MeasureLine(p))
 	fmt.Fprintf(w, "measured %s, skipped %d", plural(p.Measured, "line"), p.Skipped) // scope (§15)
 	if p.Budget > 0 {
@@ -1141,6 +1149,38 @@ func Print(w io.Writer, p *Plan) {
 		fmt.Fprintf(w, ", the breaker opened %s (%d s, load %.2f)", plural(b.Opens, "time"), b.WaitS, b.Load) // §15
 	}
 	fmt.Fprintln(w)
+}
+
+// planBand is band.json's top level on a login with no five-hour window
+// (AR98 ruling 6), read and never asked: nil on any other window, `band:
+// off`, a config or a file not readable, or effects with no environment.
+func planBand(fx effects.Effects, root string) *effects.BandFile {
+	if fx.Getenv == nil {
+		return nil
+	}
+	if cfg, err := effects.LoadConfig(fx.FS, fx.Getenv, root); err != nil || cfg.Band == effects.BandOff {
+		return nil
+	}
+	f, err := effects.ReadBandFile(fx.FS, fx.Getenv)
+	if err != nil || f.Window != "none" {
+		return nil
+	}
+	return &f
+}
+
+// untilClock is a zoned ISO time's HH:MM, its own digits.
+var untilClock = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T(\d{2}:\d{2})`)
+
+// bandLine is the plan's line on a login with no five-hour window: `band: no
+// 5h window`, and `· avoid to 11:00` when the demand names both.
+func bandLine(f *effects.BandFile) string {
+	s := "band: no 5h window"
+	if d := f.Demand; d != nil && d.Band != "" {
+		if m := untilClock.FindStringSubmatch(d.Until); m != nil {
+			s += " · " + d.Band + " to " + m[1]
+		}
+	}
+	return s
 }
 
 // MeasureLine is the measure's budget and its source as `plan` and `run`

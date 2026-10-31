@@ -41,13 +41,27 @@ type BandRequest struct {
 	ToolUseID    string `json:"tool_use_id"`
 }
 
-// BandVerdict is the plugin's answer: its verdict, mode and text, and the
-// peak it projects (nil for `unread` and `stale`).
+// BandVerdict is the plugin's answer: its verdict, mode and text, the peak
+// it projects (nil for `unread` and `stale`), and the login's window and the
+// reset it names (AR98 ruling 1): either absent or null reads empty, so an
+// older plugin's answer reads as before.
 type BandVerdict struct {
-	Verdict string   `json:"verdict"`
-	Mode    string   `json:"mode"`
-	Text    string   `json:"text"`
-	Peak    *float64 `json:"peak"`
+	Verdict  string   `json:"verdict"`
+	Mode     string   `json:"mode"`
+	Text     string   `json:"text"`
+	Peak     *float64 `json:"peak"`
+	Window   string   `json:"window"`
+	ResumeAt string   `json:"resume_at"`
+}
+
+// ResumeAfter is the answer's `resume_at` when it parses RFC 3339 and is
+// after now (AR98 ruling 3); any other is false, and the hold reads Reset.
+func (v BandVerdict) ResumeAfter(now time.Time) (time.Time, bool) {
+	at, err := time.Parse(time.RFC3339, v.ResumeAt)
+	if err != nil || !at.After(now) {
+		return time.Time{}, false
+	}
+	return at, true
 }
 
 // Band is the session band: Ask runs one admission for session, Reset
@@ -141,24 +155,9 @@ func (b OSBand) Reset() (time.Time, error) {
 	if env == nil {
 		env = os.Getenv
 	}
-	home := xdg.StateHome(env)
-	if home == "" {
-		return time.Time{}, errors.New("band.json: no state home")
-	}
-	var data []byte
-	var path string
-	for _, rel := range bandFiles {
-		path = filepath.Join(home, rel)
-		var err error
-		if data, err = os.ReadFile(path); err == nil {
-			break
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return time.Time{}, fmt.Errorf("band.json: %v", err)
-		}
-		data = nil
-	}
-	if data == nil {
-		return time.Time{}, fmt.Errorf("band.json: none under %s", home)
+	data, path, err := findBandFile(os.ReadFile, env)
+	if err != nil {
+		return time.Time{}, err
 	}
 	var f struct {
 		ResetsAt *string `json:"resetsAt"`
@@ -174,6 +173,68 @@ func (b OSBand) Reset() (time.Time, error) {
 		return time.Time{}, fmt.Errorf("%s: resetsAt %q: not RFC 3339", path, *f.ResetsAt)
 	}
 	return at, nil
+}
+
+// findBandFile reads band.json under xdg.StateHome, the new folder else the
+// old, with read; it names the path it read.
+func findBandFile(read func(string) ([]byte, error), env func(string) string) ([]byte, string, error) {
+	home := xdg.StateHome(env)
+	if home == "" {
+		return nil, "", errors.New("band.json: no state home")
+	}
+	for _, rel := range bandFiles {
+		path := filepath.Join(home, rel)
+		data, err := read(path)
+		if err == nil {
+			return data, path, nil
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, "", fmt.Errorf("band.json: %v", err)
+		}
+	}
+	return nil, "", fmt.Errorf("band.json: none under %s", home)
+}
+
+// BandDemand is band.json's `demand` as the plan reads it (AR98 ruling 6):
+// the band and when it ends, and no more of it.
+type BandDemand struct {
+	Band  string `json:"band"`
+	Until string `json:"until"`
+}
+
+// BandFile is band.json's top level as the plan reads it (AR98 ruling 6):
+// the login's window, and the demand when there is one.
+type BandFile struct {
+	Window string      `json:"window"`
+	Demand *BandDemand `json:"demand,omitempty"`
+}
+
+// ReadBandFile reads the file Reset finds, its top level: no file, or one
+// not JSON, errs; a `demand` that is not an object, or whose `band` or `until`
+// is not a string or is null, is dropped, the window still read (AR98 A1
+// ruling 4, A2 ruling 2). It never asks.
+func ReadBandFile(fs FS, env func(string) string) (BandFile, error) {
+	data, path, err := findBandFile(fs.ReadFile, env)
+	if err != nil {
+		return BandFile{}, err
+	}
+	var raw struct {
+		Window string          `json:"window"`
+		Demand json.RawMessage `json:"demand"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return BandFile{}, fmt.Errorf("%s: %v", path, err)
+	}
+	f := BandFile{Window: raw.Window}
+	var fields struct { // a null string decodes as "", as an absent one: read them raw
+		Band  json.RawMessage `json:"band"`
+		Until json.RawMessage `json:"until"`
+	}
+	if json.Unmarshal(raw.Demand, &f.Demand) != nil || json.Unmarshal(raw.Demand, &fields) != nil ||
+		string(fields.Band) == "null" || string(fields.Until) == "null" {
+		f.Demand = nil
+	}
+	return f, nil
 }
 
 // ResolveBand is the night's band under the config's mode: `off` gives nil

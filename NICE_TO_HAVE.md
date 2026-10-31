@@ -739,3 +739,10 @@ From now on any relay packet that edits `plugin/` lists `plugin/.claude-plugin/p
 - relay-r1 §5 (line 110) and §11 (line 564) still end the `denied` notice's body `; move accounts`, while the code and the tests pin `; move accounts, or band: off in the relay config stops the hold` (`effects.BandLever`). relay-r1 lies outside AR97's may-touch past §15; the next packet that touches relay-r1 moves both lines.
 - Four forms the grammar refuses that should pass as ruling 2 is written: `git log -- ':/'` (git's pathspec for the repo's top), `HEAD^{/a..:/b}` (the `..` split reads `:/b}` as a side), `-S :/x` and `--grep :/x` (the search text is a flag's value, not a revision, but a separate value is read as an operand). A packet that reads each option's arity would pass them.
 - Not probed: a `go test -C` dir that is a symlink out of the worktree passes, since `goTestDir` reads the text only, as the other readers do; a check that resolves the path would close it.
+
+## AR98's build (2026-10-30): what it leaves (S4)
+- The relay's `status` does not read band.json: on a `none` login only `plan` prints the band and its end (AR98 ruling 7). A line in `status` would show it during a night.
+- A head sitting in an Ask across its reset lets a row launched then spawn `unchecked` up to `BandTimeout` early: the reset it carries is past when the row opens (AR98 Amendment 2).
+- A row behind a bare head can hold with no `--until` while the verdict never moves: it stays bare though `Reset` answers again, until the head's verdict moves, `--until` or a stop (AR98 Amendment 2).
+- A hold's reset never moves after it opens, so a head later `denied` to the week still spawns at its first reset, with its row (AR98 Amendment 2).
+- The plan's band line draws a past `demand.until`, which the session plugin's line drops, and omits the weekday past 24 hours (AR98, from S44's round 2; S4). `internal/night/plan.go`, `bandLine`.
