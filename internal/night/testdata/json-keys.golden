@@ -41,6 +41,11 @@ gate verify.main_exit
 gate verify.main_last
 gate verify.name
 gate verify.status
+plan band
+plan band.demand
+plan band.demand.band
+plan band.demand.until
+plan band.window
 plan block
 plan breaker
 plan breaker.load

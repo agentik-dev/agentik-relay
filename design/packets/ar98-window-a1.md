@@ -1,4 +1,4 @@
-# Packet AR98, Amendment 1: round 1's findings
+# Packet AR98: Amendment 1, round 1's findings
 
 | item | value |
 |---|---|
@@ -6,9 +6,9 @@
 | pin | `ar98-window` at 0b495d6; worktree `.claude/worktrees/ar98-window` |
 | wall | the parent packet's, unchanged |
 | may touch | `internal/night/run.go`, `internal/night/ar98_test.go`, `internal/effects/band.go`, `internal/effects/ar98_test.go`, `design/packets/ar98-window-a1.md`, the sitting's charter, `NICE_TO_HAVE.md` |
-| acceptance | the parent packet's acceptance lines, each reading as it does there, but the night's `^TestAR98_` count reads the new total, named in the report; `git diff --stat 57aba66 -- internal/night/ar80_test.go internal/night/ar65_test.go internal/night/ar69_test.go` prints nothing; `make doclint` exits 0; `make hygiene` reads `hits outside allowlist: 0` |
-| budget | 40 tool calls, 180k context, `claude-opus-5-5`; acts: 0 this file; 1 the tests, red; 2 the code; one commit per act |
-| verify | `make check`, by the coordinator |
+| acceptance | `git diff --quiet 57aba66 -- internal/night/ar80_test.go internal/night/ar65_test.go internal/night/ar69_test.go` exits 0, with the parent packet's acceptance lines, each reading as it does there, but the night's `^TestAR98_` count reads the new total, named in the report, `make doclint` exiting 0 and `make hygiene` reading `hits outside allowlist: 0` |
+| budget | 40 turns, 180k context, `claude-opus-5-5`; acts: 0 this file; 1 the tests, red; 2 the code; one commit per act; the verify row by the coordinator |
+| verify | `make check` |
 
 ## 1. What the source says
 
