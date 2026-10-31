@@ -176,11 +176,11 @@ type bandQueue struct {
 	clock    effects.Clock
 	mu       sync.Mutex
 	rows     []string
-	holding  map[string]bool // the rows whose hold is open, a queued one's too (the fix round's finding 3)
-	bare     map[string]bool // the rows of holding whose hold has no reset (AR98 ruling 4)
-	after    time.Time       // the head asks no sooner: one BandPoll after a held head's leave
-	settling string          // the head that left to spawn and has not shown (AR87 ruling 2; "": none)
-	settleBy time.Time       // its leave plus BandSettle
+	holding  map[string]bool      // the rows whose hold is open, a queued one's too (the fix round's finding 3)
+	resets   map[string]time.Time // the reset each row of holding holds to, zero for none (AR98 A1 ruling 2)
+	after    time.Time            // the head asks no sooner: one BandPoll after a held head's leave
+	settling string               // the head that left to spawn and has not shown (AR87 ruling 2; "": none)
+	settleBy time.Time            // its leave plus BandSettle
 	moved    chan struct{}
 }
 
@@ -193,24 +193,24 @@ func (q *bandQueue) join(row string) {
 }
 
 // place reads row's place: whether it heads the queue (a row with no place
-// does), whether the head holds, whether that hold has no reset (AR98
-// ruling 4) and which it is, the row that settles when its cap is after the
+// does), whether the head holds, that hold's reset (AR98 A1 ruling 2; zero:
+// none) and which row it is, the row that settles when its cap is after the
 // BandPoll mark ("": none), the head's earliest ask (the later of the two),
 // and the channel the next change closes.
-func (q *bandQueue) place(row string) (head, held, bare bool, first, waits string, after time.Time, moved <-chan struct{}) {
+func (q *bandQueue) place(row string) (head, held bool, heldTo time.Time, first, waits string, after time.Time, moved <-chan struct{}) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if q.moved == nil {
 		q.moved = make(chan struct{})
 	}
 	if len(q.rows) == 0 || !slices.Contains(q.rows, row) {
-		return true, false, false, row, "", time.Time{}, q.moved
+		return true, false, time.Time{}, row, "", time.Time{}, q.moved
 	}
 	after = q.after
 	if q.settling != "" && q.settleBy.After(after) {
 		waits, after = q.settling, q.settleBy
 	}
-	return q.rows[0] == row, q.holding[q.rows[0]], q.bare[q.rows[0]], q.rows[0], waits, after, q.moved
+	return q.rows[0] == row, q.holding[q.rows[0]], q.resets[q.rows[0]], q.rows[0], waits, after, q.moved
 }
 
 // changed wakes every waiter; under mu.
@@ -223,15 +223,15 @@ func (q *bandQueue) changed() {
 
 // hold marks row's hold open, after its line is written (the fix
 // round's finding 4): a head whose hold is open, a queued row's that came
-// to the head included, makes the rows behind it queue; bare, a hold with
-// no reset (AR98 ruling 4), makes them hold on Reset's error too.
-func (q *bandQueue) hold(row string, bare bool) {
+// to the head included, makes the rows behind it queue, and a row that opens
+// behind it takes its reset, zero or not (AR98 A1 ruling 2).
+func (q *bandQueue) hold(row string, reset time.Time) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if q.holding == nil {
-		q.holding, q.bare = map[string]bool{}, map[string]bool{}
+		q.holding, q.resets = map[string]bool{}, map[string]time.Time{}
 	}
-	q.bare[row] = bare
+	q.resets[row] = reset
 	if !q.holding[row] {
 		q.holding[row] = true
 		q.changed()
@@ -260,7 +260,7 @@ func (q *bandQueue) leave(row string, held, spawns bool) {
 			}
 		}
 		delete(q.holding, row)
-		delete(q.bare, row)
+		delete(q.resets, row)
 		q.rows = append(q.rows[:i], q.rows[i+1:]...)
 		q.changed()
 		return
@@ -313,18 +313,19 @@ func peakOf(p *float64) any {
 // askBand is a row's first part before the breaker (band-pacing-r1 §2.2 to
 // §2.4; AR80 rulings 3 to 6). At its turn in the queue it asks; a verdict
 // that spawns ends it, one that holds opens a hold (its one Reset read, a
-// `band` line `held`), and a row behind a held head opens its hold
-// `queued`. A hold asks again every BandPoll at the head, and ends at the
-// nearest of a spawning verdict (`admitted`), its reset (`reset`, the row
-// spawning unasked), --until or the context. An error, a verdict outside
-// the seven, or a reset that errs or is not after now is `unchecked` and
-// spawns, but for a `wait` with no `resume_at`, and a row behind a hold so
-// opened, whose Reset errs: that hold opens with no reset and re-asks each
-// BandPoll, its verdict, --until or the context ending it (AR98 ruling 4). A
-// verdict's `resume_at` after now is its hold's reset, before Reset (AR98
-// ruling 3). A `denied` on window `none`, at any ask, ends it `weekly`, the
-// row unspawned (AR98 ruling 2). A re-ask writes no line but a hold's first
-// `denied` that did not open it.
+// `band` line `held`), and a row behind a held head opens its hold `queued`
+// on the head's reset, never reading Reset (AR98 A1 ruling 2). A hold asks
+// again every BandPoll at the head, and ends at the nearest of a spawning
+// verdict (`admitted`), its reset (`reset`, the row spawning unasked), --until
+// or the context. An error, a verdict outside the seven, or a reset that errs
+// or is not after now is `unchecked` and spawns, but for a `wait` that names a
+// window and has no `resume_at`, whose Reset errs (AR98 ruling 4; A1 ruling
+// 1): that hold opens with no reset and re-asks each BandPoll, its verdict,
+// --until or the context ending it, and a row behind it holds with no reset
+// too. A verdict's `resume_at` after now is its hold's reset, before Reset
+// (AR98 ruling 3). A `denied` on window `none`, at any ask, ends it `weekly`,
+// the row unspawned (AR98 ruling 2). A re-ask writes no line but a hold's
+// first `denied` that did not open it.
 func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptions, log io.Writer) (*bandRecord, bandEnd) {
 	q, clock := opts.band, fx.Clock
 	r := &bandRecord{}
@@ -361,24 +362,26 @@ func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptio
 		fmt.Fprintf(log, "relay %s: the band unchecked: %s\n", rp.ID, why)
 		return r, bandSpawn
 	}
-	open := func(now time.Time, v effects.BandVerdict, bare bool) string { // the hold's one reset; "" when it opens
+	opens := func(now, at time.Time) string { // the hold's one reset; "" when it opens
+		if !at.After(now) {
+			return "reset: " + at.Format(time.RFC3339) + " not after " + now.Format(time.RFC3339)
+		}
+		since, reset = now, at
+		return ""
+	}
+	open := func(now time.Time, v effects.BandVerdict) string { // a head's: its answer, else Reset
 		if at, ok := v.ResumeAfter(now); ok {
-			since, reset = now, at
-			return ""
+			return opens(now, at)
 		}
 		at, err := fx.Band.Reset()
-		if err != nil && bare { // no reset: only the verdict or --until ends it
+		if err != nil && v.Verdict == "wait" && v.ResumeAt == "" && v.Window != "" { // no reset: only the verdict or --until ends it
 			since, reset = now, time.Time{}
 			return ""
 		}
 		if err != nil {
 			return "reset: " + err.Error()
 		}
-		if !at.After(now) {
-			return "reset: " + at.Format(time.RFC3339) + " not after " + now.Format(time.RFC3339)
-		}
-		since, reset = now, at
-		return ""
+		return opens(now, at)
 	}
 	for {
 		now := clock.Now()
@@ -395,9 +398,9 @@ func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptio
 			ends(map[string]any{"state": "reset"})
 			return r, bandSpawn
 		}
-		head, headHeld, headBare, first, waits, after, moved := true, false, false, rp.ID, "", time.Time{}, (<-chan struct{})(nil)
+		head, headHeld, heldTo, first, waits, after, moved := true, false, time.Time{}, rp.ID, "", time.Time{}, (<-chan struct{})(nil)
 		if q != nil {
-			head, headHeld, headBare, first, waits, after, moved = q.place(rp.ID)
+			head, headHeld, heldTo, first, waits, after, moved = q.place(rp.ID)
 		}
 		if !head && !since.IsZero() && behind != "" && first != behind { // a new head: status reads it (AR81 fix round, finding 1)
 			behind = first
@@ -406,12 +409,14 @@ func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptio
 			}
 		}
 		if !head && headHeld && since.IsZero() { // behind a held head: queued
-			if why := open(now, effects.BandVerdict{}, headBare); why != "" {
+			if heldTo.IsZero() { // the head holds with no reset, so this row does (AR98 ruling 4)
+				since, reset = now, time.Time{}
+			} else if why := opens(now, heldTo); why != "" {
 				return unchecked(why)
 			}
 			r.verdict, behind = "queued", first
 			line(map[string]any{"state": "held", "verdict": "queued", "peak": nil, "text": "behind " + first})
-			q.hold(rp.ID, reset.IsZero())
+			q.hold(rp.ID, reset)
 			fmt.Fprintf(log, "relay %s: the band holds it behind %s\n", rp.ID, first)
 			continue
 		}
@@ -483,13 +488,13 @@ func askBand(ctx context.Context, fx effects.Effects, rp *RowPlan, opts RunOptio
 		r.verdict, r.peak = v.Verdict, v.Peak
 		held := map[string]any{"state": "held", "verdict": v.Verdict, "peak": peakOf(v.Peak), "text": v.Text}
 		if since.IsZero() {
-			if why := open(now, v, v.Verdict == "wait" && v.ResumeAt == ""); why != "" {
+			if why := open(now, v); why != "" {
 				return unchecked(why)
 			}
 			denied = v.Verdict == "denied"
 			line(held) // the line, then the rows behind wake (the fix round's finding 4)
 			if q != nil {
-				q.hold(rp.ID, reset.IsZero())
+				q.hold(rp.ID, reset)
 			}
 			if v.Peak != nil { // AR97 ruling 1: the peak and the owner's lever
 				fmt.Fprintf(log, "relay %s: the band holds it: %s (peak %s%%); %s\n", rp.ID, v.Verdict, strconv.FormatFloat(*v.Peak, 'f', -1, 64), effects.BandLever)

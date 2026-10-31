@@ -107,6 +107,19 @@ func TestAR98_2_ResetReadsAnswerResumeAt(t *testing.T) {
 	if _, err := ReadBandFile(OSFS{}, env); err == nil {
 		t.Fatal("ReadBandFile read a file that is not JSON")
 	}
+	// Amendment 1, ruling 5: a read error other than no file errs, and never
+	// falls through to the older folder's file.
+	put(strings.SplitN(oldSessionConfig, "/", 2)[0], `{"window":"none"}`)
+	unread := filepath.Join(state, BandTool, "admission", "band.json")
+	if err := os.Remove(unread); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(unread, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if f, err := ReadBandFile(OSFS{}, env); err == nil {
+		t.Fatalf("ReadBandFile fell through a read error: %+v", f)
+	}
 	if _, err := ReadBandFile(OSFS{}, func(string) string { return "" }); err == nil {
 		t.Fatal("ReadBandFile read with no state home")
 	}

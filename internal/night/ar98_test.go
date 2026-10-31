@@ -288,9 +288,7 @@ func TestAR98_4_PlanShowsBand(t *testing.T) {
 		}
 	}
 
-	// A read error other than no file reads as no line, and never falls through
-	// to the older folder's file.
-	put("claude-code-session", `{"window":"none"}`)
+	// A read error other than no file reads as no line.
 	unread := filepath.Join(state, effects.BandTool, "admission", "band.json")
 	if err := os.Remove(unread); err != nil {
 		t.Fatal(err)
@@ -300,7 +298,6 @@ func TestAR98_4_PlanShowsBand(t *testing.T) {
 	}
 	same("a read error")
 	os.Remove(unread)
-	os.RemoveAll(filepath.Join(state, "claude-code-session"))
 
 	// `band: off`, on the same file: today's.
 	put(effects.BandTool, `{"window":"none"}`)

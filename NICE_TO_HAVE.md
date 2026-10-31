@@ -742,4 +742,3 @@ From now on any relay packet that edits `plugin/` lists `plugin/.claude-plugin/p
 
 ## AR98's build (2026-10-30): what it leaves (S4)
 - The relay's `status` does not read band.json: on a `none` login only `plan` prints the band and its end (AR98 ruling 7). A line in `status` would show it during a night.
-- A row queued behind a head that holds on its answer's `resume_at`, with band.json's `Reset` erring, goes `unchecked` and spawns (AR98 ruling 4, pinned in `TestAR98_5`); the head's own reset is not handed to the queue. Handing it on would close the one-spawn gate there too; a lead, not seen in a night.

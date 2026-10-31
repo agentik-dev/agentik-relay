@@ -210,15 +210,24 @@ type BandFile struct {
 }
 
 // ReadBandFile reads the file Reset finds, its top level: no file, or one
-// not JSON, errs. It never asks.
+// not JSON, errs; a `demand` that is not an object, or whose `band` or `until`
+// is not a string, is dropped, the window still read (AR98 A1 ruling 4). It
+// never asks.
 func ReadBandFile(fs FS, env func(string) string) (BandFile, error) {
 	data, path, err := findBandFile(fs.ReadFile, env)
 	if err != nil {
 		return BandFile{}, err
 	}
-	var f BandFile
-	if err := json.Unmarshal(data, &f); err != nil {
+	var raw struct {
+		Window string          `json:"window"`
+		Demand json.RawMessage `json:"demand"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
 		return BandFile{}, fmt.Errorf("%s: %v", path, err)
+	}
+	f := BandFile{Window: raw.Window}
+	if err := json.Unmarshal(raw.Demand, &f.Demand); err != nil {
+		f.Demand = nil
 	}
 	return f, nil
 }
