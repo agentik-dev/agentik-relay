@@ -28,9 +28,10 @@ vet:  ## go vet
 fmt:  ## gofmt: exit 2 naming the files it would change
 	@files=$$(gofmt -l cmd internal); if [ -n "$$files" ]; then echo "fmt: gofmt would change:"; echo "$$files"; exit 2; fi
 lint: vet  ## conventions §5 name for vet
-doclint:  ## the doc gate (conventions §5), its bytes pinned (conventions §6)
+doclint:  ## the doc gate (conventions §5), its bytes pinned (conventions §6), then scripts/recordlint on HANDOFF.md and NICE_TO_HAVE.md (hq design/05 §4)
 	@echo "$(DOCLINT_SHA)  scripts/doclint" | shasum -a 256 -c --status || { echo "doclint: scripts/doclint is not conventions §6's copy"; exit 2; }
 	$(PY) -B scripts/doclint
+	$(PY) -B scripts/recordlint
 hygiene:  ## the public-hygiene scan (conventions §6); scripts/{agentik,hygiene,bounded} pinned by scripts/vendored.sha256 (agentik-commons scripts/sync)
 	@shasum -a 256 -c --status scripts/vendored.sha256 || { echo "hygiene: scripts/{agentik,hygiene,bounded} are not agentik-commons' copies (scripts/vendored.sha256; run its scripts/sync)"; exit 2; }
 	$(PY) -B scripts/hygiene

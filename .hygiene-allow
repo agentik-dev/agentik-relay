@@ -56,7 +56,9 @@ README.md: sibling
 Makefile: sibling
 DECISION[S].md: sibling
 DESIGN.md: sibling
+# The open items, and their archive of 2026-11-01, name the siblings as the ledgers do.
 NICE_TO_HAVE.md: sibling
+history/NICE-2026-11-01.md: sibling
 OPEN-QUESTIONS.md: sibling
 decision[s]/*: sibling
 # The effects, the prompt's block reader and the night's plan name the session plugin or the ledger file.

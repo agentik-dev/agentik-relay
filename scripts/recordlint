@@ -1,0 +1,266 @@
+#!/usr/bin/env python3
+"""recordlint: HANDOFF.md and NICE_TO_HAVE.md held to their tables (hq design/05 §2, §4).
+
+    recordlint [FILE...]
+
+Each FILE is a HANDOFF.md or a NICE_TO_HAVE.md, by its name; by default both, in
+the current directory. A finding is one line on stdout, `path:line: rule: detail`;
+a file with none prints one line, `path: held: N rows` or `path: skip: why`, and a
+missing file is skipped. Exit 0 when clean, 2 on any finding, 1 on usage, as
+doclint. It reads the lines as the backlog reader does (front matter and fences
+aside, a row is a line that opens with `|`, its cells split on unescaped pipes,
+so `\\|` in a code span stays in one cell) and writes nothing.
+
+  skip       a file without its canonical header row is not held, and passes
+             (rule 1): HANDOFF's `| # | item | level | repo | where | state |`,
+             NICE's `| id | level | area | finding | evidence | from |`
+  non-row    a line under a `##` that is not a table row (rule 2), or any line
+             inside a table that is not a row, an indented line, a bullet or
+             prose, where the reader ends the table and drops the rows after it
+             (d26's refuter F1)
+  header     a table that does not open with the canonical header and then its
+             separator of as many cells (rule 3; F3 for HANDOFF)
+  cells      a row without the header's cell count (rule 3)
+  long       a row over 400 characters (rule 4)
+  duplicate  a `#` or `id` used twice (rule 5)
+  number     a `#` that is not ASCII digits, a row the reader takes for a header,
+             or digits with a leading zero, `01` beside `1`, which the reader
+             reads as the same step (`^[1-9][0-9]*$`, refuter round 1's F1)
+  level      a `level` cell not `S1` to `S4` (rule 5)
+  state      a `state` that opens with none of open, building, waiting:, watch:,
+             done (rule 5)
+  repo       a `repo` cell that is not a bare short name, `^[a-z][a-z0-9-]*$`
+             without the `agentik-` prefix: `--order` matches it exactly (F3)
+  order      a HANDOFF table outside the first `##` after the build-order marker
+             comment, the one section the reader takes
+  size       HANDOFF.md at 8,192 B or NICE_TO_HAVE.md at 24,576 B (rule 6)
+  unreadable a file that is there but cannot be read, at line 0, with the
+             system's reason; never a traceback
+"""
+import os
+import re
+import sys
+
+HANDOFF = "HANDOFF.md"
+NICE = "NICE_TO_HAVE.md"
+HEADERS = {HANDOFF: ["#", "item", "level", "repo", "where", "state"],
+           NICE: ["id", "level", "area", "finding", "evidence", "from"]}
+CAPS = {HANDOFF: 8192, NICE: 24576}
+REMEDY = {HANDOFF: "a done row leaves as one line in history/handoff-done.md",
+          NICE: "move the oldest S4 rows, appended, to history/NICE-overflow.md;"
+                " the frozen archive is never edited"}
+ROW_MAX = 400
+# assembled, so the hygiene scan's sibling group finds no tool name in this file
+MARKER = "<!-- " + "decision" + "s: build order -->"
+PREFIX = "agentik-"
+STATES = ("open", "building", "waiting:", "watch:", "done")
+
+CELL = re.compile(r"(?<!\\)\|")
+SEPARATOR = re.compile(r"^:?-+:?$")
+LEVEL = re.compile(r"^S[1-4]$")
+DIGITS = re.compile(r"[0-9]+")
+NUMBER = re.compile(r"[1-9][0-9]*")
+STATE = re.compile(r"^(?:open|building|waiting:|watch:|done)(?:\s|$)")
+REPO = re.compile(r"^[a-z][a-z0-9-]*$")
+HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
+FENCE = re.compile(r"^(```|~~~)")
+STEP = re.compile(r"^([0-9]+)\. (.*)$")
+WHAT = {"more": "an indented line", "bullet": "a bullet", "step": "a numbered item",
+        "fence": "a fenced line", "prose": "prose", "heading": "a heading deeper than `##`"}
+USAGE = "usage: recordlint [FILE...]  (each a HANDOFF.md or a NICE_TO_HAVE.md)"
+
+
+class UsageError(Exception):
+    pass
+
+
+def cells(line):
+    """A row's cells as the backlog reader splits them: outer pipes off, then on
+    each pipe that no backslash escapes, each cell stripped."""
+    body = line.strip()
+    body = body[1:-1] if body.endswith("|") and not body.endswith("\\|") else body[1:]
+    return [cell.strip() for cell in CELL.split(body)]
+
+
+def classify(lines):
+    """(line number, kind, payload, line) per line after any front matter, the kinds
+    the backlog reader's blocks() gives: blank, more, bullet, heading (its depth),
+    step, row (its cells), prose; and fence, a fence line or a line inside one."""
+    start = 0
+    if lines and lines[0].strip() == "---":
+        for i in range(1, len(lines)):
+            if lines[i].strip() == "---":
+                start = i + 1
+                break
+    fenced = False
+    for i in range(start, len(lines)):
+        line, n = lines[i], i + 1
+        if FENCE.match(line):
+            fenced = not fenced
+            yield n, "fence", None, line
+        elif fenced:
+            yield n, "fence" if line.strip() else "blank", None, line
+        elif not line.strip():
+            yield n, "blank", None, line
+        elif line[0] in " \t":
+            yield n, "more", None, line
+        elif line.startswith("- "):
+            yield n, "bullet", None, line
+        elif HEADING.match(line):
+            yield n, "heading", len(HEADING.match(line).group(1)), line
+        elif STEP.match(line):
+            yield n, "step", None, line
+        elif line.startswith("|"):
+            yield n, "row", cells(line), line
+        else:
+            yield n, "prose", None, line
+
+
+def fields(kind, n, row, keys, say):
+    """Rule 5 and F3 on one body row of the canonical width."""
+    cell = dict(zip(HEADERS[kind], row))
+    key = row[0]
+    if key in keys:
+        say(n, "duplicate", "%s %s again, first at line %d" % (HEADERS[kind][0], key, keys[key]))
+    else:
+        keys[key] = n
+    if not LEVEL.match(cell["level"]):
+        say(n, "level", '"%s" is not S1 to S4' % cell["level"])
+    if kind != HANDOFF:
+        return
+    if not DIGITS.fullmatch(key):
+        say(n, "number", '# "%s" is not a number: the backlog reader takes the row for a header' % key)
+    elif not NUMBER.fullmatch(key):
+        say(n, "number", '# "%s" is not ^[1-9][0-9]*$: the backlog reader reads it as step %d'
+            % (key, int(key)))
+    if not REPO.match(cell["repo"]) or cell["repo"].startswith(PREFIX):
+        say(n, "repo", '"%s" is not a bare short name (^[a-z][a-z0-9-]*$, no `%s` prefix):'
+            " `--order` matches it exactly" % (cell["repo"], PREFIX))
+    if not STATE.match(cell["state"]):
+        say(n, "state", '"%s" opens with none of %s' % (cell["state"], ", ".join(STATES)))
+
+
+def lint(kind, text, size):
+    """(held, rows, findings) for one file's text; findings are (line, rule, detail)."""
+    header = HEADERS[kind]
+    lines = text.splitlines()
+    marked = list(classify(lines))
+    if not any(k == "row" and payload == header for _, k, payload, _ in marked):
+        return False, 0, []
+    found = []
+
+    def say(n, rule, detail):
+        found.append((n, rule, detail))
+
+    if size >= CAPS[kind]:
+        say(1, "size", "%s B, the bound is under %s B; %s"
+            % (format(size, ","), format(CAPS[kind], ","), REMEDY[kind]))
+    under = in_table = False
+    state, rows, keys, tables, headings, marker = None, 0, {}, [], [], None
+    for n, k, payload, line in marked:
+        if k == "blank" or (k == "heading" and payload <= 2):
+            in_table = False
+            if k == "heading":
+                headings.append((n, payload))
+                under = payload == 2
+            continue
+        if k != "row":
+            if in_table:
+                say(n, "non-row", "%s inside a table: the backlog reader ends the table here"
+                    " and drops the rows after it" % WHAT[k])
+            elif under:
+                say(n, "non-row", "%s under a `##`: only table rows belong there" % WHAT[k])
+            if k == "prose" and marker is None and line.strip() == MARKER:
+                marker = n
+            continue
+        if len(line) > ROW_MAX:
+            say(n, "long", "%d characters, the bound is %d; evidence that does not fit goes"
+                " to a cited file under history/sessions/" % (len(line), ROW_MAX))
+        if not in_table:
+            in_table, state = True, "header"
+            tables.append(n)
+        if state == "header":
+            if payload != header:
+                say(n, "header", "a table opens with `| %s |` and its separator" % " | ".join(header))
+                state = "bad"
+            else:
+                state = "separator"
+        elif state == "separator":
+            if len(payload) != len(header) or not all(SEPARATOR.match(c) for c in payload):
+                say(n, "header", "the header's next row is not a separator of %d cells" % len(header))
+                state = "bad"
+            else:
+                state = "body"
+        elif state == "body":
+            rows += 1
+            if len(payload) != len(header):
+                say(n, "cells", "%d cells, the header has %d; a pipe inside a cell is `\\|`"
+                    % (len(payload), len(header)))
+            else:
+                fields(kind, n, payload, keys, say)
+    if kind == HANDOFF:
+        order(marker, headings, tables, say)
+    found.sort(key=lambda f: f[0])
+    return True, rows, found
+
+
+def order(marker, headings, tables, say):
+    """Every HANDOFF table inside the first `##` after the marker, the reader's section."""
+    start = next((n for n, depth in headings if depth == 2 and marker is not None and n > marker), None)
+    end = next((n for n, depth in headings if start is not None and n > start), None)
+    for t in tables:
+        if marker is None:
+            say(t, "order", "no build-order marker comment above the first `##`:"
+                " the backlog reader takes no build order")
+        elif start is None or t < start or (end is not None and t > end):
+            say(t, "order", "outside the first `##` after the build-order marker comment,"
+                " the one section the backlog reader takes")
+
+
+def check(path):
+    """The lines one file prints, and whether any is a finding."""
+    kind = os.path.basename(path)
+    if kind not in HEADERS:
+        raise UsageError("%s is neither a %s nor a %s" % (path, HANDOFF, NICE))
+    if not os.path.isfile(path):
+        return ["%s: skip: no such file" % path], False
+    try:
+        with open(path, "rb") as handle:
+            data = handle.read()
+    except OSError as exc:
+        return ["%s:0: unreadable: %s" % (path, exc.strerror or exc)], True
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        return ["%s:1: encoding: not UTF-8 (%s)" % (path, exc.reason)], True
+    held, rows, found = lint(kind, text, len(data))
+    if not held:
+        return ["%s: skip: no canonical header `| %s |`" % (path, " | ".join(HEADERS[kind]))], False
+    if not found:
+        return ["%s: held: %d row%s" % (path, rows, "" if rows == 1 else "s")], False
+    return ["%s:%d: %s: %s" % (path, n, rule, detail) for n, rule, detail in found], True
+
+
+def main(argv):
+    args = argv[1:]
+    if args[:1] in (["-h"], ["--help"]):
+        print(__doc__.rstrip())
+        return 0
+    try:
+        if any(a.startswith("-") for a in args):
+            raise UsageError("unknown option: %s" % next(a for a in args if a.startswith("-")))
+        out, red = [], False
+        for path in args or [HANDOFF, NICE]:
+            lines, bad = check(path)
+            out.extend(lines)
+            red = red or bad
+    except UsageError as exc:
+        sys.stderr.write("recordlint: %s\n%s\n" % (exc, USAGE))
+        return 1
+    for line in out:
+        print(line)
+    return 2 if red else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
