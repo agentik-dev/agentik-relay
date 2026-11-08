@@ -13,3 +13,8 @@ rows:
     budget: {turns: 100, context: 144000, usd: 25}
     merge: branch-only
     device: never
+  - id: ar100-entry13
+    packet: design/packets/ar100-entry13.md
+    budget: {turns: 30, context: 100000, usd: 10}
+    merge: merge-on-green
+    device: never
