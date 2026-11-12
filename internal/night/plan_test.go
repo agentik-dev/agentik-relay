@@ -112,7 +112,7 @@ func TestPlanOverFakes(t *testing.T) {
 		}
 	}
 	wantSpawn := []string{"caffeinate", "-i", "claude", "-p", "--permission-mode", "auto", "--allowedTools",
-		effects.DefaultAllowedTools, "--model", "claude-opus-5-5", "--max-turns", "120", "--max-budget-usd", "15",
+		effects.DefaultAllowedTools, "--model", "claude-opus-5-5", "--effort", "high", "--max-turns", "120", "--max-budget-usd", "15",
 		"--output-format", "stream-json", "--verbose", "--session-id", "33333333"}
 	if r := p.Rows[2]; !reflect.DeepEqual(r.Spawn, wantSpawn) || r.Worktree != "/root/.claude/worktrees/a5-effects-plan" || r.Base != "a4-schemas" {
 		t.Fatalf("a5 = %+v", r)

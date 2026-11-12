@@ -2,6 +2,7 @@
 name: attendant
 description: Answers "where is the night" from the relay's --json verbs and the ledger's lines, never the transcripts. Use when the owner asks how a night is going, what stopped, or how to resume a row.
 model: sonnet
+effort: low
 tools: Read, Bash
 maxTurns: 35
 ---

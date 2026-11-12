@@ -2,6 +2,7 @@
 name: builder
 description: Builds one relay packet in its worktree. Use when a hand-run coordinator sitting hands off a packet with an acceptance table; the packet is the whole scope. Commits per item, never pushes.
 model: claude-opus-5-5
+effort: high
 tools: Read, Edit, Write, Bash, Glob, Grep
 maxTurns: 120
 ---
