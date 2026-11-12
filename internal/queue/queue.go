@@ -256,7 +256,7 @@ func (q *Queue) fill(root yaml.Node) error {
 func apply(r *Row, n yaml.Node, what string) error {
 	strs := map[string]*string{"id": &r.ID, "packet": &r.PacketPath, "base": &r.Base, "model": &r.Model,
 		"merge": &r.Merge, "device": &r.Device, "parked": &r.Parked, "verify": &r.Verify,
-		"kind": &r.Kind, "prompt": &r.Prompt, "effort": &r.Effort}
+		"kind": &r.Kind, "prompt": &r.Prompt}
 	ints := map[string]*int{"turns": &r.Turns, "context": &r.Context, "usd": &r.USD}
 	for _, kv := range n.Map {
 		switch {
@@ -266,6 +266,14 @@ func apply(r *Row, n yaml.Node, what string) error {
 				return refuse(kv.Val, "%s: %s: want a string", what, kv.Key)
 			}
 			*strs[kv.Key] = s
+		case kv.Key == "effort": // AR101 ruling 1: empty is no value, so a row keeps the defaults' level
+			s, ok := kv.Val.String()
+			if !ok {
+				return refuse(kv.Val, "%s: %s: want a string", what, kv.Key)
+			}
+			if s != "" {
+				r.Effort = s
+			}
 		case ints[kv.Key] != nil:
 			v, ok := kv.Val.Int()
 			if !ok {
