@@ -998,14 +998,15 @@ func Holds(l packet.Line, exit int, last string) bool {
 }
 
 // SpawnArgv is §7's spawn line for a row (D1): headless, streamed, the
-// pre-allowed working tools, the driver's session id. Stdin is the prompt.
+// pre-allowed working tools, the row's effort level (AR101: never the
+// interactive default), the driver's session id. Stdin is the prompt.
 func SpawnArgv(r queue.Row, session, tools string, caffeinate bool) []string {
 	var argv []string
 	if caffeinate {
 		argv = append(argv, "caffeinate", "-i")
 	}
 	return append(argv, "claude", "-p", "--permission-mode", "auto", "--allowedTools", tools,
-		"--model", r.Model, "--max-turns", strconv.Itoa(r.Turns),
+		"--model", r.Model, "--effort", r.EffortLevel(), "--max-turns", strconv.Itoa(r.Turns),
 		"--max-budget-usd", strconv.Itoa(r.USD), "--output-format", "stream-json", "--verbose",
 		"--session-id", session)
 }

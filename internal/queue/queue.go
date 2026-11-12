@@ -56,8 +56,26 @@ type Row struct {
 	Kind, Prompt string
 	Sections     []string
 	MayTouch     []string
+	// Effort is the child's `claude --effort` level (AR101 ruling 1), in
+	// the defaults and per row, "" unset; EffortLevel resolves it.
+	Effort string
 
 	packetErr error
+}
+
+// The effort levels a row may name, `claude --effort`'s, and the level a
+// row that names none spawns at (AR101 rulings 1 and 2).
+var Efforts = []string{"low", "medium", "high", "xhigh", "max"}
+
+const DefaultEffort = "high"
+
+// EffortLevel is the level r's child spawns at: its own (the defaults'
+// when the row names none), else DefaultEffort.
+func (r Row) EffortLevel() string {
+	if r.Effort == "" {
+		return DefaultEffort
+	}
+	return r.Effort
 }
 
 // The row kinds (orchestrator r1 §2).
@@ -107,9 +125,9 @@ const (
 
 var (
 	topKeys      = []string{"version", "defaults", "words", "rows"}
-	defaultsKeys = []string{"model", "turns", "context", "usd", "wall", "merge", "device", "verify", "harness", "measure_seconds"}
+	defaultsKeys = []string{"model", "turns", "context", "usd", "wall", "merge", "device", "verify", "harness", "measure_seconds", "effort"}
 	rowKeys      = []string{"id", "packet", "depends_on", "base", "model", "budget", "merge", "device", "parked", "harness",
-		"kind", "prompt", "sections", "may_touch"}
+		"kind", "prompt", "sections", "may_touch", "effort"}
 	budgetKeys = []string{"turns", "context", "usd", "wall"}
 )
 
@@ -238,7 +256,7 @@ func (q *Queue) fill(root yaml.Node) error {
 func apply(r *Row, n yaml.Node, what string) error {
 	strs := map[string]*string{"id": &r.ID, "packet": &r.PacketPath, "base": &r.Base, "model": &r.Model,
 		"merge": &r.Merge, "device": &r.Device, "parked": &r.Parked, "verify": &r.Verify,
-		"kind": &r.Kind, "prompt": &r.Prompt}
+		"kind": &r.Kind, "prompt": &r.Prompt, "effort": &r.Effort}
 	ints := map[string]*int{"turns": &r.Turns, "context": &r.Context, "usd": &r.USD}
 	for _, kv := range n.Map {
 		switch {
@@ -492,6 +510,9 @@ func (q *Queue) Validate() []Problem {
 			continue
 		}
 		add := func(format string, a ...any) { ps = append(ps, Problem{name, fmt.Sprintf(format, a...)}) }
+		if r.Effort != "" && !slices.Contains(Efforts, r.Effort) { // AR101 ruling 1: every kind
+			add("effort %q; want low, medium, high, xhigh or max", r.Effort)
+		}
 		switch r.Kind {
 		case KindOrchestrator:
 			orchestratorProblems(r, add)
