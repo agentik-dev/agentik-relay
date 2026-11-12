@@ -1,5 +1,6 @@
 ---
 description: Where the night is: its state and reason, one line per row, the next stop, and every `agentik relay resume` line
+disable-model-invocation: true
 allowed-tools: Bash(agentik-relay *)
 argument-hint: "[--night D]"
 ---

@@ -1,5 +1,6 @@
 ---
 description: Check the machine for a night: claude, git, tmux, ntfy, the state dir, the queue, the config
+disable-model-invocation: true
 allowed-tools: Bash(agentik-relay *)
 ---
 

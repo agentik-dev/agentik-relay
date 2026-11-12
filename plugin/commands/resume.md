@@ -1,5 +1,6 @@
 ---
 description: The door back into a stopped sitting: print the exact `agentik relay resume <row>` line and worktree for your own terminal
+disable-model-invocation: true
 allowed-tools: Bash(agentik-relay *)
 argument-hint: "[<row>] [--night D]"
 ---
