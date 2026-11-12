@@ -2,6 +2,7 @@
 name: adversary
 description: Read-only refuter over a named slice of a branch. Use after a builder reports green, to find what the tests miss; it runs tests and shell lines, numbers findings with a reproduction, and fixes nothing.
 model: claude-opus-5-5
+effort: high
 tools: Read, Grep, Glob, Bash
 maxTurns: 100
 ---
