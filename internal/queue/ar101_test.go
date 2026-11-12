@@ -124,4 +124,21 @@ rows:
 			t.Errorf("Load %q: err %v; want a refusal naming effort", bad, err)
 		}
 	}
+
+	// The review's F1: an empty row value, quoted or bare, is no value, so
+	// the row keeps the defaults' level it inherited.
+	for _, c := range []struct{ name, val string }{{"empty-quoted", ` ""`}, {"empty-bare", ""}} {
+		t.Run(c.name, func(t *testing.T) {
+			q, err := ar101Load(t, "version: 1\ndefaults: {model: m, effort: medium}\nrows:\n  - id: a\n    packet: a.md\n    effort:"+c.val+"\n")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if r := q.Rows[0]; r.Effort != "medium" || r.EffortLevel() != "medium" {
+				t.Errorf("row effort%s over medium: effort %q, level %q; want medium", c.val, r.Effort, r.EffortLevel())
+			}
+			if ps := ar101EffortProblems(q); len(ps) != 0 {
+				t.Errorf("effort problems: %v", ps)
+			}
+		})
+	}
 }

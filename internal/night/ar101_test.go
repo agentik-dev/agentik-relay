@@ -111,6 +111,31 @@ func TestAR101_3_DefaultsThenRow(t *testing.T) {
 			t.Errorf("defaults %q rows %v: %v; want %v", c.defaults, c.rows, got, c.want)
 		}
 	}
+
+	// The review's F1: a row whose effort is empty, quoted or bare, spawns at
+	// the defaults' level. ar101Queue skips an empty value, so the queue is
+	// written by hand.
+	for _, c := range []struct{ name, val string }{{"empty-quoted", ` ""`}, {"empty-bare", ""}} {
+		t.Run(c.name, func(t *testing.T) {
+			repo, _ := fixture(t)
+			os.WriteFile(filepath.Join(repo, "empty.yaml"), []byte("version: 1\n"+
+				"defaults: {model: claude-opus-5-5, turns: 100, context: 130000, usd: 15, wall: 4h,\n"+
+				"           merge: branch-only, device: never, verify: auto, effort: medium}\n"+
+				"rows:\n  - id: a3-machine\n    packet: design/packets/a3-machine.md\n"+
+				"    depends_on: [a2-relay-design]\n    effort:"+c.val+"\n"), 0o644)
+			q, err := queue.Load(repo, "empty.yaml")
+			if err != nil {
+				t.Fatal(err)
+			}
+			p, _ := ar101Plan(t, repo, q)
+			if len(p.Rows) != 1 {
+				t.Fatalf("%d rows", len(p.Rows))
+			}
+			if e, after := ar101Effort(p.Rows[0].Spawn); e != "medium" || !after {
+				t.Errorf("row effort%s over medium: spawn %q; want --effort medium after --model", c.val, p.Rows[0].Spawn)
+			}
+		})
+	}
 }
 
 // TestAR101_4_BadValueSpawnsNothing (ruling 1): a value outside the five is
