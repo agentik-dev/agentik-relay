@@ -1,5 +1,6 @@
 ---
 description: The morning read: the night's report as markdown, or as a narrative through respeak when it is installed
+disable-model-invocation: true
 allowed-tools: Bash(agentik-relay *)
 argument-hint: "[--night D]"
 ---

@@ -1,5 +1,6 @@
 ---
 description: Run the gate on one row by hand: the result, the facts, and each acceptance line on main and on the branch
+disable-model-invocation: true
 allowed-tools: Bash(agentik-relay *)
 argument-hint: "<row>"
 ---

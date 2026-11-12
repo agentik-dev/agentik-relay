@@ -1,0 +1,178 @@
+#!/usr/bin/env python3
+"""plugin-description-bytes: a plugin's loaded description bytes against a ceiling (GUIDE §1)
+
+Usage: plugin-description-bytes [--max BYTES] [PLUGIN_DIR]
+
+Claude Code puts the description of every skill, command and agent type the
+model may start into the context of every main session, and of every helper
+whose agent type holds the Skill or Agent tool. This counts those bytes for one
+plugin (PLUGIN_DIR, default `plugin`): the `description` of each
+`agents/**/*.md` and `skills/*/SKILL.md`, and of each `commands/**/*.md`,
+each with its `when_to_use` when it has one, measured as UTF-8 with the
+surrounding whitespace stripped. A command or skill whose frontmatter sets
+`disable-model-invocation: true` is hidden, so it is listed and not counted.
+
+Output: one stdout line per file, `<bytes>  <kind>  <name>`, a hidden one with
+`hidden` for its bytes, then `total <sum> of <max> B`. An over sum adds a
+stderr line; a counted file with no description, or a frontmatter the reader
+cannot take, adds `error: <path>: <why>`.
+
+The reader takes the frontmatter between the first two `---` lines as
+top-level `key: value` lines: a plain, single- or double-quoted value, a plain
+or quoted value continued on more-indented lines, and a `>` or `|` block
+(chomping and indent indicators read and ignored, the block's lines folded or
+kept as YAML does). `true`, `True` and `TRUE` are true.
+
+Exit codes: 0 the sum is at most the ceiling, 1 it is over or a counted file
+has no description (a check said no), 2 usage or no such plugin directory.
+Stdlib only. Canonical in agentik-commons, vendored into each repo's scripts/
+by its `scripts/sync`.
+"""
+import json
+import os
+import re
+import sys
+
+CEILING = 1024
+KEY = re.compile(r"^([A-Za-z_][A-Za-z0-9_-]*):(?:[ \t]+(.*))?$")
+DQ = re.compile(r'^"(?:[^"\\]|\\.)*"')
+BLOCK = re.compile(r"^([>|])[+-]?[1-9]?[+-]?$")
+TRUE = ("true", "True", "TRUE")
+
+
+class Unreadable(Exception):
+    pass
+
+
+def frontmatter(text):
+    """The top-level keys of the frontmatter, as strings; {} when there is none."""
+    lines = text.splitlines()
+    if not lines or lines[0].rstrip() != "---":
+        return {}
+    try:
+        end = next(i for i in range(1, len(lines)) if lines[i].rstrip() == "---")
+    except StopIteration:
+        raise Unreadable("the frontmatter has no closing ---")
+    body = lines[1:end]
+    out = {}
+    i = 0
+    while i < len(body):
+        line = body[i]
+        i += 1
+        if not line.strip() or line.lstrip().startswith("#") or line[0] in " \t":
+            continue
+        m = KEY.match(line.rstrip())
+        if not m:
+            continue
+        key, value = m.group(1), (m.group(2) or "").strip()
+        more = []
+        while i < len(body) and (not body[i].strip() or body[i][0] in " \t"):
+            more.append(body[i])
+            i += 1
+        while more and not more[-1].strip():
+            more.pop()
+        out[key] = scalar(value, more)
+    return out
+
+
+def scalar(value, more):
+    block = BLOCK.match(value)
+    if block:
+        indent = min((len(l) - len(l.lstrip()) for l in more if l.strip()), default=0)
+        rows = [l[indent:] if l.strip() else "" for l in more]
+        if block.group(1) == "|":
+            return "\n".join(rows)
+        out, blank, last = [], 0, None
+        for row in rows:
+            if not row:
+                blank += 1
+                continue
+            if last is not None:
+                out.append("\n" * blank if blank else
+                           "\n" if row[0].isspace() or last[0].isspace() else " ")
+            out.append(row)
+            blank, last = 0, row
+        return "".join(out)
+    text = " ".join([value] + [l.strip() for l in more if l.strip()]).strip()
+    quoted = DQ.match(text)
+    if quoted:
+        try:
+            return json.loads(quoted.group(0))
+        except ValueError:
+            return quoted.group(0)[1:-1]
+    if text[:1] == "'":
+        return text[1:].rsplit("'", 1)[0].replace("''", "'")
+    return re.split(r"[ \t]#", text, maxsplit=1)[0].strip()
+
+
+def entries(root):
+    """(kind, name, path, countable) for each command, skill and agent type, sorted."""
+    found = []
+    for kind, sub, pattern in (("command", "commands", None), ("skill", "skills", "SKILL.md"),
+                               ("agent", "agents", None)):
+        top = os.path.join(root, sub)
+        for here, dirs, files in os.walk(top):
+            dirs.sort()
+            for f in sorted(files):
+                path = os.path.join(here, f)
+                if pattern:
+                    if f != pattern or os.path.dirname(here) != top:
+                        continue
+                    name = os.path.basename(here)
+                elif f.endswith(".md"):
+                    name = os.path.relpath(path, top)[:-3].replace(os.sep, ":")
+                else:
+                    continue
+                found.append((kind, name, path))
+    return found
+
+
+def main(argv):
+    ceiling = CEILING
+    args = list(argv)
+    if args[:1] == ["--max"]:
+        if len(args) < 2 or not args[1].isdigit():
+            return usage()
+        ceiling = int(args[1])
+        args = args[2:]
+    if len(args) > 1 or (args and args[0].startswith("-")):
+        return usage()
+    root = args[0] if args else "plugin"
+    if not os.path.isdir(root):
+        print("plugin-description-bytes: %s is not a directory" % root, file=sys.stderr)
+        return 2
+    total, bad = 0, 0
+    for kind, name, path in entries(root):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                meta = frontmatter(fh.read())
+        except (OSError, UnicodeDecodeError, Unreadable) as e:
+            print("error: %s: %s" % (path, e), file=sys.stderr)
+            bad += 1
+            continue
+        if kind != "agent" and meta.get("disable-model-invocation", "") in TRUE:
+            print("hidden  %s  %s" % (kind, name))
+            continue
+        text = meta.get("description", "").strip()
+        if not text:
+            print("error: %s: no description" % path, file=sys.stderr)
+            bad += 1
+            continue
+        extra = meta.get("when_to_use", "").strip()
+        n = len(text.encode("utf-8")) + (len(extra.encode("utf-8")) if extra else 0)
+        total += n
+        print("%d  %s  %s" % (n, kind, name))
+    print("total %d of %d B" % (total, ceiling))
+    if total > ceiling:
+        print("plugin-description-bytes: %s: %d B of descriptions, over the %d B ceiling"
+              % (root, total, ceiling), file=sys.stderr)
+    return 1 if bad or total > ceiling else 0
+
+
+def usage():
+    print("usage: plugin-description-bytes [--max BYTES] [PLUGIN_DIR]", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

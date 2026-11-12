@@ -1,5 +1,6 @@
 ---
 description: Dry-run the queue: rows, their states, the problems, and the spawn line each row would run
+disable-model-invocation: true
 allowed-tools: Bash(agentik-relay *)
 argument-hint: "[--queue PATH] [--rows a,b] [--until HH:MM]"
 ---
