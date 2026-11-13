@@ -28,7 +28,7 @@ so `\\|` in a code span stays in one cell) and writes nothing.
              reads as the same step (`^[1-9][0-9]*$`, refuter round 1's F1)
   level      a `level` cell not `S1` to `S4` (rule 5)
   state      a `state` that opens with none of open, building, waiting:, watch:,
-             done (rule 5)
+             done, or a `waiting:` that names none of the four forms (rule 5)
   repo       a `repo` cell that is not a bare short name, `^[a-z][a-z0-9-]*$`
              without the `agentik-` prefix: `--order` matches it exactly (F3)
   order      a HANDOFF table outside the first `##` after the build-order marker
@@ -61,6 +61,9 @@ LEVEL = re.compile(r"^S[1-4]$")
 DIGITS = re.compile(r"[0-9]+")
 NUMBER = re.compile(r"[1-9][0-9]*")
 STATE = re.compile(r"^(?:open|building|waiting:|watch:|done)(?:\s|$)")
+TOKEN = "[A-Za-z0-9._/-]+"
+WAITING = re.compile(r"waiting: (?:(?:owner|row) [0-9]+|the owner: \S.*|(?!(?:owner|row|the) )%s %s)(?:;.*)?"
+                     % (TOKEN, TOKEN))
 REPO = re.compile(r"^[a-z][a-z0-9-]*$")
 HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
 FENCE = re.compile(r"^(```|~~~)")
@@ -138,6 +141,9 @@ def fields(kind, n, row, keys, say):
             " `--order` matches it exactly" % (cell["repo"], PREFIX))
     if not STATE.match(cell["state"]):
         say(n, "state", '"%s" opens with none of %s' % (cell["state"], ", ".join(STATES)))
+    elif cell["state"].startswith("waiting:") and not WAITING.fullmatch(cell["state"]):
+        say(n, "state", '"%s" waits on none of owner <n>, row <n>, the owner: <text>, <repo> <branch>'
+            % cell["state"])
 
 
 def lint(kind, text, size):
