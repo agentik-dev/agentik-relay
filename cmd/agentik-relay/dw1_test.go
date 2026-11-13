@@ -15,8 +15,18 @@ import (
 // scripts/install-door with sh over made-up doors in a temp dir. None builds
 // or runs a relay binary, and none runs make install.
 
-const dw1Script = "../../scripts/install-door"
-const dw1Vendored = "../../scripts/agentik"
+// dw1Script and dw1Vendored are the copies dw1Copy makes of the two scripts.
+var dw1Script, dw1Vendored string
+
+// dw1Copy copies scripts/install-door and the vendored scripts/agentik out of
+// the tree (copyIn, AR17D act 4) and points dw1Script and dw1Vendored at the
+// copies; each test calls it first.
+func dw1Copy(t *testing.T) {
+	t.Helper()
+	root := copyIn(t, "../..", "scripts/install-door", "scripts/agentik")
+	dw1Script = filepath.Join(root, "scripts", "install-door")
+	dw1Vendored = filepath.Join(root, "scripts", "agentik")
+}
 
 var dw1VersionLine = regexp.MustCompile(`(?m)^VERSION=.*\n`)
 
@@ -124,6 +134,7 @@ func dw1Written(t *testing.T, src, dest string) {
 // TestDW1_1_NewerKept (R2, R3): a door at 0.2.0, or one at the source's
 // 0.1.0 with a line of its own, stays byte for byte, silently.
 func TestDW1_1_NewerKept(t *testing.T) {
+	dw1Copy(t)
 	d := t.TempDir()
 	dw1Kept(t, dw1Vendored, dw1Door(t, d, "newer", "0.2.0", ""), "")
 	dw1Kept(t, dw1Vendored, dw1Door(t, d, "equal", "0.1.0", "# a line of its own\n"), "")
@@ -133,6 +144,7 @@ func TestDW1_1_NewerKept(t *testing.T) {
 // TestDW1_2_Written (R2, R4): no door is written from the source at 0755; a
 // door at 0.0.9 becomes the source; the first VERSION= line is the one read.
 func TestDW1_2_Written(t *testing.T) {
+	dw1Copy(t)
 	d := t.TempDir()
 	dw1Written(t, dw1Vendored, filepath.Join(d, "none"))
 	older := dw1Door(t, d, "older", "0.0.9", "")
@@ -146,6 +158,7 @@ func TestDW1_2_Written(t *testing.T) {
 
 // TestDW1_3_NumberByNumber (R2): 0.10.0 is above 0.9.0.
 func TestDW1_3_NumberByNumber(t *testing.T) {
+	dw1Copy(t)
 	d := t.TempDir()
 	s := t.TempDir()
 	dw1Kept(t, dw1Door(t, s, "src9", "0.9.0", ""), dw1Door(t, d, "door10", "0.10.0", ""), "")
@@ -158,6 +171,7 @@ func TestDW1_3_NumberByNumber(t *testing.T) {
 // TestDW1_4_LinkLeft (R2, R3): a link at DEST, to an older door or to
 // nothing, stays that link, its target untouched, with the link line.
 func TestDW1_4_LinkLeft(t *testing.T) {
+	dw1Copy(t)
 	d := t.TempDir()
 	target := dw1Door(t, d, "target", "0.0.1", "")
 	before := dw1Read(t, target)
@@ -185,6 +199,7 @@ func TestDW1_4_LinkLeft(t *testing.T) {
 // none, and a source at a prerelease each leave the door alone, the line
 // naming both sides.
 func TestDW1_5_NoVersion(t *testing.T) {
+	dw1Copy(t)
 	d := t.TempDir()
 	s := t.TempDir()
 	line := func(dest, theirs, ours string) string {
@@ -203,6 +218,7 @@ func TestDW1_5_NoVersion(t *testing.T) {
 // exits 1 with one stderr line, DEST unchanged, no temp file beside it; two
 // arguments or a usage line and exit 2.
 func TestDW1_6_SourceMissing(t *testing.T) {
+	dw1Copy(t)
 	d := t.TempDir()
 	dest := dw1Door(t, d, "door", "0.0.9", "")
 	before := dw1Read(t, dest)
