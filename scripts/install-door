@@ -5,7 +5,8 @@
 #
 #   install-door SRC DEST
 #
-# Nothing at DEST: written. DEST a link: left alone. A file's first VERSION=
+# Nothing at DEST: written. DEST a link, or there and no regular file (a
+# FIFO, a device, a folder), never opened: left alone. A file's first VERSION=
 # line, in DEST or in SRC, not three numbers with dots between (a prerelease
 # included): left alone. SRC newer, number by number: written. Equal or newer
 # at DEST: kept, byte for byte. Written or kept prints nothing; left alone
@@ -60,7 +61,9 @@ if [ -L "$dest" ]; then
 	exit 0
 fi
 [ -e "$dest" ] || write
-theirs=$(version "$dest")
+# Only a regular file is read: a FIFO or a device would block awk's open.
+theirs=none
+[ -f "$dest" ] && theirs=$(version "$dest")
 ours=$(version "$src")
 if ! numbered "$theirs" || ! numbered "$ours"; then
 	echo "the door $dest has no version to compare ($theirs there, $ours here); left alone"
