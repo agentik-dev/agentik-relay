@@ -151,3 +151,30 @@ func TestAR6_YAMLCloserWithoutOpener(t *testing.T) {
 		}
 	}
 }
+
+// AK8 review 1, R1-F3: each mapping entry carries the line its key stands
+// on, which for a block value is above the value's first line; a flow
+// mapping's entries stand on the flow's line.
+func TestAK8_KVLine(t *testing.T) {
+	src := "# made-up\nntfi:\n  topic: t\nrelay:\n\n  tmux: never\nextra:\n- a\nflat: 1\nflow: {a: 1, b: 2}\nempty:\n"
+	root, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string][2]int{}
+	for _, kv := range root.Map {
+		got[kv.Key] = [2]int{kv.Line, kv.Val.Line}
+	}
+	want := map[string][2]int{"ntfi": {2, 3}, "relay": {4, 6}, "extra": {7, 8}, "flat": {9, 9}, "flow": {10, 10}, "empty": {11, 11}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("key and value lines %v, want %v", got, want)
+	}
+	if sub := root.Map[1].Val.Map[0]; sub.Key != "tmux" || sub.Line != 6 {
+		t.Errorf("nested %+v", sub)
+	}
+	for _, kv := range root.Map[4].Val.Map {
+		if kv.Line != 10 {
+			t.Errorf("flow entry %+v", kv)
+		}
+	}
+}

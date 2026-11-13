@@ -99,8 +99,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	// measure or spawn: absolute git, make, sh and ps from dirs the account
 	// cannot write, the relay home, and the committer read (Identity);
 	// every gate line and runner git runs under it. None is exit 2,
-	// unpinned-tool. The hook (inside a sitting) and version need none.
-	if verb != "version" && verb != "--version" && verb != "hook" && !stubs[verb] {
+	// unpinned-tool. The hook (inside a sitting), version and describe
+	// (AK8 R2: it starts no process) need none.
+	if verb != "version" && verb != "--version" && verb != "hook" && verb != "describe" && !stubs[verb] {
 		release, err := pinFor()
 		if err != nil {
 			fmt.Fprintf(stderr, "relay %s: %v\n", verb, err)
@@ -112,6 +113,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	case verb == "version" || verb == "--version":
 		fmt.Fprintf(stdout, "relay %s\n", version)
 		return exitOK
+	case verb == "describe":
+		return describeVerb(args[1:], stdout, stderr)
 	case verb == "doctor":
 		f, _, err := flagSet(args[1:], []string{"--verify", "--line"}, []string{"--json"}, false)
 		if err == nil && f["--line"] != "" && f["--verify"] == "" {
@@ -175,7 +178,14 @@ type check struct {
 	OK     bool   `json:"ok"`
 	Warn   bool   `json:"warn"`
 	Detail string `json:"detail"`
+	// Status and Remedy are the plug contract's (AK8 R9): fail when not
+	// OK, else warn or ok; Remedy the one command a detail names, or null.
+	Status string  `json:"status"`
+	Remedy *string `json:"remedy"`
 }
+
+// planRemedy is the queue check's remedy when the queue has problems.
+const planRemedy = "agentik relay plan"
 
 // claudeProbe runs `claude --max-turns 1 --version` and reads exit 0: the
 // flag the spawn leans on is accepted even where --help hides it (2.1.280).
@@ -200,13 +210,19 @@ var gitWorktree = func(repo string) error {
 func doctor(asJSON bool, stdout io.Writer) int {
 	var checks []check
 	add := func(name string, ok, warn bool, format string, a ...any) {
-		checks = append(checks, check{name, ok, warn, fmt.Sprintf(format, a...)})
+		status := "ok"
+		if !ok {
+			status = "fail"
+		} else if warn {
+			status = "warn"
+		}
+		checks = append(checks, check{name, ok, warn, fmt.Sprintf(format, a...), status, nil})
 	}
 	repo, err := toplevel()
 	if err != nil || repo == "" {
 		repo = "."
 	}
-	cfg, cfgErr := effects.LoadConfig(effects.OSFS{}, getenv, repo)
+	cfg, cfgErr := loadConfig(effects.OSFS{}, getenv, repo)
 
 	if p, err := lookPath("claude"); err != nil {
 		add("claude", false, false, "not on PATH")
@@ -266,7 +282,7 @@ func doctor(asJSON bool, stdout io.Writer) int {
 		add("tmux", true, false, "%s (%s)", p, mode)
 	}
 	if cfg.Ntfy.URL != "" && cfg.Ntfy.Topic != "" {
-		add("ntfy", true, false, "configured %s", cfg.Ntfy.Topic)
+		add("ntfy", true, false, "configured (topic set)") // the topic is a secret: never printed (AK8 review 1, R1-F2)
 	} else {
 		add("ntfy", true, false, "unset: notices go to the log")
 	}
@@ -287,6 +303,8 @@ func doctor(asJSON bool, stdout io.Writer) int {
 		add("queue", false, false, "%v", err)
 	} else if ps := q.Validate(); len(ps) > 0 {
 		add("queue", true, true, "%s parses, %d rows; %d problems (relay plan names them)", qpath, len(q.Rows), len(ps))
+		remedy := planRemedy
+		checks[len(checks)-1].Remedy = &remedy
 	} else {
 		add("queue", true, false, "%s parses, %d rows, valid", qpath, len(q.Rows))
 	}
@@ -318,7 +336,7 @@ func doctor(asJSON bool, stdout io.Writer) int {
 	add("template", true, false, "sha256 %s", prompt.TemplateHash())
 	switch {
 	case cfgErr != nil:
-		add("config", false, false, "%v", cfgErr)
+		add("config", false, false, "%s", quotesNoValue(cfgErr))
 	case len(cfg.Unknown) > 0 || modeErr != nil:
 		unknown := cfg.Unknown
 		if modeErr != nil {
@@ -331,24 +349,24 @@ func doctor(asJSON bool, stdout io.Writer) int {
 		add("config", true, false, "%d files read, no unknown keys", len(cfg.Sources))
 	}
 
-	allOK := true
+	failed, warned := 0, 0
 	for _, c := range checks {
-		allOK = allOK && c.OK
-	}
-	if asJSON {
-		writeJSON(stdout, struct {
-			Checks []check `json:"checks"`
-			OK     bool    `json:"ok"`
-		}{checks, allOK})
-	} else {
-		failed, warned := 0, 0
-		for _, c := range checks {
-			if !c.OK {
-				failed++
-			} else if c.Warn {
-				warned++
-			}
+		if !c.OK {
+			failed++
+		} else if c.Warn {
+			warned++
 		}
+	}
+	if asJSON { // AK8 R9: ok is that the read ran; no check failed is failed == 0
+		writeJSON(stdout, struct {
+			Schema string  `json:"schema"`
+			OK     bool    `json:"ok"`
+			Tool   string  `json:"tool"`
+			Failed int     `json:"failed"`
+			Warned int     `json:"warned"`
+			Checks []check `json:"checks"`
+		}{"agentik.doctor/1", true, "relay", failed, warned, checks})
+	} else {
 		verdict := fmt.Sprintf("all %d checks ok", len(checks))
 		if failed > 0 {
 			verdict = fmt.Sprintf("%d of %d checks failed", failed, len(checks))
@@ -378,7 +396,7 @@ func doctor(asJSON bool, stdout io.Writer) int {
 			}
 		}
 	}
-	if !allOK {
+	if failed > 0 {
 		return exitUnwell
 	}
 	return exitOK
@@ -615,7 +633,7 @@ func repoConfig() (repo, state string, cfg effects.Config, err error) {
 	if root, err := effectsFor(state, "").Git.Root(repo); err == nil && root != "" {
 		repo = root
 	}
-	cfg, err = effects.LoadConfig(effects.OSFS{}, getenv, repo)
+	cfg, err = loadConfig(effects.OSFS{}, getenv, repo)
 	return repo, state, cfg, err
 }
 
@@ -807,6 +825,7 @@ func usage(w io.Writer) {
   clean   --merged                    remove the worktrees of merged rows
   clean   --stale                     remove dead relays' locks and their untouched worktrees
   doctor                              check claude, git, tmux, the state directory, the config
+  describe  [config [KEY]] --json     the tool, or its settings and the file and line of each
   version
 every verb takes --json
 `)
@@ -884,7 +903,7 @@ func gateVerb(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return finish(fmt.Errorf("the root: %w", err))
 	}
-	cfg, err := effects.LoadConfig(effects.OSFS{}, getenv, root)
+	cfg, err := loadConfig(effects.OSFS{}, getenv, root)
 	if err != nil {
 		return finish(err)
 	}
@@ -1466,8 +1485,12 @@ func statusVerb(args []string, stdout, stderr io.Writer) int {
 	if lines, err := effects.NewLedger(state, effects.SystemClock{}, "").Lines(); err == nil {
 		st.TakeMerges(night.HandMerges(effects.OSGit{}, lines, n))
 	}
-	if f["--json"] != "" {
-		writeJSON(stdout, st)
+	if f["--json"] != "" { // AK8 R11: the plug contract's status read, the run's
+		writeJSON(stdout, struct {
+			Schema string `json:"schema"`
+			OK     bool   `json:"ok"`
+			night.Status
+		}{"agentik.relay.run/1", true, st})
 	} else {
 		night.PrintStatus(stdout, st)
 	}

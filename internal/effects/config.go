@@ -49,6 +49,23 @@ type Config struct {
 	Unknown       []string
 	Sources       []string
 	Warnings      []string
+	// Lines is each key apply met, in the order read, so lowest layer
+	// first (AK8 R4): the known keys it assigned and the keys it added to
+	// Unknown (Known false), each with its file, line and value as written.
+	Lines []KeyLine
+}
+
+// KeyLine is one key as a layer file sets it (AK8 R4): Key dotted
+// (`ntfy.topic`), Path the layer's file, Line the 1-based line: a known
+// key's value's (yaml's Val.Line, a scalar's being its key's), an unknown
+// key's own (yaml's KV.Line, above a block value; AK8 review 1, R1-F3),
+// Value its scalar text ("" for a mapping or a list), Known false for a key
+// apply added to Unknown.
+type KeyLine struct {
+	Key, Path string
+	Line      int
+	Value     string
+	Known     bool
 }
 
 // The shipped defaults (§7's tools, §3's queue path).
@@ -314,6 +331,15 @@ func (c *Config) apply(p string, n yaml.Node) error {
 		*dst = s
 		return nil
 	}
+	// line keeps where a known key stood once apply took it (AK8 R4);
+	// unknown adds a key to Unknown, its line the key's own (review 1, R1-F3).
+	line := func(key string, v yaml.Node) {
+		c.Lines = append(c.Lines, KeyLine{Key: key, Path: p, Line: v.Line, Value: v.Str, Known: true})
+	}
+	unknown := func(key string, kv yaml.KV) {
+		c.Unknown = append(c.Unknown, p+": "+key)
+		c.Lines = append(c.Lines, KeyLine{Key: key, Path: p, Line: kv.Line, Value: kv.Val.Str})
+	}
 	for _, kv := range n.Map {
 		var err error
 		switch kv.Key {
@@ -357,18 +383,23 @@ func (c *Config) apply(p string, n yaml.Node) error {
 				case "topic":
 					err = str(sub, &c.Ntfy.Topic)
 				default:
-					c.Unknown = append(c.Unknown, p+": ntfy."+sub.Key)
+					unknown("ntfy."+sub.Key, sub)
+					continue
 				}
 				if err != nil {
 					return err
 				}
+				line("ntfy."+sub.Key, sub.Val)
 			}
+			continue
 		default:
-			c.Unknown = append(c.Unknown, p+": "+kv.Key)
+			unknown(kv.Key, kv)
+			continue
 		}
 		if err != nil {
 			return err
 		}
+		line(kv.Key, kv.Val)
 	}
 	return nil
 }

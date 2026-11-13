@@ -9,5 +9,5 @@ Run `agentik-relay doctor --json`. If the exit is 3 or `agentik-relay` is not fo
 
 From the JSON print one line per `checks[]` entry: `ok`, `warn` or `FAIL`, then `name`, then
 `detail`. `FAIL` when `ok` is false; `warn` when `ok` and `warn` are true; else `ok`. End with
-`doctor: ok` when the top-level `ok` is true, else `doctor: <n> failing` and, for each failing
+`doctor: ok` when no check's `ok` is false, else `doctor: <n> failing` and, for each failing
 check, its detail once more as the thing to fix.

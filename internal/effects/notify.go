@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -162,16 +163,16 @@ func (t Ntfy) Send(n Notice) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), NtfyTimeout)
 	defer cancel()
-	url := strings.TrimRight(t.URL, "/") + "/" + t.Topic
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader([]byte(n.Body)))
+	base := strings.TrimRight(t.URL, "/")
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/"+t.Topic, bytes.NewReader([]byte(n.Body)))
 	if err != nil {
-		return err
+		return t.postError(base, err)
 	}
 	req.Header.Set("Title", n.Title)
 	req.Header.Set("Priority", strconv.Itoa(n.Priority))
 	resp, err := c.Do(req)
 	if err != nil {
-		return fmt.Errorf("ntfy: %w", err)
+		return t.postError(base, err)
 	}
 	defer resp.Body.Close()
 	io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
@@ -179,6 +180,33 @@ func (t Ntfy) Send(n Notice) error {
 		return fmt.Errorf("ntfy: %s", resp.Status)
 	}
 	return nil
+}
+
+// postError is a failed post as the run prints it: the server's URL (its
+// password cut, as the client's own error cuts it) with the topic as
+// "(topic)", and the reason, never the URL the client tried, since the
+// topic is the secret (AK8 review 2, R2-F2). A URL the topic breaks says
+// so, since its parse error quotes the topic's characters; the reason's
+// text has any copy of the topic cut too (a redirect's URL may hold it).
+func (t Ntfy) postError(base string, err error) error {
+	shown, reason := base, err.Error()
+	u, perr := url.Parse(base)
+	if perr == nil {
+		shown = u.Redacted()
+	}
+	var ue *url.Error
+	if errors.As(err, &ue) {
+		reason = ue.Err.Error()
+		if ue.Op == "parse" && perr == nil {
+			reason = "the topic does not make a URL"
+		} else if ue.Op == "parse" && errors.As(perr, &ue) {
+			reason = ue.Err.Error() // the server's URL is at fault
+		}
+	}
+	if t.Topic != "" {
+		reason = strings.ReplaceAll(reason, t.Topic, "(topic)")
+	}
+	return fmt.Errorf("ntfy: post to %s/(topic): %s", shown, reason)
 }
 
 // LogNotify writes each notice as one line.
