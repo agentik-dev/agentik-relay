@@ -78,6 +78,8 @@ internal/packet/testdata/a*.md: renamed
 # The relay reads each old name while only it exists, new else old (agentik-r1 §6.3 c2-c4, c6): the state root's,
 # the config layers' and the section's old spellings live in these two files, beside their new ones.
 internal/effects/config.go: renamed
+cmd/agentik-relay/describe.go: renamed
+cmd/agentik-relay/ak8_fix_test.go: sibling,renamed
 internal/hooks/hooks.go: renamed
 
 # The guards deny the old spellings too (§6.3 c12, "the old stays denied"): the session guard's pattern, and the
