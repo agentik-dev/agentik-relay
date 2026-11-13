@@ -242,9 +242,9 @@ func secret(s string) any {
 // what LoadConfig gives with no file (shipped), never typed here.
 var settings = []setting{
 	{"tmux", "string", "Whether a run opens tmux windows: when tmux is there, never, or always.",
-		[]string{"auto", "never", "required"}, func(c effects.Config) any { return c.Tmux }, asWritten},
+		[]string{"auto", "never", "required"}, tmuxRead, asWritten},
 	{"allowed_tools", "string", "The tools a row's child may use without asking, passed to Claude Code as written.",
-		nil, func(c effects.Config) any { return c.AllowedTools }, asWritten},
+		nil, toolsRead, asWritten},
 	{"caffeinate", "boolean", "Whether a run keeps the machine awake while it works.",
 		nil, func(c effects.Config) any { return c.Caffeinate }, func(s string) any {
 			if b, ok := (yaml.Node{Kind: yaml.Scalar, Str: s}).Bool(); ok {
@@ -271,6 +271,25 @@ var settings = []setting{
 		nil, func(c effects.Config) any { return orNull(c.Ntfy.URL) }, asWritten},
 	{"ntfy.topic", "secret", "The topic a run's notices are sent to.",
 		nil, func(c effects.Config) any { return secret(c.Ntfy.Topic) }, secret},
+}
+
+// tmuxRead is tmux as the run reads it, TmuxMode's answer (an empty value
+// is auto); a value TmuxMode refuses reads as written, with its choice
+// warning (AK8 review 1, R1-F1).
+func tmuxRead(c effects.Config) any {
+	if mode, err := c.TmuxMode(); err == nil {
+		return mode
+	}
+	return c.Tmux
+}
+
+// toolsRead is allowed_tools as the run passes it: an empty value is
+// DefaultAllowedTools, as plan and the orchestrator read it (R1-F1).
+func toolsRead(c effects.Config) any {
+	if c.AllowedTools == "" {
+		return effects.DefaultAllowedTools
+	}
+	return c.AllowedTools
 }
 
 const changeNote = "A run that is going keeps what it started with; the next run reads the change."

@@ -9,8 +9,11 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/agentik-dev/agentik-relay/internal/effects"
 )
 
 // ak8Text runs the verb in process, whatever its output's shape.
@@ -162,5 +165,62 @@ func TestAK8_N4_ParseErrorQuotesNoTopic(t *testing.T) {
 			t.Errorf("%s: exit %d, message %q", c.topic, code, msg)
 		}
 		ak8NoText(t, c.topic, c.quoted, "Zq", "zq")
+	}
+}
+
+// TestAK8_F1_ValueIsWhatTheRunReads (review 1, R1-F1): each of the ten
+// keys, set in the user file to a form whose raw field could differ from
+// what the run uses, reads as the run reads it; `changed` (value against
+// default) and the block follow from that value.
+func TestAK8_F1_ValueIsWhatTheRunReads(t *testing.T) {
+	for _, c := range []struct {
+		file, key string
+		value     any
+		changed   bool
+		block     string
+	}{
+		{"tmux:\n", "tmux", "auto", false, "tmux: auto"},
+		{"tmux: ''\n", "tmux", "auto", false, "tmux: auto"},
+		{"allowed_tools: ''\n", "allowed_tools", effects.DefaultAllowedTools, false, "allowed_tools: " + effects.DefaultAllowedTools},
+		{"allowed_tools:\n", "allowed_tools", effects.DefaultAllowedTools, false, "allowed_tools: " + effects.DefaultAllowedTools},
+		{"caffeinate: false\n", "caffeinate", false, true, "caffeinate: false"},
+		{"band: off\n", "band", "off", true, "band: off"},
+		{"queue: ./relay/../relay/queue.yaml\n", "queue", effects.DefaultQueue, false, "queue: " + effects.DefaultQueue},
+		{"merge: ''\n", "merge", nil, false, "merge: VALUE"},
+		{"packets: ''\n", "packets", nil, false, "packets: VALUE"},
+		{"verify_seconds: 900\n", "verify_seconds", 900.0, false, "verify_seconds: 900"},
+		{"ntfy:\n  url: ''\n", "ntfy.url", nil, false, "ntfy:\n  url: VALUE"},
+		{"ntfy:\n  topic: ''\n", "ntfy.topic", nil, false, "ntfy:\n  topic: VALUE"},
+	} {
+		w := ak8Setup(t, true)
+		ak8Write(t, w.userFile(), c.file)
+		code, m, _, _ := ak8Run(t, "describe", "config", "--json", c.key)
+		s := ak8Settings(t, m)[c.key]
+		changed := s["default"] != nil && !reflect.DeepEqual(s["value"], s["default"])
+		block := s["change"].(map[string]any)["block"]
+		if code != exitOK || !reflect.DeepEqual(s["value"], c.value) || changed != c.changed || block != c.block {
+			t.Errorf("%q: exit %d, value %#v (want %#v), changed %v, block %q (want %q)", c.file, code, s["value"], c.value, changed, block, c.block)
+		}
+		if src := s["source"].(map[string]any); src["layer"] != "user" {
+			t.Errorf("%q: source %v", c.file, src)
+		}
+		if ws := m["warnings"].([]any); len(ws) != 0 {
+			t.Errorf("%q: warnings %v", c.file, ws)
+		}
+	}
+}
+
+// TestAK8_F1_ReviewProbe is review 1's probe of R1-F1 as written.
+func TestAK8_F1_ReviewProbe(t *testing.T) {
+	for _, s := range []string{"tmux:\n", "allowed_tools: ''\n"} {
+		w := ak8Setup(t, true)
+		ak8Write(t, w.userFile(), s)
+		_, m, _, _ := ak8Run(t, "describe", "config", "--json")
+		k := map[string]string{"tmux:\n": "tmux", "allowed_tools: ''\n": "allowed_tools"}[s]
+		r := ak8Settings(t, m)[k]
+		t.Logf("%s value %q default %q block %q", k, r["value"], r["default"], r["change"].(map[string]any)["block"])
+		if r["value"] != r["default"] {
+			t.Errorf("%s: value %q is not what the run reads", k, r["value"])
+		}
 	}
 }
