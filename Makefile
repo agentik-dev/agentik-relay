@@ -43,11 +43,11 @@ validate:  ## claude plugin validate plugin/ (doclint's plugin rule runs in chec
 	$(PY) -B scripts/bounded --wall 60 -- claude plugin validate plugin/
 build:  ## bin/agentik-relay
 	go build -o bin/agentik-relay ./cmd/agentik-relay
-install:  ## agentik-relay into BINDIR, relay a link to it (until 2026-12-31), the agentik front door beside it; GOPATH's relay relinked when it exists (agentik-r1 §4.1, D3)
+install:  ## agentik-relay into BINDIR, relay a link to it (until 2026-12-31), the agentik front door beside it where none or an older one is there (scripts/install-door, DW1R); GOPATH's relay relinked when it exists (agentik-r1 §4.1, D3)
 	mkdir -p $(BINDIR)
 	go build -o $(BINDIR)/agentik-relay ./cmd/agentik-relay
 	ln -sf agentik-relay $(BINDIR)/relay
-	install -m 0755 scripts/agentik $(BINDIR)/agentik
+	sh scripts/install-door scripts/agentik $(BINDIR)/agentik
 	g="$$(go env GOPATH)/bin/relay"; if [ -e "$$g" ] || [ -L "$$g" ]; then ln -sf $(BINDIR)/agentik-relay "$$g"; fi
 doctor:  ## claude, git, tmux on PATH
 	go run ./cmd/agentik-relay doctor

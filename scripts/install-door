@@ -1,0 +1,76 @@
+#!/bin/sh
+# install-door: place the agentik front door at DEST from SRC only where no
+# door or an older one is there (packet DW1R; the suite's install module's
+# rule). This repo's own script, not vendored.
+#
+#   install-door SRC DEST
+#
+# Nothing at DEST: written. DEST a link, or there and no regular file (a
+# FIFO, a device, a folder), never opened: left alone. A file's first VERSION=
+# line, in DEST or in SRC, not three numbers with dots between (a prerelease
+# included): left alone. SRC newer, number by number: written. Equal or newer
+# at DEST: kept, byte for byte. Written or kept prints nothing; left alone
+# prints one stdout line. Exit 0 for each; 1, with one stderr line, when SRC
+# cannot be read or the write fails; 2 for usage. The write copies SRC at 0755
+# to a temp file beside DEST, then moves it over DEST with one mv -f.
+
+[ $# -eq 2 ] || { printf '%s\n' "usage: install-door SRC DEST" >&2; exit 2; }
+src=$1
+door=$2
+# A relative DEST is taken as ./DEST, so mv, rm and install read no name of
+# the script's as an option; the lines name DEST as given.
+case $door in /*) dest=$door ;; *) dest=./$door ;; esac
+
+if [ ! -f "$src" ] || [ ! -r "$src" ]; then
+	printf '%s\n' "install-door: cannot read $src" >&2
+	exit 1
+fi
+
+# version FILE: the value of FILE's first VERSION= line, or none.
+version() {
+	v=$(awk '/^VERSION=/ { print "=" substr($0, 9); exit }' "$1" 2>/dev/null)
+	case $v in
+	=*) printf '%s\n' "${v#=}" ;;
+	*) printf '%s\n' none ;;
+	esac
+}
+
+# numbered V: V is three numbers with dots between.
+numbered() {
+	printf '%s\n' "$1" | awk '/^[0-9]+\.[0-9]+\.[0-9]+$/ { ok++ } END { exit !(ok == 1 && NR == 1) }'
+}
+
+# above A B: A is above B, compared number by number.
+above() {
+	awk -v a="$1" -v b="$2" 'BEGIN {
+		split(a, x, "."); split(b, y, ".")
+		for (i = 1; i <= 3; i++) if (x[i] + 0 != y[i] + 0) exit !(x[i] + 0 > y[i] + 0)
+		exit 1
+	}'
+}
+
+write() {
+	tmp=$dest.install-door.$$
+	if install -m 0755 "$src" "$tmp" 2>/dev/null && mv -f "$tmp" "$dest" 2>/dev/null; then
+		exit 0
+	fi
+	rm -f "$tmp" 2>/dev/null
+	printf '%s\n' "install-door: cannot write $door" >&2
+	exit 1
+}
+
+if [ -L "$dest" ]; then
+	printf '%s\n' "the door $door is a link; left alone"
+	exit 0
+fi
+[ -e "$dest" ] || write
+# Only a regular file is read: a FIFO or a device would block awk's open.
+theirs=none
+[ -f "$dest" ] && theirs=$(version "$dest")
+ours=$(version "$src")
+if ! numbered "$theirs" || ! numbered "$ours"; then
+	printf '%s\n' "the door $door has no version to compare ($theirs there, $ours here); left alone"
+	exit 0
+fi
+above "$ours" "$theirs" && write
+exit 0
