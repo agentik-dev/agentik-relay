@@ -31,15 +31,15 @@ At the pin, line 50's command run by hand over made-up doors: a door at `VERSION
 
 ## 4. Findings that name this row
 
-None. Not here: the 0.2.0 door or any edit of `scripts/agentik`; what `make install` does with the binary, the `relay` link or GOPATH's link; a doctor check of the door's version; the README's install lines (its sentence on `make install` stays true); a script shared with other repos. Nothing under `plugin/` changes: the plugin stays at 0.2.2.
-
-## 4a. Review 1: the findings and the ruling
+Review 1's, one line each with its ruling (the packet grammar holds no extra section, so they sit here):
 
 - F1, fix: a FIFO at `DEST` hung the script (`awk` blocks on its open). `DEST` is read only when `[ -f ]`; anything else there (a FIFO, a device, a socket, a folder) gets the no-version line, exit 0, never opened. `TestDW1_7_NotAFile`.
 - F2, fix: a relative `DEST` starting with `-` was read as `mv`'s option, exit 1 and a temp file left. A relative `DEST` is taken as `./DEST`; R3's lines still name it as given. `TestDW1_8_DashName`.
 - L1, fix: `echo` cut or split R3's one line over a value holding a backslash or `-n`. Every line goes through `printf '%s\n'`. `TestDW1_9_OneLine`.
 - L2, built: R4's temp file and one rename are pinned by a shim `mv` on `PATH` that logs its call. `TestDW1_10_TempThenRename`.
 - F3, not built: two runs at once can leave the older door; no lock. Filed in `NICE_TO_HAVE.md` for the door's probe over its three writers, with the review's other leads.
+
+Not here: the 0.2.0 door or any edit of `scripts/agentik`; what `make install` does with the binary, the `relay` link or GOPATH's link; a doctor check of the door's version; the README's install lines (its sentence on `make install` stays true); a script shared with other repos. Nothing under `plugin/` changes: the plugin stays at 0.2.2.
 
 ## 5. Forbidden reads
 
