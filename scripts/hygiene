@@ -42,7 +42,12 @@ repo, in the private list: `$AGENTIK_HYGIENE_PRIVATE` when set and not empty,
 else `${XDG_CONFIG_HOME:-$HOME/.config}/agentik/hygiene-private.tsv`. It is UTF-8,
 one `group<TAB>regex` per line; `#` comments and blank lines are skipped. Its
 patterns are compiled case-insensitively and multiline (`^` and `$` meet a line's
-edges, inside a binary's content too) and scanned as the in-file ones; a group
+edges, inside a binary's content too) and scanned as the in-file ones; a row
+that opens with an unanchored `.*` (after an optional leading flags group such
+as `(?i)`), or ends with one, searches without it, never under DOTALL: a search
+tries every start and `.` may match nothing, so a line holds a match of the one
+exactly when it holds one of the other, and such a row costs a literal's time,
+never the square of a long line (packet h2-hygiene-binary); a group
 it names that this file lacks is a new group, one this file has gains the
 patterns. A regex from the list is never printed, not even in an error: a bad
 line is reported by its number. An absent list prints one stderr line and the
@@ -124,6 +129,7 @@ GROUP_NAMES = [name for name, _ in GROUPS]
 PRIVATE_ENV = "AGENTIK_HYGIENE_PRIVATE"
 PRIVATE_NAME = os.path.join("agentik", "hygiene-private.tsv")
 GROUP_NAME = re.compile(r"[A-Za-z0-9_-]+\Z")
+LEAD_FLAGS = re.compile(r"\(\?[aiLmsux]+\)")
 ALL = None  # a text line is scanned for every group
 BINARY_PROBE = 8192
 UTF16_NUL = 0.9
@@ -226,6 +232,32 @@ def private_path():
     return os.path.join(base, PRIVATE_NAME)
 
 
+def unwild(regex, flags):
+    """A private row compiled for search: without an unanchored leading `.*` (after an
+    optional leading flags group) and an unanchored trailing `.*`, since `.*X` and `X.*`
+    match somewhere in a line exactly when X does. Not `.*?`, `.+`, `^.*`, `.*$`, an
+    escaped dot or a `.*` inside a group; never under DOTALL. A row whose stripped form
+    does not compile keeps its own."""
+    rx = re.compile(regex, flags)
+    if rx.flags & re.DOTALL:
+        return rx
+    lead = LEAD_FLAGS.match(regex)
+    head, body = (regex[:lead.end()], regex[lead.end():]) if lead else ("", regex)
+    if body.startswith(".*") and body[2:3] not in ("?", "+", "*", "{"):
+        body = body[2:]
+    if body.endswith(".*"):
+        dot = len(body) - 2
+        slashes = len(body[:dot]) - len(body[:dot].rstrip("\\"))
+        if slashes % 2 == 0:
+            body = body[:dot]
+    if head + body == regex:
+        return rx
+    try:
+        return re.compile(head + body, flags)
+    except re.error:
+        return rx
+
+
 def load_private(path, required):
     """[(group, compiled)] from the private list, in its order; one stderr line and []
     when it is absent (NoPrivateList when required or unreadable). Never prints a regex."""
@@ -254,7 +286,7 @@ def load_private(path, required):
         try:
             if not sep or not GROUP_NAME.match(group) or not regex:
                 raise re.error("bad entry")
-            entries.append((group, re.compile(regex, re.IGNORECASE | re.MULTILINE)))
+            entries.append((group, unwild(regex, re.IGNORECASE | re.MULTILINE)))
         except re.error:
             raise UsageError("%s:%d: bad entry (group<TAB>regex)" % (path, n)) from None
     if required and not entries:
