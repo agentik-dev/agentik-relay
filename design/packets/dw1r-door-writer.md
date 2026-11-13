@@ -5,7 +5,7 @@
 | from | agentik-hq's row brief `dw1r-door-writer` (a mend, found by a reproduction; no owner's words); the suite's canonical install module, which writes the door forward only |
 | pin | `main` at `7359e5b` plus this packet's own commit; branch `dw1r-door-writer`, worktree `.claude/worktrees/dw1r-door-writer`; nothing linked from main (a Go repo, no venv) |
 | wall | this repo's worktree only; no push, `--amend`, rebase, merge, real `make install`, plugin update; never build a relay binary by hand, never run one outside `make`'s test harness, never run `relay` or `agentik relay` `run`, `plan`, `gate`, `stop`, `kill`, `clean` or `resume`, never write inside `~/.local/state/agent-relay`; never `claude`; `make check` only through the gate queue (`agentik session gate run`), never a bare `make`; no `DECISIONS.md` or rendered block edited; `scripts/agentik` and every vendored file unchanged |
-| may touch | `scripts/install-door` (new), `Makefile` (the `install` target's door line and its `##` text), `cmd/agentik-relay/dw1_test.go` (new), `cmd/agentik-relay/agentik_r1_test.go` (`TestAgentikR1_5_InstallTarget`'s fourth line), `design/packets/dw1r-door-writer.md`, `history/sittings/2026-11-13-1-dw1r.md` |
+| may touch | `scripts/install-door` (new), `Makefile` (the `install` target's door line and its `##` text), `cmd/agentik-relay/dw1_test.go` (new), `cmd/agentik-relay/agentik_r1_test.go` (`TestAgentikR1_5_InstallTarget`'s fourth line), `design/packets/dw1r-door-writer.md`, `history/sittings/2026-11-13-1-dw1r.md`; at review 1, `NICE_TO_HAVE.md` (its open rows) |
 | acceptance | `go test ./cmd/agentik-relay -run '^TestDW1_' -count=1 -v 2>&1 \| grep -c -E '^--- PASS: TestDW1_'` reads `6` (main: `0`); `grep -c -F 'sh scripts/install-door scripts/agentik' Makefile` reads `1` (main: `0`); `go test ./cmd/agentik-relay -run '^TestAgentikR1_5_' -count=1` exits 0 (main: 0, on the old line); `go test ./internal/hygiene -run '^TestAgentikR1_2_' -count=1` exits 0 (main: 0, its six lines OK); `git diff main -- scripts/vendored.sha256 scripts/agentik plugin \| wc -l` reads `0` (main: `0`) |
 | budget | 40 turns, 150k context, `claude-opus-5-5` at `high`; three acts, one commit each: 0 this packet; 1 the tests, red; 2 the script and the Makefile's line, green |
 | verify | `make check` |
@@ -32,6 +32,14 @@ At the pin, line 50's command run by hand over made-up doors: a door at `VERSION
 ## 4. Findings that name this row
 
 None. Not here: the 0.2.0 door or any edit of `scripts/agentik`; what `make install` does with the binary, the `relay` link or GOPATH's link; a doctor check of the door's version; the README's install lines (its sentence on `make install` stays true); a script shared with other repos. Nothing under `plugin/` changes: the plugin stays at 0.2.2.
+
+## 4a. Review 1: the findings and the ruling
+
+- F1, fix: a FIFO at `DEST` hung the script (`awk` blocks on its open). `DEST` is read only when `[ -f ]`; anything else there (a FIFO, a device, a socket, a folder) gets the no-version line, exit 0, never opened. `TestDW1_7_NotAFile`.
+- F2, fix: a relative `DEST` starting with `-` was read as `mv`'s option, exit 1 and a temp file left. A relative `DEST` is taken as `./DEST`; R3's lines still name it as given. `TestDW1_8_DashName`.
+- L1, fix: `echo` cut or split R3's one line over a value holding a backslash or `-n`. Every line goes through `printf '%s\n'`. `TestDW1_9_OneLine`.
+- L2, built: R4's temp file and one rename are pinned by a shim `mv` on `PATH` that logs its call. `TestDW1_10_TempThenRename`.
+- F3, not built: two runs at once can leave the older door; no lock. Filed in `NICE_TO_HAVE.md` for the door's probe over its three writers, with the review's other leads.
 
 ## 5. Forbidden reads
 
