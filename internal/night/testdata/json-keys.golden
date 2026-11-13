@@ -2,8 +2,14 @@ doctor checks
 doctor checks[].detail
 doctor checks[].name
 doctor checks[].ok
+doctor checks[].remedy
+doctor checks[].status
 doctor checks[].warn
+doctor failed
 doctor ok
+doctor schema
+doctor tool
+doctor warned
 gate clean
 gate commit
 gate error

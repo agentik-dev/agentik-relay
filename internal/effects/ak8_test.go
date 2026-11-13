@@ -1,6 +1,8 @@
 package effects
 
 import (
+	"fmt"
+	"path/filepath"
 	"reflect"
 	"testing"
 )
@@ -36,8 +38,9 @@ func ak8Of(c Config, err error) ak8Fields {
 // code returned (recorded at the pin), and Lines names each key's file,
 // line and value as written, lowest first, the unknown key among them.
 func TestAK8_8_PinFieldsAndLines(t *testing.T) {
-	const user, repo, sess = "/h/.config/agent-relay/config.yaml", "/r/.claude/claude-code-session/config.yaml",
-		"/h/.local/state/claude-code-session/sessions/s1/resolved.yaml"
+	// TestLoadConfig's old names, spelled from the constants.
+	user, repo := "/h/"+oldUserConfig, "/r/"+oldRepoConfig
+	sess := "/h/.local/state/" + fmt.Sprintf(oldSessionConfig, "s1")
 	old := []string{repo + ": the old path; move it to .claude/agentik/config.yaml"}
 	defaults := ak8Fields{Tmux: "auto", AllowedTools: DefaultAllowedTools, Caffeinate: true, Band: "pace", Queue: "relay/queue.yaml"}
 
@@ -55,11 +58,11 @@ func TestAK8_8_PinFieldsAndLines(t *testing.T) {
 	fs.WriteFile(user, []byte(
 		"ntfy: {url: https://ntfy.example, topic: night}\ntmux: never\ncaffeinate: false\ncolour: blue\n"), 0o600)
 	fs.WriteFile(repo, []byte(
-		"other: {x: 1}\nagent-relay:\n  queue: q.yaml\n  merge: branch-only\n  tmux: auto\n"), 0o600)
+		"other: {x: 1}\n"+oldSection+":\n  queue: q.yaml\n  merge: branch-only\n  tmux: auto\n"), 0o600)
 	env["CLAUDE_CODE_SESSION_ID"] = "s1"
 	fs.WriteFile(sess, []byte(
-		"agent-relay: {queue: s.yaml, allowed_tools: Bash}\n"+
-			inputs(fs, repo, "/r/.claude/claude-code-session/config.local.yaml")), 0o600)
+		oldSection+": {queue: s.yaml, allowed_tools: Bash}\n"+
+			inputs(fs, repo, filepath.Join(filepath.Dir(repo), localConfig))), 0o600)
 	c, err = LoadConfig(fs, get, "/r")
 	layered := ak8Fields{Tmux: "auto", AllowedTools: "Bash", Caffeinate: false, Band: "pace", Queue: "s.yaml", Merge: "branch-only",
 		Unknown: []string{user + ": colour"}, Sources: []string{user, repo, sess}, Warnings: old}

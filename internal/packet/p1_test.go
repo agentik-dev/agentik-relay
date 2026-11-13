@@ -30,7 +30,7 @@ func p1Body(t *testing.T, path string) (string, string) {
 // disable-model-invocation: true, and its body is the pin's byte for byte.
 func TestP1_1_CommandsHidden(t *testing.T) {
 	bodies := map[string]string{ // sha256 of each body at a3c501d
-		"doctor": "89d0f340e6ae5867a567d22300ad57b1333fad419c62e2aaa5d669db4a451bcd",
+		"doctor": "00be40ad2bf72dff38d20c8f3c779c760ff4f5e76052517795a0641a3d81a1fd", // AK8 R10: its last sentence
 		"gate":   "e476c09556c56ddcd151691c353766946f3d42a70a70793f333fb34adf83a05f",
 		"plan":   "a7bf3f21f809db282551df2e46cb40d516cd84f06d38b8f5cd3b024c91c3db50",
 		"report": "d6d5f720f6b223d845bf232a9d9594b73d523b8e1d1dd77049bac50730f13453",

@@ -5,7 +5,7 @@
 | from | agentik-hq's row brief `ak8-plug-relay`; the owner's words below; the suite's plug contract (sections 2 to 7, held in §3 below) |
 | pin | `main` at `fa29bcc` (`version` `0.1.0-dev`, plugin 0.2.2) plus this packet's own commit; branch `ak8-plug-relay`, worktree `.claude/worktrees/ak8-plug-relay`; nothing linked from main |
 | wall | this repo's worktree only; no push, `--amend`, rebase, merge, install, plugin update; never `go build`, `go run`, `go install`, `make build` or `make install` by hand, never run a relay binary, never run `relay` or `agentik relay` `run`, `plan`, `gate`, `stop`, `kill`, `clean` or `resume`, never write inside `~/.local/state/agent-relay`; `make check` only through the gate queue; no `DECISIONS.md` or rendered block edited; nothing under `internal/night` changed |
-| may touch | `cmd/agentik-relay/describe.go` (new), `cmd/agentik-relay/main.go`, `internal/effects/config.go`, `cmd/agentik-relay/ak8_test.go` (new), `internal/effects/ak8_test.go` (new), `internal/night/testdata/json-keys.golden`, `plugin/commands/doctor.md`, `plugin/.claude-plugin/plugin.json`, `NICE_TO_HAVE.md`, `design/packets/ak8-plug-relay.md`, `history/sittings/2026-11-13-2-ak8.md` |
+| may touch | `cmd/agentik-relay/describe.go` (new), `cmd/agentik-relay/main.go`, `internal/effects/config.go`, `cmd/agentik-relay/ak8_test.go` (new), `internal/effects/ak8_test.go` (new), `internal/night/testdata/json-keys.golden`, `plugin/commands/doctor.md`, `plugin/.claude-plugin/plugin.json`, `internal/packet/agentik_r1_test.go` and `internal/packet/p1_test.go` (their pins of the plugin's version and of `doctor.md`'s body), `NICE_TO_HAVE.md`, `design/packets/ak8-plug-relay.md`, `history/sittings/2026-11-13-2-ak8.md` |
 | acceptance | `go test ./cmd/agentik-relay -run '^TestAK8_' -count=1 -v 2>&1 \| grep -c -E '^--- PASS: TestAK8_'` reads `9` (main: `0`); `go test ./internal/effects -run '^TestAK8_' -count=1` exits 0 (main: 1, no such field); `go test ./cmd/agentik-relay -run '^TestJSONShapesFrozen$' -count=1` exits 0 (main: 0); `grep -c -F 'doctor: <n> failing' plugin/commands/doctor.md` reads `1` (main: `1`); `git diff main -- internal/night/status.go \| wc -l` reads `0` (main: `0`) |
 | budget | 90 turns, 200k context, `claude-opus-5-5` at `high`; four acts, one commit each: 0 this packet; 1 the tests, red; 2 R4 in `config.go`; 3 R2 to R11, green, and the plugin page |
 | verify | `make check` |
@@ -50,7 +50,7 @@ At the pin, measured by reading the code (no relay verb run): `run` has no `desc
 
 ## 4. Findings that name this row
 
-None yet.
+Build 1: two tests pin what R10 changes, the plugin's version (`TestAgentikR1_5_PluginIsRelay`) and `doctor.md`'s body sha (`TestP1_1_CommandsHidden`); each pin moves to the new bytes, and nothing else in them.
 
 ## 5. Forbidden reads
 
