@@ -20,7 +20,7 @@ agentik-relay is a static Go binary, `agentik-relay` (`relay` a link to it until
 ## Install
 
 ```
-claude plugin marketplace add agentik-dev/agentik-relay
+claude plugin marketplace add agentik-dev/agentik-commons
 claude plugin install relay@agentik
 go install github.com/agentik-dev/agentik-relay/cmd/agentik-relay@latest
 ```
