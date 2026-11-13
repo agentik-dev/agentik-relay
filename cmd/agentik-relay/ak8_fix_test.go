@@ -282,3 +282,99 @@ func TestAK8_N1_BlockNamesTheFilesSection(t *testing.T) {
 		}
 	}
 }
+
+// TestAK8_R2F1_NoVerbQuotesTheTopic (review 2, R2-F1): a topic the reader
+// refuses by quoting one of its characters (an escape, an indicator), in
+// each of the five files the relay reads, block and flow. plan, its --json,
+// and run --orchestrate's refusal (with --no-notify and without) name the
+// file, the line and the fault, and no byte of the topic. run and gate take
+// the account's pid file, so no test runs them: each reads its config
+// through loadConfig, as plan does (TestAK8_R2F1_EveryVerbReadsMasked).
+func TestAK8_R2F1_NoVerbQuotesTheTopic(t *testing.T) {
+	const url = "url: https://ntfy.example.invalid"
+	for _, shape := range []struct{ block, flow, fault string }{
+		{`topic: "ab\qxzv"`, "", "unsupported escape"},
+		{"topic: @qxzv", "", "reserved indicator"},
+		{"", `{` + url + `, topic: "qxzv\z"}`, "unsupported escape"},
+	} {
+		for _, file := range []string{"user", "old user", "repo", "old repo", "local"} {
+			w := ak8Doctor(t)
+			path, sec := w.userFile(), ""
+			switch file {
+			case "old user":
+				path = filepath.Join(w.home, ".config", "agent-relay", "config.yaml")
+			case "repo":
+				path, sec = w.repoFile(), "relay:\n"
+			case "old repo":
+				path, sec = filepath.Join(w.repo, ".claude", "claude-code-session", "config.yaml"), "agent-relay:\n"
+			case "local":
+				path, sec = filepath.Join(filepath.Dir(w.repoFile()), "config.local.yaml"), "relay:\n"
+			}
+			ind, line := "", 1
+			if sec != "" {
+				ind, line = "  ", 2
+			}
+			text := sec + ind + "ntfy: " + shape.flow + "\n"
+			if shape.flow == "" {
+				text, line = sec+ind+"ntfy:\n"+ind+"  "+url+"\n"+ind+"  "+shape.block+"\n", line+2
+			}
+			ak8Write(t, path, text)
+			what := file + " " + strings.TrimSpace(shape.block+shape.flow)
+			want := []string{path, "line " + string(rune('0'+line)) + ": " + shape.fault}
+			outs := map[string]string{}
+			_, out, errb := ak8Text("plan")
+			outs["plan"] = out + errb
+			_, out, errb = ak8Text("plan", "--json")
+			outs["plan --json"] = out + errb
+			outs["orchestrate"] = orchestrateRefusalFor(false)
+			outs["orchestrate --no-notify"] = orchestrateRefusalFor(true)
+			for verb, s := range outs {
+				for _, word := range want {
+					if !strings.Contains(s, word) {
+						t.Errorf("%s, %s: no %q in %q", what, verb, word, s)
+					}
+				}
+				for _, leak := range []string{"qxzv", `\q`, `\z`, "@"} {
+					if strings.Contains(s, leak) {
+						t.Errorf("%s, %s: prints %q: %q", what, verb, leak, s)
+					}
+				}
+			}
+		}
+	}
+}
+
+// TestAK8_R2F1_EveryVerbReadsMasked (review 2, R2-F1): the package reads
+// its config through loadConfig alone, so gate and run, which no test runs,
+// print a parse refusal as plan does; describe's read of the shipped
+// defaults (no file) is the one other call. loadConfig itself masks.
+func TestAK8_R2F1_EveryVerbReadsMasked(t *testing.T) {
+	srcs, _ := filepath.Glob("*.go")
+	calls := 0
+	for _, src := range srcs {
+		if strings.HasSuffix(src, "_test.go") {
+			continue
+		}
+		b, err := os.ReadFile(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i, l := range strings.Split(string(b), "\n") {
+			if strings.Contains(l, "effects.LoadConfig(") {
+				calls++
+				if src != "describe.go" || !(strings.Contains(l, "noFiles{}") || strings.Contains(l, "LoadConfig(fsys, env, repo)")) {
+					t.Errorf("%s:%d reads the config past loadConfig: %s", src, i+1, strings.TrimSpace(l))
+				}
+			}
+		}
+	}
+	if calls != 2 {
+		t.Errorf("effects.LoadConfig called %d times in the package, want 2 (loadConfig and the shipped read)", calls)
+	}
+	home := t.TempDir()
+	ak8Write(t, filepath.Join(home, ".config", "agentik", "relay", "config.yaml"), "ntfy:\n  topic: \"zq\\qxzv\"\n")
+	_, err := loadConfig(effects.OSFS{}, func(k string) string { return map[string]string{"HOME": home}[k] }, "")
+	if err == nil || strings.Contains(err.Error(), "qxzv") || !strings.HasSuffix(err.Error(), ": line 2: unsupported escape") {
+		t.Errorf("loadConfig: %v", err)
+	}
+}

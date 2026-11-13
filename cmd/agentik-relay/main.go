@@ -222,7 +222,7 @@ func doctor(asJSON bool, stdout io.Writer) int {
 	if err != nil || repo == "" {
 		repo = "."
 	}
-	cfg, cfgErr := effects.LoadConfig(effects.OSFS{}, getenv, repo)
+	cfg, cfgErr := loadConfig(effects.OSFS{}, getenv, repo)
 
 	if p, err := lookPath("claude"); err != nil {
 		add("claude", false, false, "not on PATH")
@@ -633,7 +633,7 @@ func repoConfig() (repo, state string, cfg effects.Config, err error) {
 	if root, err := effectsFor(state, "").Git.Root(repo); err == nil && root != "" {
 		repo = root
 	}
-	cfg, err = effects.LoadConfig(effects.OSFS{}, getenv, repo)
+	cfg, err = loadConfig(effects.OSFS{}, getenv, repo)
 	return repo, state, cfg, err
 }
 
@@ -903,7 +903,7 @@ func gateVerb(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return finish(fmt.Errorf("the root: %w", err))
 	}
-	cfg, err := effects.LoadConfig(effects.OSFS{}, getenv, root)
+	cfg, err := loadConfig(effects.OSFS{}, getenv, root)
 	if err != nil {
 		return finish(err)
 	}

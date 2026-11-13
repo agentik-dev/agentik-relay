@@ -339,7 +339,7 @@ func configRead(key string, stdout io.Writer) int {
 	if repo == "" {
 		fsys = absOnly{fsys}
 	}
-	cfg, err := effects.LoadConfig(fsys, getenv, repo)
+	cfg, err := loadConfig(fsys, getenv, repo)
 	if err != nil {
 		writeJSON(stdout, configFailed{"agentik.config/1", false, "relay",
 			readError{"bad_file", strings.Join(strings.Fields(quotesNoValue(err)), " "), nil}})
@@ -479,6 +479,22 @@ func blockValue(s setting, v any) string {
 // unsupported escape) names its file, line and fault and not the character,
 // since the value may be the ntfy topic (AK8 review 1, N4). Every other
 // error reads as LoadConfig wrote it.
+// loadConfig is effects.LoadConfig as every verb reads it: a refusal comes
+// back as quotesNoValue prints it, so plan, run, gate, run --orchestrate's
+// refusal, describe and doctor print no character of a value, the ntfy
+// topic among them (AK8 review 2, R2-F1). LoadConfig's own answer stands
+// (the packet's R1); the masked error wraps nothing, so no caller reaches
+// the value through it. describe's read of what ships is the one other call.
+func loadConfig(fsys effects.FS, env func(string) string, repo string) (effects.Config, error) {
+	cfg, err := effects.LoadConfig(fsys, env, repo)
+	if err != nil {
+		if s := quotesNoValue(err); s != err.Error() {
+			err = errors.New(s)
+		}
+	}
+	return cfg, err
+}
+
 func quotesNoValue(err error) string {
 	s := err.Error()
 	var ye *yaml.Error
