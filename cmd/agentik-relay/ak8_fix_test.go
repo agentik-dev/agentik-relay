@@ -251,3 +251,34 @@ func TestAK8_F3_UnknownBlockKeyLine(t *testing.T) {
 		}
 	}
 }
+
+// TestAK8_N1_BlockNamesTheFilesSection (review 1, N1): an edit in a repo
+// or local file names the section that file already uses, as LoadConfig
+// reads it (relay when both stand, else agent-relay), so a paste never
+// gives the file a second section.
+func TestAK8_N1_BlockNamesTheFilesSection(t *testing.T) {
+	for _, c := range []struct {
+		dir, name, text, block string
+	}{
+		{"claude-code-session", "config.yaml", "# made-up\nagent-relay:\n  queue: relay/q.yaml\n  tmux: required\n", "agent-relay:\n  tmux: required"},
+		{"claude-code-session", "config.local.yaml", "agent-relay:\n  tmux: required\n", "agent-relay:\n  tmux: required"},
+		{"agentik", "config.yaml", "agent-relay:\n  tmux: required\n", "agent-relay:\n  tmux: required"},
+		{"agentik", "config.yaml", "agent-relay:\n  band: off\nrelay:\n  tmux: required\n", "relay:\n  tmux: required"},
+		{"agentik", "config.local.yaml", "relay:\n  tmux: required\n", "relay:\n  tmux: required"},
+	} {
+		w := ak8Setup(t, true)
+		ak8Write(t, w.userFile(), "tmux: never\n")
+		file := filepath.Join(w.repo, ".claude", c.dir, c.name)
+		if c.dir == "claude-code-session" && c.name != "config.yaml" { // the old folder is read only beside its repo file
+			ak8Write(t, filepath.Join(filepath.Dir(file), "config.yaml"), "agent-relay:\n  band: off\n")
+		}
+		ak8Write(t, file, c.text)
+		_, m, _, _ := ak8Run(t, "describe", "config", "--json", "tmux")
+		s := ak8Settings(t, m)["tmux"]
+		ch := s["change"].(map[string]any)
+		t.Logf("%s/%s: path %v block %q", c.dir, c.name, ch["path"], ch["block"])
+		if s["value"] != "required" || ch["path"] != file || ch["block"] != c.block {
+			t.Errorf("%s/%s: value %v, change %v, want block %q", c.dir, c.name, s["value"], ch, c.block)
+		}
+	}
+}

@@ -383,7 +383,7 @@ func configRead(key string, stdout io.Writer) int {
 		if row.Values == nil {
 			row.Values = []valueRow{}
 		}
-		row.Change = editFor(s, row, paths[0])
+		row.Change = editFor(s, row, paths[0], func(p string) string { return fileSection(fsys, p) })
 		if key == "" || key == s.key {
 			out.Settings = append(out.Settings, row)
 		}
@@ -416,8 +416,9 @@ func settingRows(cfg effects.Config, key string) []effects.KeyLine {
 
 // editFor is the edit that sets s (R6): the file of the layer in force
 // when a person edits it (user, repo, local), else the user's; the block
-// at the top level of the user's file, under `relay:` in a repo's.
-func editFor(s setting, row settingRow, userFile string) changeRow {
+// at the top level of the user's file, in a repo's under the section that
+// file uses (sectionOf; AK8 review 1, N1).
+func editFor(s setting, row settingRow, userFile string, sectionOf func(string) string) changeRow {
 	path := userFile
 	switch row.Source.Layer {
 	case "user", "repo", "local":
@@ -425,7 +426,7 @@ func editFor(s setting, row settingRow, userFile string) changeRow {
 	}
 	indent, block := "", []string{}
 	if path != userFile {
-		block, indent = append(block, "relay:"), "  "
+		block, indent = append(block, sectionOf(path)+":"), "  "
 	}
 	segs := strings.Split(s.key, ".")
 	for i, seg := range segs[:len(segs)-1] {
@@ -434,6 +435,23 @@ func editFor(s setting, row settingRow, userFile string) changeRow {
 	block = append(block, indent+strings.Repeat("  ", len(segs)-1)+segs[len(segs)-1]+": "+blockValue(s, row.Value))
 	text, note := strings.Join(block, "\n"), changeNote
 	return changeRow{Kind: "edit", Path: &path, Block: &text, Note: &note}
+}
+
+// fileSection is the section of a repo, local or session file that
+// LoadConfig reads: `relay`, else the old `agent-relay` when the file holds
+// that one alone, so a pasted block never gives the file a second section
+// (AK8 review 1, N1).
+func fileSection(fsys effects.FS, path string) string {
+	if src, err := fsys.ReadFile(path); err == nil {
+		if root, err := yaml.Parse(src); err == nil {
+			_, nw := root.Get("relay")
+			_, old := root.Get("agent-relay")
+			if old && !nw {
+				return "agent-relay"
+			}
+		}
+	}
+	return "relay"
 }
 
 // blockValue is v as it would stand in a YAML file: VALUE for a secret or
