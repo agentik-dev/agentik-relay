@@ -49,6 +49,22 @@ type Config struct {
 	Unknown       []string
 	Sources       []string
 	Warnings      []string
+	// Lines is each key apply met, in the order read, so lowest layer
+	// first (AK8 R4): the known keys it assigned and the keys it added to
+	// Unknown (Known false), each with its file, line and value as written.
+	Lines []KeyLine
+}
+
+// KeyLine is one key as a layer file sets it (AK8 R4): Key dotted
+// (`ntfy.topic`), Path the layer's file, Line the 1-based line the key's
+// value stands on (yaml's Val.Line: for a block mapping, its first key's),
+// Value its scalar text ("" for a mapping or a list), Known false for a key
+// apply added to Unknown.
+type KeyLine struct {
+	Key, Path string
+	Line      int
+	Value     string
+	Known     bool
 }
 
 // The shipped defaults (§7's tools, §3's queue path).
@@ -314,6 +330,10 @@ func (c *Config) apply(p string, n yaml.Node) error {
 		*dst = s
 		return nil
 	}
+	// line keeps where key stood once apply took it (AK8 R4).
+	line := func(key string, v yaml.Node, known bool) {
+		c.Lines = append(c.Lines, KeyLine{Key: key, Path: p, Line: v.Line, Value: v.Str, Known: known})
+	}
 	for _, kv := range n.Map {
 		var err error
 		switch kv.Key {
@@ -358,17 +378,24 @@ func (c *Config) apply(p string, n yaml.Node) error {
 					err = str(sub, &c.Ntfy.Topic)
 				default:
 					c.Unknown = append(c.Unknown, p+": ntfy."+sub.Key)
+					line("ntfy."+sub.Key, sub.Val, false)
+					continue
 				}
 				if err != nil {
 					return err
 				}
+				line("ntfy."+sub.Key, sub.Val, true)
 			}
+			continue
 		default:
 			c.Unknown = append(c.Unknown, p+": "+kv.Key)
+			line(kv.Key, kv.Val, false)
+			continue
 		}
 		if err != nil {
 			return err
 		}
+		line(kv.Key, kv.Val, true)
 	}
 	return nil
 }

@@ -65,7 +65,9 @@ func ak8Setup(t *testing.T, inRepo bool) *ak8World {
 func (w *ak8World) userFile() string {
 	return filepath.Join(w.home, ".config", "agentik", "relay", "config.yaml")
 }
-func (w *ak8World) repoFile() string { return filepath.Join(w.repo, ".claude", "agentik", "config.yaml") }
+func (w *ak8World) repoFile() string {
+	return filepath.Join(w.repo, ".claude", "agentik", "config.yaml")
+}
 
 func ak8Write(t *testing.T, path, text string) {
 	t.Helper()
