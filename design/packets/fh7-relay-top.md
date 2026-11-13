@@ -28,9 +28,13 @@ The ledger's own words bind and stay: "night" stays in the ledger and in the rel
 
 No code, no verb, no flag, no file format. `go env GOBIN` with `GOBIN="$HOME/.local/bin"` given prints that folder, which is where the second line looks; with none given `go install` writes `~/go/bin`, on no newcomer's PATH. Whether `agentik-relay doctor` exits 0 on a new machine is not read here.
 
-## 4. Not built
+## 4. Findings that name this row
 
-The Status line, which trails the plugin's version. Anything under `plugin/`, `cmd/` or `internal/`: the plugin's commands each say `agentik-relay is not on PATH: make install`, a lead for a later plugin version. The relay's own output and its ledger, which say "night".
+None yet. Not built:
+
+- The Status line, which trails the plugin's version.
+- Anything under `plugin/`, `cmd/` or `internal/`: the plugin's commands each say `agentik-relay is not on PATH: make install`, a lead for a later plugin version.
+- The relay's own output and its ledger, which say "night".
 
 ## 5. Forbidden reads
 
