@@ -224,3 +224,30 @@ func TestAK8_F1_ReviewProbe(t *testing.T) {
 		}
 	}
 }
+
+// TestAK8_F3_UnknownBlockKeyLine (review 1, R1-F3): an unknown key that
+// holds a block is reported at its own line; the review's three inputs.
+func TestAK8_F3_UnknownBlockKeyLine(t *testing.T) {
+	for _, c := range []struct {
+		file, key string
+		line      float64
+	}{
+		{"ntfi:\n  topic: t\n", "ntfi", 1},
+		{"relay:\n\n  tmux: never\n", "relay", 1},
+		{"tmux: never\nextra:\n- a\n", "extra", 2},
+		{"# made-up\nntfy:\n  room:\n    a: 1\n", "ntfy.room", 3},
+	} {
+		w := ak8Setup(t, true)
+		ak8Write(t, w.userFile(), c.file)
+		_, m, _, _ := ak8Run(t, "describe", "config", "--json")
+		ws := m["warnings"].([]any)
+		t.Logf("%q %v", c.file, ws)
+		if len(ws) != 1 {
+			t.Errorf("%q: warnings %v", c.file, ws)
+			continue
+		}
+		if row := ws[0].(map[string]any); row["key"] != c.key || row["line"] != c.line || row["reason"] != "unknown" {
+			t.Errorf("%q: row %v, want %s at line %v", c.file, row, c.key, c.line)
+		}
+	}
+}

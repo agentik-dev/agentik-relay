@@ -56,8 +56,9 @@ type Config struct {
 }
 
 // KeyLine is one key as a layer file sets it (AK8 R4): Key dotted
-// (`ntfy.topic`), Path the layer's file, Line the 1-based line the key's
-// value stands on (yaml's Val.Line: for a block mapping, its first key's),
+// (`ntfy.topic`), Path the layer's file, Line the 1-based line: a known
+// key's value's (yaml's Val.Line, a scalar's being its key's), an unknown
+// key's own (yaml's KV.Line, above a block value; AK8 review 1, R1-F3),
 // Value its scalar text ("" for a mapping or a list), Known false for a key
 // apply added to Unknown.
 type KeyLine struct {
@@ -330,9 +331,14 @@ func (c *Config) apply(p string, n yaml.Node) error {
 		*dst = s
 		return nil
 	}
-	// line keeps where key stood once apply took it (AK8 R4).
-	line := func(key string, v yaml.Node, known bool) {
-		c.Lines = append(c.Lines, KeyLine{Key: key, Path: p, Line: v.Line, Value: v.Str, Known: known})
+	// line keeps where a known key stood once apply took it (AK8 R4);
+	// unknown adds a key to Unknown, its line the key's own (review 1, R1-F3).
+	line := func(key string, v yaml.Node) {
+		c.Lines = append(c.Lines, KeyLine{Key: key, Path: p, Line: v.Line, Value: v.Str, Known: true})
+	}
+	unknown := func(key string, kv yaml.KV) {
+		c.Unknown = append(c.Unknown, p+": "+key)
+		c.Lines = append(c.Lines, KeyLine{Key: key, Path: p, Line: kv.Line, Value: kv.Val.Str})
 	}
 	for _, kv := range n.Map {
 		var err error
@@ -377,25 +383,23 @@ func (c *Config) apply(p string, n yaml.Node) error {
 				case "topic":
 					err = str(sub, &c.Ntfy.Topic)
 				default:
-					c.Unknown = append(c.Unknown, p+": ntfy."+sub.Key)
-					line("ntfy."+sub.Key, sub.Val, false)
+					unknown("ntfy."+sub.Key, sub)
 					continue
 				}
 				if err != nil {
 					return err
 				}
-				line("ntfy."+sub.Key, sub.Val, true)
+				line("ntfy."+sub.Key, sub.Val)
 			}
 			continue
 		default:
-			c.Unknown = append(c.Unknown, p+": "+kv.Key)
-			line(kv.Key, kv.Val, false)
+			unknown(kv.Key, kv)
 			continue
 		}
 		if err != nil {
 			return err
 		}
-		line(kv.Key, kv.Val, true)
+		line(kv.Key, kv.Val)
 	}
 	return nil
 }

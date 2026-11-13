@@ -112,3 +112,22 @@ func TestAK8_8_NestedUnknownLine(t *testing.T) {
 		t.Fatalf("Lines = %+v, Unknown = %q", c.Lines, c.Unknown)
 	}
 }
+
+// TestAK8_F3_UnknownBlockKeyLine (review 1, R1-F3): an unknown key that
+// holds a block, at the top or under ntfy or in a repo's section, is kept
+// at the line its key stands on; Unknown is as it was.
+func TestAK8_F3_UnknownBlockKeyLine(t *testing.T) {
+	fs := &FakeFS{}
+	u, r := "/h/.config/agentik/relay/config.yaml", "/r/.claude/agentik/config.yaml"
+	fs.WriteFile(u, []byte("# made-up\nntfi:\n  topic: t\nntfy:\n  room:\n\n    a: 1\nextra:\n- a\n"), 0o600)
+	fs.WriteFile(r, []byte("relay:\n  more:\n    b: 2\n"), 0o600)
+	c, err := LoadConfig(fs, func(k string) string { return map[string]string{"HOME": "/h"}[k] }, "/r")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []KeyLine{{Key: "ntfi", Path: u, Line: 2}, {Key: "ntfy.room", Path: u, Line: 5},
+		{Key: "extra", Path: u, Line: 8}, {Key: "more", Path: r, Line: 2}}
+	if !reflect.DeepEqual(c.Lines, want) || !reflect.DeepEqual(c.Unknown, []string{u + ": ntfi", u + ": ntfy.room", u + ": extra", r + ": more"}) {
+		t.Fatalf("Lines = %+v, Unknown = %q", c.Lines, c.Unknown)
+	}
+}

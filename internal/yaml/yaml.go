@@ -35,10 +35,12 @@ type Node struct {
 	Line int
 }
 
-// KV is one mapping entry.
+// KV is one mapping entry. Line is the 1-based line its key stands on,
+// which for a block value is above Val.Line (AK8 review 1, R1-F3).
 type KV struct {
-	Key string
-	Val Node
+	Key  string
+	Val  Node
+	Line int
 }
 
 // Error is a refusal, naming the 1-based line it was found on.
@@ -316,7 +318,7 @@ func (p *parser) mapping(ind int) (Node, error) {
 			}
 			val = v
 		}
-		node.Map = append(node.Map, KV{Key: key, Val: val})
+		node.Map = append(node.Map, KV{Key: key, Val: val, Line: l.n})
 	}
 	return node, nil
 }
@@ -518,7 +520,7 @@ func flow(s string, n int) (Node, error) {
 		if err != nil {
 			return Node{}, err
 		}
-		node.Map = append(node.Map, KV{Key: k, Val: val})
+		node.Map = append(node.Map, KV{Key: k, Val: val, Line: n})
 	}
 	return node, nil
 }
