@@ -8,7 +8,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 )
 
 // The DW1R tests (packet design/packets/dw1r-door-writer.md) run
@@ -54,11 +56,15 @@ func dw1Door(t *testing.T, dir, name, version, extra string) string {
 	return p
 }
 
-// dw1Run runs sh scripts/install-door SRC DEST and returns stdout, stderr
-// and the exit code.
-func dw1Run(t *testing.T, src, dest string) (string, string, int) {
+// dw1Run runs sh scripts/install-door SRC DEST, each opt set on the command
+// first (its folder, its environment), and returns stdout, stderr and the
+// exit code.
+func dw1Run(t *testing.T, src, dest string, opts ...func(*exec.Cmd)) (string, string, int) {
 	t.Helper()
 	cmd := exec.Command("sh", dw1Script, src, dest)
+	for _, o := range opts {
+		o(cmd)
+	}
 	var out, errb bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errb
 	err := cmd.Run()
@@ -254,4 +260,119 @@ func TestDW1_6_SourceMissing(t *testing.T) {
 	if !errors.As(err, &ee) || ee.ExitCode() != 2 || !strings.HasPrefix(string(out), "usage: install-door SRC DEST") {
 		t.Errorf("one argument: %v, %q; want exit 2 and the usage line", err, out)
 	}
+}
+
+// dw1Line is R3's no-version line.
+func dw1Line(dest, theirs, ours string) string {
+	return "the door " + dest + " has no version to compare (" + theirs + " there, " + ours + " here); left alone\n"
+}
+
+// TestDW1_7_NotAFile (review 1, F1): a FIFO at DEST is never opened: the
+// script returns at once with the no-version line, exit 0, the FIFO still
+// there.
+func TestDW1_7_NotAFile(t *testing.T) {
+	dw1Copy(t)
+	d := t.TempDir()
+	fifo := filepath.Join(d, "door")
+	if err := syscall.Mkfifo(fifo, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("sh", dw1Script, dw1Vendored, fifo)
+	var out, errb bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &errb
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	var err error
+	select {
+	case err = <-done:
+	case <-time.After(5 * time.Second):
+		t.Error("the script blocked on the FIFO for 5 s")
+		// A writer's open frees a reader blocked on the FIFO, so the script ends.
+		for i := 0; i < 100; i++ {
+			if f, e := os.OpenFile(fifo, os.O_WRONLY|syscall.O_NONBLOCK, 0); e == nil {
+				f.Close()
+				break
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+		err = <-done
+	}
+	if want := dw1Line(fifo, "none", "0.1.0"); err != nil || out.String() != want || errb.String() != "" {
+		t.Errorf("over a FIFO: %v, stdout %q, stderr %q; want exit 0, %q, none", err, out.String(), errb.String(), want)
+	}
+	if fi, err := os.Lstat(fifo); err != nil || fi.Mode()&os.ModeNamedPipe == 0 {
+		t.Errorf("the FIFO is gone or changed: %v, %v", fi, err)
+	}
+	dw1Only(t, d, "door")
+}
+
+// TestDW1_8_DashName (review 1, F2): a relative DEST that starts with a dash
+// is no option to mv: an older -door is replaced and a new -new written, exit
+// 0, the folder holding nothing else.
+func TestDW1_8_DashName(t *testing.T) {
+	dw1Copy(t)
+	d := t.TempDir()
+	src := dw1Door(t, d, "src", "0.2.0", "")
+	dw1Door(t, d, "-door", "0.0.9", "")
+	in := func(c *exec.Cmd) { c.Dir = d }
+	for _, name := range []string{"-door", "-new"} {
+		if out, errOut, code := dw1Run(t, "src", name, in); code != 0 || out != "" || errOut != "" {
+			t.Errorf("over %s: exit %d, stdout %q, stderr %q; want 0 and no output", name, code, out, errOut)
+		}
+		if !bytes.Equal(dw1Read(t, filepath.Join(d, name)), dw1Read(t, src)) {
+			t.Errorf("%s is not the source's bytes", name)
+		}
+	}
+	dw1Only(t, d, "-door", "-new", "src")
+}
+
+// TestDW1_9_OneLine (review 1, the echo lead): a door's value holding a
+// backslash or reading -n is said whole on R3's one line, the door left
+// alone.
+func TestDW1_9_OneLine(t *testing.T) {
+	dw1Copy(t)
+	d := t.TempDir()
+	for i, v := range []string{`0.2.0\c`, `a\nb`, "-n"} {
+		door := dw1Door(t, d, "door"+string(rune('a'+i)), v, "")
+		dw1Kept(t, dw1Vendored, door, dw1Line(door, v, "0.1.0"))
+	}
+	dw1Only(t, d, "doora", "doorb", "doorc")
+}
+
+// TestDW1_10_TempThenRename (R4, review 1's lead): the write is one mv -f of
+// a temp file beside DEST over DEST, seen through an mv on PATH that logs its
+// arguments, so a script that writes DEST in place goes red.
+func TestDW1_10_TempThenRename(t *testing.T) {
+	dw1Copy(t)
+	d := t.TempDir()
+	bin := t.TempDir()
+	mv, err := exec.LookPath("mv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	log := filepath.Join(bin, "mv.log")
+	shim := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> '" + log + "'\nexec '" + mv + "' \"$@\"\n"
+	if err := os.WriteFile(filepath.Join(bin, "mv"), []byte(shim), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := func(c *exec.Cmd) {
+		c.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	}
+	door := dw1Door(t, d, "door", "0.0.9", "")
+	if out, errOut, code := dw1Run(t, dw1Vendored, door, path); code != 0 || out != "" || errOut != "" {
+		t.Errorf("over door: exit %d, stdout %q, stderr %q; want 0 and no output", code, out, errOut)
+	}
+	if !bytes.Equal(dw1Read(t, door), dw1Read(t, dw1Vendored)) {
+		t.Error("door is not the source's bytes")
+	}
+	b, _ := os.ReadFile(log)
+	calls := strings.Split(strings.TrimSuffix(string(b), "\n"), "\n")
+	f := strings.Fields(calls[0])
+	if len(calls) != 1 || len(f) != 3 || f[0] != "-f" || f[2] != door || filepath.Dir(f[1]) != d || !strings.HasPrefix(filepath.Base(f[1]), "door.") {
+		t.Errorf("mv was called %q; want once, -f <a temp file beside door> %s", calls, door)
+	}
+	dw1Only(t, d, "door")
 }
