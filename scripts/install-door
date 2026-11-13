@@ -16,7 +16,10 @@
 
 [ $# -eq 2 ] || { echo "usage: install-door SRC DEST" >&2; exit 2; }
 src=$1
-dest=$2
+door=$2
+# A relative DEST is taken as ./DEST, so mv, rm and install read no name of
+# the script's as an option; the lines name DEST as given.
+case $door in /*) dest=$door ;; *) dest=./$door ;; esac
 
 if [ ! -f "$src" ] || [ ! -r "$src" ]; then
 	echo "install-door: cannot read $src" >&2
@@ -52,12 +55,12 @@ write() {
 		exit 0
 	fi
 	rm -f "$tmp" 2>/dev/null
-	echo "install-door: cannot write $dest" >&2
+	echo "install-door: cannot write $door" >&2
 	exit 1
 }
 
 if [ -L "$dest" ]; then
-	echo "the door $dest is a link; left alone"
+	echo "the door $door is a link; left alone"
 	exit 0
 fi
 [ -e "$dest" ] || write
@@ -66,7 +69,7 @@ theirs=none
 [ -f "$dest" ] && theirs=$(version "$dest")
 ours=$(version "$src")
 if ! numbered "$theirs" || ! numbered "$ours"; then
-	echo "the door $dest has no version to compare ($theirs there, $ours here); left alone"
+	echo "the door $door has no version to compare ($theirs there, $ours here); left alone"
 	exit 0
 fi
 above "$ours" "$theirs" && write
