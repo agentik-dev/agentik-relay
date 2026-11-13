@@ -2,6 +2,7 @@ package effects
 
 import (
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -79,5 +80,49 @@ func TestAR7_NoticeGateObject(t *testing.T) {
 		"gate": map[string]any{"result": "green", "verify": map[string]any{"line": "make check", "status": "green"}}})
 	if !ok || !strings.Contains(n.Body, "gate=green") || strings.Contains(n.Body, "make check") {
 		t.Fatalf("notice %q", n.Body)
+	}
+}
+
+// TestAK8_R2F2_SendErrorHoldsNoTopic (AK8 review 2, R2-F2): a post that
+// fails names the server's URL and the reason, with the topic cut, since
+// the run prints the error (`relay: notify <event>: <err>`); a URL the
+// topic breaks says so without quoting it; a refusal by status reads as
+// before.
+func TestAK8_R2F2_SendErrorHoldsNoTopic(t *testing.T) {
+	const topic = "qxzv-made-up-topic"
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	closed := "http://" + l.Addr().String()
+	l.Close() // a loopback port nothing listens on
+	n := Notice{Title: "t", Body: "b", Priority: 3}
+	err = Ntfy{URL: closed + "/", Topic: topic}.Send(n)
+	t.Logf("unreachable: %v", err)
+	if err == nil || strings.Contains(err.Error(), "qxzv") || !strings.HasPrefix(err.Error(), "ntfy: post to "+closed+"/(topic): ") || !strings.Contains(err.Error(), "dial tcp") {
+		t.Errorf("unreachable: %v", err)
+	}
+	err = Ntfy{URL: closed, Topic: "qxzv%zz"}.Send(n)
+	t.Logf("bad escape: %v", err)
+	if err == nil || strings.Contains(err.Error(), "qxzv") || strings.Contains(err.Error(), "%zz") || !strings.HasPrefix(err.Error(), "ntfy: post to "+closed+"/(topic): ") {
+		t.Errorf("bad escape: %v", err)
+	}
+	// A server that sends the post on to the closed port, the topic in the
+	// path: the client's error names the last URL, which is the topic's.
+	hop := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, closed+r.URL.Path, http.StatusTemporaryRedirect)
+	}))
+	defer hop.Close()
+	err = Ntfy{URL: hop.URL, Topic: topic}.Send(n)
+	t.Logf("redirect: %v", err)
+	if err == nil || strings.Contains(err.Error(), "qxzv") {
+		t.Errorf("redirect: %v", err)
+	}
+	deny := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer deny.Close()
+	if err := (Ntfy{URL: deny.URL, Topic: topic}).Send(n); err == nil || err.Error() != "ntfy: 403 Forbidden" {
+		t.Errorf("403: %v", err)
 	}
 }
