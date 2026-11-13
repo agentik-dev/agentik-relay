@@ -101,7 +101,7 @@ func doctorVerify(dir, line string, asJSON bool, stdout, stderr io.Writer) int {
 	// A config that does not load leaves the limit unknown (0 in --json)
 	// and the line is measured anyway (AR59's fix round).
 	if cfg, err := effects.LoadConfig(effects.OSFS{}, getenv, root); err != nil {
-		rep.Limit, from = 0, effects.LastLine(err.Error())
+		rep.Limit, from = 0, effects.LastLine(quotesNoValue(err))
 	} else if rep.Limit = int(cfg.VerifyLimit() / time.Second); cfg.VerifySeconds > 0 {
 		from = "verify_seconds"
 	}

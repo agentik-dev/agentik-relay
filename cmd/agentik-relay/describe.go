@@ -7,6 +7,7 @@ package main
 // is written.
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -322,7 +323,7 @@ func configRead(key string, stdout io.Writer) int {
 	cfg, err := effects.LoadConfig(fsys, getenv, repo)
 	if err != nil {
 		writeJSON(stdout, configFailed{"agentik.config/1", false, "relay",
-			readError{"bad_file", strings.Join(strings.Fields(err.Error()), " "), nil}})
+			readError{"bad_file", strings.Join(strings.Fields(quotesNoValue(err)), " "), nil}})
 		return exitUsage
 	}
 	shipped, err := effects.LoadConfig(noFiles{}, func(string) string { return "" }, "")
@@ -434,4 +435,22 @@ func blockValue(s setting, v any) string {
 		return x
 	}
 	return "VALUE"
+}
+
+// quotesNoValue is a config error as describe and doctor print it: a parse
+// refusal that quotes a character of a value (yaml's reserved indicator and
+// unsupported escape) names its file, line and fault and not the character,
+// since the value may be the ntfy topic (AK8 review 1, N4). Every other
+// error reads as LoadConfig wrote it.
+func quotesNoValue(err error) string {
+	s := err.Error()
+	var ye *yaml.Error
+	if errors.As(err, &ye) {
+		for _, fault := range []string{"reserved indicator", "unsupported escape"} {
+			if strings.HasPrefix(ye.Msg, fault+" ") && strings.HasSuffix(s, ye.Msg) {
+				return strings.TrimSuffix(s, ye.Msg) + fault
+			}
+		}
+	}
+	return s
 }

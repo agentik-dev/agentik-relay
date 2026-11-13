@@ -282,7 +282,7 @@ func doctor(asJSON bool, stdout io.Writer) int {
 		add("tmux", true, false, "%s (%s)", p, mode)
 	}
 	if cfg.Ntfy.URL != "" && cfg.Ntfy.Topic != "" {
-		add("ntfy", true, false, "configured %s", cfg.Ntfy.Topic)
+		add("ntfy", true, false, "configured (topic set)") // the topic is a secret: never printed (AK8 review 1, R1-F2)
 	} else {
 		add("ntfy", true, false, "unset: notices go to the log")
 	}
@@ -336,7 +336,7 @@ func doctor(asJSON bool, stdout io.Writer) int {
 	add("template", true, false, "sha256 %s", prompt.TemplateHash())
 	switch {
 	case cfgErr != nil:
-		add("config", false, false, "%v", cfgErr)
+		add("config", false, false, "%s", quotesNoValue(cfgErr))
 	case len(cfg.Unknown) > 0 || modeErr != nil:
 		unknown := cfg.Unknown
 		if modeErr != nil {
