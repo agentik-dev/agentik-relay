@@ -21,7 +21,11 @@ exceptions, one per line: `<path-glob>: <group>[,<group>]`, `#` comments; a
 glob's `*` stays inside one path segment; a `secret` exception outside
 `tests/fixtures/` is a usage error. Under `history/sittings/` (charters are
 records) the `sibling` group is not evaluated; the rest still scan there.
-`secret` is matched case-sensitively, the others ignore case.
+`secret` is matched case-sensitively, the others ignore case. `secret` holds
+token shapes alone (keys by their vendor's prefix, a JWT, a key block's first
+line); a URL's userinfo, a `password=` assignment, a bearer or basic header and a
+key block's body are left to the issue reporter's own scrub, since in a tree's
+scan they would hit code.
 
 The `renamed` group (agentik-r1 section 6.1) finds the names the tools had before
 agentik-r1 as whole names, never inside a longer word or slug (a URL that runs on
@@ -105,6 +109,13 @@ import re
 import subprocess
 import sys
 
+# A short prefix that a longer word can hold starts a token only after a character that is no
+# letter, or after a JSON escape (`\n`, `\r`, `\t` as two characters) or a percent-encoded `=`.
+TOKEN_START = r"(?:(?<![A-Za-z])|(?<=\\[nrt])|(?<=%3[Dd]))"
+# A JWT's match starts only where a base64url run starts, its `eyJ` within the run's first 32
+# characters (after `my_`, a digit, an escape's letter, `3D`), so a long run is read a bounded
+# number of times and not once for each `eyJ` in it.
+JWT_START = r"(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{0,32}?"
 GROUPS = (
     ("home", (r"/Users/[a-z]+", r"~/cod[e]/")),
     ("lan", (r"192\.168\.", r"\b10\.\d+\.\d+\.\d+",
@@ -114,7 +125,13 @@ GROUPS = (
                  r"claude-code-sessio[n]", r"claude-code-agent[s]")),
     ("secret", (r"sk-an[t]-[A-Za-z0-9_-]+", r"gh[p]_[A-Za-z0-9]{20,}",
                 r"github_pa[t]_[A-Za-z0-9_]{20,}", r"AGE-SECRET-KE[Y]-1[0-9A-Z]{20,}",
-                r"\bAKI[A][0-9A-Z]{16}\b", r"BEGI[N] [A-Z0-9 ]*PRIVATE KEY")),
+                r"\bAKI[A][0-9A-Z]{16}\b", r"BEGI[N] [A-Z0-9 ]*PRIVATE KEY",
+                r"gh[ousr]_[A-Za-z0-9]{20,}",
+                JWT_START + r"ey[J][A-Za-z0-9_-]{10,}\.ey[J][A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{20,}",
+                r"xox[baprs]-[A-Za-z0-9-]{20,}", TOKEN_START + r"s[k]-[A-Za-z0-9]{20,}",
+                TOKEN_START + r"s[k]-pro[j]-[A-Za-z0-9_-]{20,}", r"AIz[a][A-Za-z0-9_-]{35}",
+                r"np[m]_[A-Za-z0-9]{36}", r"glpa[t]-[A-Za-z0-9_-]{20,}",
+                TOKEN_START + r"h[f]_[A-Za-z0-9]{30,}")),
     ("email", (r"\b[A-Za-z0-9._%+-]+[@][A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b",)),
     ("renamed", (r"(?<![\w-])claude-cod[e]-(?:session|decision[s]|respea[k]|agents)(?![\w-])",
                  r"agent-rela[y]", r"claude-sessio[n]",
