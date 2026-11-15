@@ -1,22 +1,16 @@
 #!/bin/sh
-# agentik: the front door to the agentik tools (agentik-r1 section 3).
-#
-#   agentik <tool> [args...]   exec agentik-<tool> from PATH, the args unchanged
-#   agentik [help]             list each agentik-* on PATH, first in PATH order winning
-#   agentik help <tool>        run agentik-<tool> --help
-#   agentik --version          print this front door's version
-#
-# It reads and writes nothing and resolves no old name. Exit: 0 for the list,
-# help and version (even when no tool is found); the tool's own code on
-# dispatch; 2 for usage, a bad tool name included; 3 when agentik-<tool> is not
-# on PATH, with one stderr line naming its repo. POSIX sh, no interpreter.
-VERSION=0.1.0
+# agentik: the front door to the agentik tools (agentik-r1 section 3, packets ak2 and sc13-door);
+# GUIDE.md section 10's rows `front door` and `exit codes` say what it does. It reads and
+# writes nothing and resolves no old name. POSIX sh.
+VERSION=0.3.0
 LOWER=abcdefghijklmnopqrstuvwxyz
+UPPER=ABCDEFGHIJKLMNOPQRSTUVWXYZ
+USAGE="usage: agentik [<verb or tool> [args...]] | agentik help [<verb or tool>] | agentik --version"
+NEXT="next: git clone https://github.com/agentik-dev/agentik-commons && agentik-commons/setup"
+# The door's own folder, `./` before one that opens with `-`, so exec never reads it as an option.
+case $0 in -*/*) self=./${0%/*}/ ;; */*) self=${0%/*}/ ;; *) self= ;; esac
 
-usage() {
-	echo "usage: agentik <tool> [args...] | agentik help [<tool>] | agentik --version" >&2
-	exit 2
-}
+usage() { echo "$USAGE" >&2; exit 2; }
 
 # valid NAME: NAME matches ^[a-z][a-z0-9]*(-[a-z0-9]+)*$ (ASCII only, no newline).
 valid() {
@@ -25,72 +19,91 @@ valid() {
 	esac
 }
 
-# found NAME: the first agentik-NAME on PATH that is an executable file, in $hit.
-# An empty PATH entry, the trailing one included, is the current directory.
+# can FILE: FILE is an executable file, in $hit.
+can() { [ -f "$1" ] && [ -x "$1" ] && hit=$1; }
+
+# found NAME: the first agentik-NAME on PATH, else in the door's own folder, in $hit.
+# An empty PATH entry, the trailing one included, is the current directory; an unset PATH is none.
 found() {
 	hit=
 	oldifs=$IFS
-	IFS=: p=$PATH:
+	IFS=: p=${PATH+$PATH:}
 	set -f
 	for dir in $p; do
-		[ -n "$dir" ] || dir=.
-		if [ -f "$dir/agentik-$1" ] && [ -x "$dir/agentik-$1" ]; then
-			hit=$dir/agentik-$1
-			break
-		fi
+		case ${dir:-.} in -*) dir=./$dir ;; esac
+		can "${dir:-.}/agentik-$1" && break
 	done
 	set +f
 	IFS=$oldifs
-	[ -n "$hit" ]
+	[ -n "$hit" ] || { [ -n "$self" ] && can "${self}agentik-$1"; }
+}
+
+# target ARGS: the first word after the first that is no flag, in $t.
+target() {
+	shift
+	for t in "$@"; do case $t in -*) ;; *) return 0 ;; esac; done; return 1
 }
 
 missing() {
-	echo "agentik: agentik-$1 is not on PATH; it comes from agentik-dev/agentik-$1" >&2
+	printf '%s\n' "agentik: $1 is not installed, and neither is the agentik suite" "$NEXT" >&2
 	exit 3
 }
 
-list() {
-	echo "usage: agentik <tool> [args...] | agentik help [<tool>] | agentik --version"
-	seen=' '
-	count=0
-	oldifs=$IFS
-	IFS=: p=$PATH:
-	set -f
-	for dir in $p; do
-		[ -n "$dir" ] || dir=.
-		set +f
-		for path in "$dir"/agentik-*; do
-			name=${path##*/agentik-}
-			valid "$name" || continue
-			[ -f "$path" ] && [ -x "$path" ] || continue
-			case $seen in *" $name "*) continue ;; esac
-			seen="$seen$name "
-			[ "$count" -gt 0 ] || echo "tools on PATH:"
-			count=$((count + 1))
-			printf '  %-12s %s\n' "$name" "$path"
-		done
-		set -f
-	done
+# plain WORD [/]: WORD holds no byte a terminal reads: ASCII letters, digits, `.`, `_`, `-`, and `/`
+# when it is given.
+plain() { case $1 in '' | *[!${LOWER}${UPPER}0123456789._$2-]*) return 1 ;; esac; }
+
+# refuse WORD: not a name; the word is shown only when it is plain.
+refuse() {
+	plain "$1" || set -- 'that word'
+	printf '%s\n' "agentik: $1 is not a name: lowercase letters, digits and dashes" "next: agentik help" >&2
+	exit 2
+}
+
+# listdir DIR: each agentik-NAME in DIR not yet seen, under set -f; a path that is not plain
+# is shown as `that folder`.
+listdir() {
 	set +f
-	IFS=$oldifs
+	for path in "$1"agentik-*; do
+		name=${path##*/agentik-}
+		valid "$name" && can "$path" || continue
+		case $seen in *" $name "*) continue ;; esac
+		seen="$seen$name "
+		[ "$count" -gt 0 ] || echo "tools on PATH:"
+		count=$((count + 1))
+		plain "$path" / || path='that folder'
+		printf '  %-12s %s\n' "$name" "$path"
+	done
+	set -f
+}
+
+list() {
+	echo "$USAGE"
+	seen=' ' count=0 oldifs=$IFS
+	IFS=: p=${PATH+$PATH:}
+	set -f
+	for dir in $p; do listdir "${dir:-.}/"; done
+	[ -z "$self" ] || listdir "$self"
+	set +f && IFS=$oldifs
 	[ "$count" -gt 0 ] || echo "no agentik-* tool on PATH"
+	echo "$NEXT" >&2
 	exit 0
 }
 
-case $# in 0) list ;; esac
+[ $# -gt 0 ] || { found suite && exec "$hit"; list; }
+if [ "$1" = help ]; then
+	target "$@" && valid "$t" && found "$t" && exec "$hit" --help
+	found suite && exec "$hit" "$@"
+	[ $# -gt 1 ] || list
+	[ $# -eq 2 ] && target "$@" || usage
+	set -- "$t"
+fi
+case $1 in -*) ;; *) valid "$1" && found "$1" && shift && exec "$hit" "$@" ;; esac
+found suite && exec "$hit" "$@"
 case $1 in
-help | -h | --help)
-	[ $# -le 2 ] || usage
-	[ $# -eq 2 ] || list
-	valid "$2" || usage
-	found "$2" || missing "$2"
-	exec "agentik-$2" --help
-	;;
---version)
-	[ $# -eq 1 ] || usage
-	echo "agentik $VERSION" && exit 0 ;;
+--version) [ $# -eq 1 ] || usage; echo "agentik $VERSION (no suite installed)"; exit 0 ;;
+-h | --help) [ $# -eq 1 ] || usage; list ;;
+-*) usage ;;
 esac
-valid "$1" || usage
-found "$1" || missing "$1"
-tool=$1 && shift
-exec "agentik-$tool" "$@"
+valid "$1" || refuse "$1"
+missing "$1"
