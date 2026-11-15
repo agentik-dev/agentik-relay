@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+"""readme-top: holds a README's top, the lines before its first `## `, to the ten-line form (GUIDE §10).
+
+Usage: readme-top [FILE...]
+
+FILE defaults to `README.md` in the current folder. The top is every line before the
+first line that starts `## `; a file with no such line is read whole. Four tests, each its
+own finding, in this order:
+
+  lines     a line counts unless it is blank, a fence marker (it starts with three
+            backticks) or starts `<img `; a line inside the fence counts; more than
+            ten is a finding
+  block     exactly one fenced block, holding exactly two lines
+  sentence  exactly one line starts `Use it when `
+  link      at least one markdown link whose target is exactly
+            `https://github.com/agentik-dev`; a longer address under it does not count
+
+One line a finding on stdout, `<file>: top: <what>`, the file as it was given. A file in
+the form prints `<file>: top: <n> lines, in the form`. Every file is read before any line
+is printed.
+
+Exit codes: 0 every file is in the form; 1 a finding; 2 usage or a file that cannot be
+read, one line on stderr naming it. `-h` and `--help` print this text, exit 0. No other
+flag. Stdlib only.
+"""
+import sys
+
+LINK = "](https://github.com/agentik-dev)"
+USE = "Use it when "
+USAGE = "usage: readme-top [FILE...]"
+MAX = 10
+
+
+def top_of(text):
+    lines = []
+    for line in text.splitlines():
+        if line.startswith("## "):
+            break
+        lines.append(line)
+    return lines
+
+
+def check(lines):
+    """The findings of one top, in the order of the tests, and its counted lines."""
+    counted = 0
+    blocks = []  # the line count of each fenced block
+    inside = False
+    for line in lines:
+        if line.startswith("```"):
+            if not inside:
+                blocks.append(0)
+            inside = not inside
+            continue
+        if not line.strip() or line.startswith("<img "):
+            continue
+        counted += 1
+        if inside:
+            blocks[-1] += 1
+    found = []
+    if counted > MAX:
+        found.append("%d lines of text before the first ##; the form allows %d" % (counted, MAX))
+    if len(blocks) != 1:
+        found.append("%d fenced blocks; the form has exactly one" % len(blocks))
+    elif blocks[0] != 2:
+        found.append("the fenced block holds %d line%s; the form has exactly two"
+                     % (blocks[0], "" if blocks[0] == 1 else "s"))
+    uses = sum(1 for line in lines if line.startswith(USE))
+    if uses == 0:
+        found.append('no line starts "Use it when"')
+    elif uses > 1:
+        found.append('%d lines start "Use it when"; the form has one' % uses)
+    if not any(LINK in line for line in lines):
+        found.append("no link to https://github.com/agentik-dev")
+    return found, counted
+
+
+def main(argv):
+    if any(a in ("-h", "--help") for a in argv):
+        print(__doc__.strip())
+        return 0
+    for a in argv:
+        if a.startswith("-"):
+            print("readme-top: %s: no such flag; %s" % (a, USAGE), file=sys.stderr)
+            return 2
+    names = argv or ["README.md"]
+    tops = []
+    for name in names:
+        try:
+            with open(name, encoding="utf-8", newline=None) as f:
+                tops.append(top_of(f.read()))
+        except (OSError, UnicodeDecodeError) as e:
+            print("readme-top: %s: cannot read: %s" % (name, getattr(e, "strerror", None) or "not UTF-8 text"),
+                  file=sys.stderr)
+            return 2
+    status = 0
+    for name, lines in zip(names, tops):
+        found, counted = check(lines)
+        if not found:
+            print("%s: top: %d lines, in the form" % (name, counted))
+        for what in found:
+            print("%s: top: %s" % (name, what))
+            status = 1
+    return status
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

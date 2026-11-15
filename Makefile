@@ -23,8 +23,9 @@ test:  ## go test (no network, no quota): every package but internal/night in on
 	pids=; go test -race -timeout 15m $$(go list ./... | grep -v '/internal/night$$') & pids=$$!; \
 	while read -r p; do go test -race -timeout 15m -run "$$p" ./internal/night & pids="$$pids $$!"; done < internal/night/testdata/shards.txt; \
 	rc=0; for p in $$pids; do wait $$p || rc=$$?; done; exit $$rc
-vet:  ## go vet
+vet:  ## go vet, then the README's top (GUIDE §10)
 	go vet ./...
+	$(PY) -B scripts/readme-top
 fmt:  ## gofmt: exit 2 naming the files it would change
 	@files=$$(gofmt -l cmd internal); if [ -n "$$files" ]; then echo "fmt: gofmt would change:"; echo "$$files"; exit 2; fi
 lint: vet  ## conventions §5 name for vet
