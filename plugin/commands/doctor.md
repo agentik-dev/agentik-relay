@@ -5,7 +5,7 @@ allowed-tools: Bash(agentik-relay *)
 ---
 
 Run `agentik-relay doctor --json`. If the exit is 3 or `agentik-relay` is not found, say
-`agentik-relay is not on PATH: make install` and stop (the hooks stay quiet without it).
+`agentik-relay is not on PATH: GOBIN="$HOME/.local/bin" go install github.com/agentik-dev/agentik-relay/cmd/agentik-relay@latest` (from a clone, `make install`) and stop (the hooks stay quiet without it).
 
 From the JSON print one line per `checks[]` entry: `ok`, `warn` or `FAIL`, then `name`, then
 `detail`. `FAIL` when `ok` is false; `warn` when `ok` and `warn` are true; else `ok`. End with

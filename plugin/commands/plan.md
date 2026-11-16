@@ -6,7 +6,7 @@ argument-hint: "[--queue PATH] [--rows a,b] [--until HH:MM]"
 ---
 
 Run `agentik-relay plan --json $ARGUMENTS` and print it. If the exit is 3 or `agentik-relay` is not found,
-say `agentik-relay is not on PATH: make install` and stop. Exit 2 means the plan is invalid: print it
+say `agentik-relay is not on PATH: GOBIN="$HOME/.local/bin" go install github.com/agentik-dev/agentik-relay/cmd/agentik-relay@latest` (from a clone, `make install`) and stop. Exit 2 means the plan is invalid: print it
 anyway.
 
 From the JSON print, in plain lines:
