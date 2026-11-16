@@ -29,13 +29,13 @@ func p1Body(t *testing.T, path string) (string, string) {
 // every command is one only the owner types, so each sets
 // disable-model-invocation: true, and its body is the pin's byte for byte.
 func TestP1_1_CommandsHidden(t *testing.T) {
-	bodies := map[string]string{ // sha256 of each body at a3c501d
-		"doctor": "00be40ad2bf72dff38d20c8f3c779c760ff4f5e76052517795a0641a3d81a1fd", // AK8 R10: its last sentence
-		"gate":   "e476c09556c56ddcd151691c353766946f3d42a70a70793f333fb34adf83a05f",
-		"plan":   "a7bf3f21f809db282551df2e46cb40d516cd84f06d38b8f5cd3b024c91c3db50",
-		"report": "d6d5f720f6b223d845bf232a9d9594b73d523b8e1d1dd77049bac50730f13453",
-		"resume": "fbbb5fd706f51d81fc49b0e391e345f55f52d0daf7a56af23e51ff74036e93b8",
-		"status": "6cb54aec78fa65ae14b32e87d38d5572d7c99700af81848802ce56ed5a651dcb",
+	bodies := map[string]string{ // sha256 of each body at a3c501d; IR1: the not-on-PATH line names the README's go install
+		"doctor": "1bbe2cb76aa6723599a46dee7b13d641003130fc3b84456b2e76c176fea1415d", // AK8 R10: its last sentence
+		"gate":   "8ada68533e1b7990d5c447f386415ace8a0a94e473b53b3ff03569532b12487f",
+		"plan":   "d91bcdadc466bf338c734ba5d48a881be2671bc96f54b869c9dff4bfffaac509",
+		"report": "3403cb291e67a5b6a99daf2707f5fc6a8bc27e29dfae673bfe63c6c26af1a570",
+		"resume": "0c10271b792a9069fa7d493608b06fd0810c0f08f2927223846e461fda63c7cf",
+		"status": "e86b3d239c92ed12231b21d2ee873c2663a1f62708b0f93b86624c73a6ae5af3",
 	}
 	cmds, _ := filepath.Glob(filepath.Join("..", "..", "plugin", "commands", "*.md"))
 	if len(cmds) != len(bodies) {

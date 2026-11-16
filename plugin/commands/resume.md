@@ -9,7 +9,7 @@ Show how to resume a sitting. Never run `agentik relay resume <row>` or `claude 
 start a nested interactive session. Only read the status.
 
 1. Run `agentik-relay status --json` (add `--night D` when `$ARGUMENTS` carries one). If the exit is 3
-   or `agentik-relay` is not found, say `agentik-relay is not on PATH: make install` and stop.
+   or `agentik-relay` is not found, say `agentik-relay is not on PATH: GOBIN="$HOME/.local/bin" go install github.com/agentik-dev/agentik-relay/cmd/agentik-relay@latest` (from a clone, `make install`) and stop.
 2. From the JSON: `night`, and `rows[]` with `id`, `worktree`, `state`, `reason` and `resume`.
 3. When `$ARGUMENTS` names a row: print its `id`, `state`, `reason` and `worktree`, then its
    `resume` line verbatim in a code block. When the row has no `resume` line, say it is not red or

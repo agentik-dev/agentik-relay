@@ -6,7 +6,7 @@ argument-hint: "<row>"
 ---
 
 Run `agentik-relay gate --json $ARGUMENTS`; it needs one row. If the exit is 3 or `relay` is not
-found, say `agentik-relay is not on PATH: make install` and stop. Exit 0 is green, 1 red or failed,
+found, say `agentik-relay is not on PATH: GOBIN="$HOME/.local/bin" go install github.com/agentik-dev/agentik-relay/cmd/agentik-relay@latest` (from a clone, `make install`) and stop. Exit 0 is green, 1 red or failed,
 2 unrun (print `error`).
 
 From the JSON print, in plain lines:
