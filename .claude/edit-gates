@@ -1,0 +1,5 @@
+# The edit gates: the files below are refused to an edit tool and a shell write;
+# change one through the instruct skill. A path or glob a line; `agentik
+# decisions render` and `answer` add the files they write.
+DECISIONS.md
+CLAUDE.md
