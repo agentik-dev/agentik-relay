@@ -138,13 +138,14 @@ func dw1Written(t *testing.T, src, dest string) {
 }
 
 // TestDW1_1_NewerKept (R2, R3): a door at 0.4.0, or one at the source's
-// 0.3.0 with a line of its own, stays byte for byte, silently (ak10-sync: the
-// vendored door is 0.3.0 now; these were 0.2.0 and 0.1.0).
+// 0.3.1 with a line of its own, stays byte for byte, silently (sy3-sync: the
+// vendored door is 0.3.1 now; these were 0.3.0, and before ak10-sync 0.2.0 and
+// 0.1.0).
 func TestDW1_1_NewerKept(t *testing.T) {
 	dw1Copy(t)
 	d := t.TempDir()
 	dw1Kept(t, dw1Vendored, dw1Door(t, d, "newer", "0.4.0", ""), "")
-	dw1Kept(t, dw1Vendored, dw1Door(t, d, "equal", "0.3.0", "# a line of its own\n"), "")
+	dw1Kept(t, dw1Vendored, dw1Door(t, d, "equal", "0.3.1", "# a line of its own\n"), "")
 	dw1Only(t, d, "equal", "newer")
 }
 
@@ -213,7 +214,7 @@ func TestDW1_5_NoVersion(t *testing.T) {
 		return "the door " + dest + " has no version to compare (" + theirs + " there, " + ours + " here); left alone\n"
 	}
 	door := dw1Door(t, d, "bare", "", "")
-	dw1Kept(t, dw1Vendored, door, line(door, "none", "0.3.0"))
+	dw1Kept(t, dw1Vendored, door, line(door, "none", "0.3.1"))
 	door = dw1Door(t, d, "old1", "0.0.9", "")
 	dw1Kept(t, dw1Door(t, s, "bare", "", ""), door, line(door, "0.0.9", "none"))
 	door = dw1Door(t, d, "old2", "0.1.0", "")
@@ -301,7 +302,7 @@ func TestDW1_7_NotAFile(t *testing.T) {
 		}
 		err = <-done
 	}
-	if want := dw1Line(fifo, "none", "0.3.0"); err != nil || out.String() != want || errb.String() != "" {
+	if want := dw1Line(fifo, "none", "0.3.1"); err != nil || out.String() != want || errb.String() != "" {
 		t.Errorf("over a FIFO: %v, stdout %q, stderr %q; want exit 0, %q, none", err, out.String(), errb.String(), want)
 	}
 	if fi, err := os.Lstat(fifo); err != nil || fi.Mode()&os.ModeNamedPipe == 0 {
@@ -338,7 +339,7 @@ func TestDW1_9_OneLine(t *testing.T) {
 	d := t.TempDir()
 	for i, v := range []string{`0.2.0\c`, `a\nb`, "-n"} {
 		door := dw1Door(t, d, "door"+string(rune('a'+i)), v, "")
-		dw1Kept(t, dw1Vendored, door, dw1Line(door, v, "0.3.0"))
+		dw1Kept(t, dw1Vendored, door, dw1Line(door, v, "0.3.1"))
 	}
 	dw1Only(t, d, "doora", "doorb", "doorc")
 }

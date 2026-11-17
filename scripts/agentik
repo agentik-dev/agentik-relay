@@ -2,7 +2,7 @@
 # agentik: the front door to the agentik tools (agentik-r1 section 3, packets ak2 and sc13-door);
 # GUIDE.md section 10's rows `front door` and `exit codes` say what it does. It reads and
 # writes nothing and resolves no old name. POSIX sh.
-VERSION=0.3.0
+VERSION=0.3.1
 LOWER=abcdefghijklmnopqrstuvwxyz
 UPPER=ABCDEFGHIJKLMNOPQRSTUVWXYZ
 USAGE="usage: agentik [<verb or tool> [args...]] | agentik help [<verb or tool>] | agentik --version"
@@ -44,8 +44,18 @@ target() {
 	for t in "$@"; do case $t in -*) ;; *) return 0 ;; esac; done; return 1
 }
 
+# back: NEXT is a clone's setup (`sh` one that cannot run), else the clone line or the folder's word.
+back() {
+	for r in agentik-commons/setup ./setup; do
+		[ "$r" = ./setup ] && [ "${PWD##*/}" != agentik-commons ] && continue
+		[ -f "$r" ] && o=-x x= && { [ -x "$r" ] || { o=-f x='sh ' && [ "$r" != ./setup ]; }; } || continue
+		d=${PWD%/}/${r#./} NEXT="next: $x$r"
+		case $d in /*) plain "$d" / && [ $o "$d" ] && NEXT="next: $x$d" ;; esac; return
+	done
+	[ ! -d agentik-commons ] || NEXT="agentik: agentik-commons here has no setup, and stands in the way of a clone"
+}
 missing() {
-	printf '%s\n' "agentik: $1 is not installed, and neither is the agentik suite" "$NEXT" >&2
+	back; printf '%s\n' "agentik: $1 is not installed, and neither is the agentik suite" "$NEXT" >&2
 	exit 3
 }
 
@@ -86,7 +96,7 @@ list() {
 	[ -z "$self" ] || listdir "$self"
 	set +f && IFS=$oldifs
 	[ "$count" -gt 0 ] || echo "no agentik-* tool on PATH"
-	echo "$NEXT" >&2
+	back; echo "$NEXT" >&2
 	exit 0
 }
 
