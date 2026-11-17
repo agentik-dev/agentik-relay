@@ -55,6 +55,8 @@ design/readme/source.md: sibling
 README.md: sibling
 Makefile: sibling
 DECISION[S].md: sibling
+# The ledger's gate list names the decisions tool whose render and answer add the files they write.
+.claude/edit-gates: sibling
 DESIGN.md: sibling
 # The open items, and their archive of 2026-11-01, name the siblings as the ledgers do.
 NICE_TO_HAVE.md: sibling
