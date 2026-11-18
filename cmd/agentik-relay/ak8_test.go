@@ -186,7 +186,7 @@ func TestAK8_1_Describe(t *testing.T) {
 		}
 	}
 	reads, _ := json.Marshal(m["reads"])
-	if want := `[{"argv":["describe","config","--json"],"kind":"config","name":"settings"},{"argv":["doctor","--json"],"kind":"doctor","name":"doctor"},{"argv":["status","--json"],"kind":"status","name":"run"}]`; string(reads) != want {
+	if want := `[{"argv":["describe","config","--json"],"kind":"config","name":"settings"},{"argv":["doctor","--json"],"kind":"doctor","name":"doctor"},{"argv":["status","--json"],"kind":"status","name":"run","wall_s":2.5}]`; string(reads) != want {
 		t.Errorf("reads = %s", reads)
 	}
 	for _, args := range [][]string{{"describe"}, {"describe", "nosuch", "--json"}, {"describe", "config"}} {
