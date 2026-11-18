@@ -75,10 +75,13 @@ type verbRow struct {
 	Top     bool   `json:"top"`
 }
 
+// readRow is one of describe's reads; WallS, above 0, is its wall in place
+// of the suite's 1 s (commons GUIDE §11), and is left out when 0.
 type readRow struct {
-	Kind string   `json:"kind"`
-	Name string   `json:"name"`
-	Argv []string `json:"argv"`
+	Kind  string   `json:"kind"`
+	Name  string   `json:"name"`
+	Argv  []string `json:"argv"`
+	WallS float64  `json:"wall_s,omitempty"`
 }
 
 type describeOut struct {
@@ -108,9 +111,9 @@ func describeAnswer() describeOut {
 		},
 		Verbs: usageVerbs(),
 		Reads: []readRow{
-			{"config", "settings", []string{"describe", "config", "--json"}},
-			{"doctor", "doctor", []string{"doctor", "--json"}},
-			{"status", "run", []string{"status", "--json"}},
+			{Kind: "config", Name: "settings", Argv: []string{"describe", "config", "--json"}},
+			{Kind: "doctor", Name: "doctor", Argv: []string{"doctor", "--json"}},
+			{Kind: "status", Name: "run", Argv: []string{"status", "--json"}, WallS: 2.5},
 		},
 	}
 }
