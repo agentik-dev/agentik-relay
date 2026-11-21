@@ -6,7 +6,7 @@
 | pin | `main` at `b735980` (plugin 0.2.4) plus this packet's own commit; branch `rr6-relay-records`, worktree `.claude/worktrees/rr6-relay-records`; nothing linked from main (a Go repo, no venv) |
 | wall | this repo's worktree only; no push, `--amend`, rebase, merge, install, plugin update; never build a relay binary by hand, never run one outside `make`'s test harness (so `go test ./cmd/agentik-relay` runs only inside the gate's check), never run `relay` or `agentik relay` `run`, `plan`, `gate`, `stop`, `kill`, `clean` or `resume`, never write inside `~/.local/state/agent-relay`; no `claude`; `make check` only through the gate queue; no `DECISIONS.md` or rendered block edited; no resolver ported, no table of cases vendored |
 | may touch | `internal/effects/records.go` (new), `internal/effects/records_test.go` (new), `cmd/agentik-relay/main.go`, `cmd/agentik-relay/rr6_test.go` (new), `cmd/agentik-relay/main_test.go` (`TestDoctorTable`'s names and letters, R3), `internal/packet/agentik_r1_test.go` (the plugin's version pin, R5), `plugin/.claude-plugin/plugin.json`, `README.md`, `design/readme/source.md`, `design/readme/rendered.sha256`, `design/packets/rr6-relay-records.md`, `history/sittings/2026-11-20-1-rr6-relay-records.md` |
-| acceptance | `go test ./internal/effects -run '^TestRR6_' -count=1 -v 2>&1 \| grep -c -E '^--- PASS: TestRR6_'` reads `2` (main: `0`); `go test ./cmd/agentik-relay -run '^TestRR6_' -count=1 -v 2>&1 \| grep -c -E '^--- PASS: TestRR6_'` reads `6` (main: `0`), run inside the verify row's check only; `grep -c -F 'agentik.records' design/readme/source.md` reads `1` (main: `0`); `grep -c -F 'agentik.records' README.md` reads `1` (main: `0`); `grep -c -F '"version": "0.2.5"' plugin/.claude-plugin/plugin.json` reads `1` (main: `0`) |
+| acceptance | `go test ./internal/effects -run '^TestRR6_' -count=1 -v 2>&1 \| grep -c -E '^--- PASS: TestRR6_'` reads `3` (main: `0`); `go test ./cmd/agentik-relay -run '^TestRR6_' -count=1 -v 2>&1 \| grep -c -E '^--- PASS: TestRR6_'` reads `6` (main: `0`), run inside the verify row's check only; `grep -c -F 'agentik.records' design/readme/source.md` reads `1` (main: `0`); `grep -c -F 'agentik.records' README.md` reads `1` (main: `0`); `grep -c -F '"version": "0.2.5"' plugin/.claude-plugin/plugin.json` reads `1` (main: `0`) |
 | budget | 90 turns, 200k context, `claude-opus-5-5`; four acts, one commit each: 0 this packet; 1 the tests, red; 2 R1 to R4, green; 3 R5 |
 | verify | `make check` |
 
@@ -27,6 +27,10 @@ repo's `DECISIONS.md` binds; no entry of it changes.
    not), or `.hygiene-allow` at `HEAD`, read through git, holds the whole line `records: out`
    (trailing white space stripped, as commons' `_declares` reads it). Else they are the repo's
    own; a git failure reading either is the repo's own. One function, through the hermetic runner.
+   The coordinator's ruling (2026-11-20, build 2): the key's presence decides, asked as `git
+   config --local --get` with no `--path`, so a value `--path` cannot expand (`~nouser/x`, exit
+   128), which commons reads `broken`, is refused and shown by the doctor like any set key; a git
+   failure not about the key (no repo, a config git cannot parse) stays the repo's own.
 2. **R2, the refusal.** `plan`, `run` and `resume` ask R1 after their argument checks and before
    the pid file, the lock, the ledger or any stage; `gate` asks it just after it takes the lock,
    since ADV13-14 (`TestAR22_2_HandGateHoldsLock`) has the hand gate read no root while another

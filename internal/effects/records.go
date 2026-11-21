@@ -16,16 +16,20 @@ const (
 )
 
 // RecordsOut is the one question of packet rr6-relay-records (R1), asked
-// at a repo's root through the hermetic runner: true when `git config
-// --local --path --get agentik.records` prints a value (exit 0, whatever
-// the value and whether or not it resolves), or when DeclaredFile at HEAD
-// holds DeclaredLine (Declares). A git failure reading either reads as the
-// repo's own, as a repo with no key does. The runner's env is the pin's,
+// at a repo's root through the hermetic runner: true when the key is set
+// in the clone's own config (`git config --local --get agentik.records`
+// exits 0, whatever the value and whether or not it resolves), or when
+// DeclaredFile at HEAD holds DeclaredLine (Declares). The key's presence
+// decides, not `--path`'s reading: a value `--path` cannot expand
+// (`~nouser/x`, git exit 128) is out too, since commons reads it broken,
+// never the repo's own (the coordinator's ruling, 2026-11-20). Any other
+// git failure reading either (no repo, a config git cannot parse) reads as
+// the repo's own, as a repo with no key does. The runner's env is the pin's,
 // so no GIT_CONFIG_* variable and no global file reaches it, and --local
 // reads the clone's common config: a worktree sees the main checkout's key.
 // No resolver: where the key points is never read.
 func RecordsOut(root string) bool {
-	if _, err := git(root, "config", "--local", "--path", "--get", RecordsKey); err == nil {
+	if _, err := git(root, "config", "--local", "--get", RecordsKey); err == nil {
 		return true
 	}
 	text, err := git(root, "cat-file", "-p", "HEAD:"+DeclaredFile)

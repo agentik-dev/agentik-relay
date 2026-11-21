@@ -18,7 +18,7 @@
 - [ ] `make check` through the gate queue: job `20261120-170317-2851` on `8b55bb1` red on two tests, `TestAR22_2_HandGateHoldsLock` (gate read the root before the lock) and `TestRR6_1` (each plan's fresh session id); both mended in `de33bc6`; job `20261120-171814-2859` on `c7eb007` exit 2: every code test green, TestAR20_5 and TestAR61_6 red on this packet's budget row (`about 90 tool calls`)
 
 - [x] build 2, act 1: the packet's budget row in the parser's shape (`90 turns, 200k context`); `go test ./internal/packet` ok
-- [ ] build 2, act 2: the coordinator's ruling: a set key `--path` cannot expand is refused (R1's added line, `TestRR6_3_KeyPathCannotExpand`)
+- [x] build 2, act 2: the coordinator's ruling: a set key `--path` cannot expand is refused, the key asked with no `--path` (R1's added line; effects `TestRR6_3_KeyPathCannotExpand` red at `c7eb007`, green now; cmd `TestRR6_3` and `TestRR6_6` gain `~nouser/x`); no file under `plugin/` changed, so no version step
 - [ ] build 2: hygiene, then `make check` once through the gate queue
 
 ## Handover
@@ -27,7 +27,7 @@
 - ruled, the coordinator 2026-11-20: a set key that `--path` cannot expand (`~nouser/x`) is refused like any set key; build 2 act 2.
 
 ## Next act
-Build 2 act 2, the unexpandable key refused; then hygiene and one check.
+Hygiene, then one `make check` through the gate queue.
 
 ## Exit
 Build 2 in flight.

@@ -193,9 +193,10 @@ func TestRR6_2_KeyRefusesEveryVerb(t *testing.T) {
 }
 
 // TestRR6_3_BrokenKeyRefuses (acceptance 3): a key whose path does not
-// exist, a relative one and an empty one refuse the same.
+// exist, a relative one, an empty one and one `git config --path` cannot
+// expand (`~nouser/x`, the coordinator's ruling) refuse the same.
 func TestRR6_3_BrokenKeyRefuses(t *testing.T) {
-	for _, v := range []string{filepath.Join(os.TempDir(), "rr6-gone", "top"), "records/top", ""} {
+	for _, v := range []string{filepath.Join(os.TempDir(), "rr6-gone", "top"), "records/top", "", "~nouser/x"} {
 		t.Run(fmt.Sprintf("%q", v), func(t *testing.T) {
 			top, home := rr6Repo(t)
 			rr6Git(t, top, "config", "--local", effects.RecordsKey, v)
@@ -282,17 +283,18 @@ func TestRR6_6_Doctor(t *testing.T) {
 	claudeProbe = func(string) error { return nil }
 	gitWorktree = func(string) error { return nil }
 	for _, c := range []struct {
-		name, status, detail, text string
-		key                        bool
+		name, status, detail, text, key string
 	}{
-		{"own", "ok", "in the repo", "ok   records      in the repo\n", false},
+		{"own", "ok", "in the repo", "ok   records      in the repo\n", ""},
 		{"out", "warn", "outside the clone: the relay does not run here (git config agentik.records)",
-			"warn records      outside the clone: the relay does not run here (git config agentik.records)\n", true},
+			"warn records      outside the clone: the relay does not run here (git config agentik.records)\n", filepath.Join(t.TempDir(), "top")},
+		{"unexpandable", "warn", "outside the clone: the relay does not run here (git config agentik.records)",
+			"warn records      outside the clone: the relay does not run here (git config agentik.records)\n", "~nouser/x"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			top, _ := rr6Repo(t)
-			if c.key {
-				rr6Git(t, top, "config", "--local", effects.RecordsKey, filepath.Join(t.TempDir(), "top"))
+			if c.key != "" {
+				rr6Git(t, top, "config", "--local", effects.RecordsKey, c.key)
 			}
 			var out, errb bytes.Buffer
 			code := run([]string{"doctor", "--json"}, strings.NewReader(""), &out, &errb)
@@ -311,7 +313,7 @@ func TestRR6_6_Doctor(t *testing.T) {
 					row = &rep.Checks[i]
 				}
 			}
-			if code != exitOK || row == nil || row.Status != c.status || row.Detail != c.detail || !row.OK || row.Warn != c.key || row.Remedy != nil {
+			if code != exitOK || row == nil || row.Status != c.status || row.Detail != c.detail || !row.OK || row.Warn != (c.key != "") || row.Remedy != nil {
 				t.Fatalf("doctor --json = %d, records %+v: %s", code, row, out.String())
 			}
 			if at := strings.Index(strings.Join(names, " "), "root records breaker"); at < 0 {

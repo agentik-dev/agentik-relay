@@ -122,3 +122,30 @@ func TestRR6_2_RecordsOut(t *testing.T) {
 		t.Errorf("a value only in the env and the global file: out; want own")
 	}
 }
+
+// TestRR6_3_KeyPathCannotExpand (the coordinator's ruling, 2026-11-20): a
+// key that is set but that `git config --path` cannot expand (`~nouser/x`,
+// git exit 128) is out like any set key, since commons reads it broken,
+// never the repo's own. A git failure that is not about the key (a clone
+// whose config git cannot parse) stays the repo's own, as R1 has it.
+func TestRR6_3_KeyPathCannotExpand(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "top")
+	os.MkdirAll(dir, 0o755)
+	rr6Git(t, dir, "init", "-q", "-b", "main")
+	rr6Git(t, dir, "config", "--local", RecordsKey, "~nouser/x")
+	if err := exec.Command("git", "-C", dir, "config", "--local", "--path", "--get", RecordsKey).Run(); err == nil {
+		t.Fatalf("the premise: git config --path expands ~nouser/x")
+	}
+	if !RecordsOut(dir) {
+		t.Errorf("the key at ~nouser/x: own; want out")
+	}
+	f, err := os.OpenFile(filepath.Join(dir, ".git", "config"), os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString("[broken\n")
+	f.Close()
+	if RecordsOut(dir) {
+		t.Errorf("a config git cannot parse, the key in it: out; want own")
+	}
+}
