@@ -14,13 +14,13 @@
 - [x] act 0, the packet
 - [x] act 1, the tests (red, undefined names under `go vet`): `internal/effects/records_test.go`, `cmd/agentik-relay/rr6_test.go`, `TestDoctorTable` gains the `records` row
 - [x] act 2, R1 to R4: `effects.RecordsOut` and `Declares`; `recordsRefused` in plan, run, gate, resume before the pid file; doctor's `records` row after `root`; `go test ./internal/effects` ok; cmd's tests wait for the gate (`go test` there builds the relay)
-- [ ] act 3, R5: the README sentence (both files, the sidecar) and the plugin at 0.2.5
+- [x] act 3, R5: the README sentence beside the queue's (both files, the sidecar restamped, `shasum -c` OK); the plugin at 0.2.5 with TestAgentikR1_5's pin; no RUNBOOK.md in the repo
 - [ ] `make check` through the gate queue
 
 ## Handover
 - If this sitting is cut: the first unticked line above.
 
 ## Next act
-Act 3, R5: the README sentence and the plugin at 0.2.5.
+`make check` through the gate queue, then the record.
 
 ## Exit

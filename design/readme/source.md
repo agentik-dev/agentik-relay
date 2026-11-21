@@ -55,6 +55,7 @@ GOBIN="$HOME/.local/bin" go install github.com/agentik-dev/agentik-relay/cmd/age
 - `agentik relay gate ar2`: the gate by hand. `agentik relay clean --merged`: remove merged rows' worktrees; `agentik relay clean --stale`: remove dead relays' locks and their untouched worktrees.
 - `agentik relay version`. Every verb takes `--json`.
 - The queue is `relay/queue.yaml` in the target repo; packets are `design/packets/<id>.md`.
+- The target repo keeps its records in its own clone: where `git config agentik.records` is set, or `records: out` is committed in `.hygiene-allow`, `plan`, `run`, `gate` and `resume` refuse in one line, and `doctor` warns.
 - State directory: `${XDG_STATE_HOME:-~/.local/state}/agentik-relay` (the old name's folder while only it exists) (ledger, `status.json`, logs, control file). The ledger never enters a repo.
 
 ## The plugin
