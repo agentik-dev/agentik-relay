@@ -34,8 +34,10 @@ func rv1Doctor(t *testing.T, env map[string]string, setup func(top string), args
 		setup(top)
 	}
 	var out, text bytes.Buffer
-	if code := run(append([]string{"doctor", "--json"}, args...), strings.NewReader(""), &out, &bytes.Buffer{}); code == exitUsage {
-		t.Fatalf("doctor --json %q: exit %d", args, code)
+	var errs bytes.Buffer
+	run(append([]string{"doctor", "--json"}, args...), strings.NewReader(""), &out, &errs)
+	if strings.Contains(errs.String(), "usage:") { // exitUsage is exitUnwell's 2, so the words tell
+		t.Fatalf("doctor --json %q: %s", args, errs.String())
 	}
 	var rep struct{ Checks []check }
 	if err := json.Unmarshal(out.Bytes(), &rep); err != nil {

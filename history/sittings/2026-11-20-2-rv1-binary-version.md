@@ -17,13 +17,17 @@
 - [x] F2: `doctor --plugin-root <dir>` over `CLAUDE_PLUGIN_ROOT` (`TestRV1_2_DoctorPluginRoot`: the flag, its `=` form, the flag over the variable, empty, unreadable and absent roots); `/relay:doctor` passes the root; the help's and the usage line's doctor name it
 - [x] F5: `TestAgentikR1_5_InstallTarget` pins `make -n build`'s stamped line too
 - [x] F6, F4, F7: NICE n28 (rr6's F3) in rr6's section; n29 (F4), n30 (F7) in a section from RV1 review 1; recordlint holds 29 rows
-- [ ] the packet true to what is built; the plugin at 0.2.7 (doctor.md changed after 0.2.6); the gate's `make check`
+- [x] the packet true to what is built (R3's states and the flag, R4's choices, the counts 3 and 4); the plugin at 0.2.7 with its pin; `TestP1_1_CommandsHidden`'s doctor body sha (doctor.md's call changed); `internal/...` but night `ok`
+- [ ] the gate's `make check` on this commit
 
 ## Handover
 - If this sitting is cut: the first unticked line above.
+- decide, owner: the coordinator (the review): the warn's JSON `remedy` stays the one command `make install` (the plug contract's one command a detail names); the detail names both ways.
+- decide, owner: the coordinator (the review): an empty `--plugin-root` reads as none given, so the variable then counts.
+- decide, owner: the coordinator (the review): the help's doctor line names `--plugin-root`; describe's verb rows take no flags, so they are unchanged.
 
 ## Next act
-The packet, the version step, the gate.
+The gate's `make check`.
 
 ## Exit
 Open.
