@@ -216,7 +216,7 @@ func TestAK8_2_ConfigDefaults(t *testing.T) {
 		t.Errorf("repo layer %v", r)
 	}
 	set := ak8Settings(t, m)
-	if len(m["settings"].([]any)) != 10 || len(set) != 10 {
+	if len(m["settings"].([]any)) != 11 || len(set) != 11 { // rv1 R4: enabled the eleventh
 		t.Fatalf("%d settings: %v", len(set), m["settings"])
 	}
 	for key, s := range set {

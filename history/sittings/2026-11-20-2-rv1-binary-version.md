@@ -12,7 +12,7 @@
 
 ## Done-ness
 - [x] act 0, the packet
-- [ ] act 1, the tests (red)
+- [x] act 1, the tests (red, undefined names under `go vet`): `internal/effects/rv1_test.go`, `cmd/agentik-relay/rv1_test.go`; `TestVerbs` reads `relay unstamped`, `TestDoctorTable` gains `binary`, `TestAK8_2` counts eleven settings
 - [ ] act 2, R1 to R4 (green)
 - [ ] act 3, R5: the README clause, the plugin at 0.2.6
 - [ ] act 4, rr6's review in words: its packet mended, NICE gains its rows
@@ -22,7 +22,7 @@
 - If this sitting is cut: the first unticked line above.
 
 ## Next act
-Act 1, the tests.
+Act 2, R1 to R4.
 
 ## Exit
 (open)
