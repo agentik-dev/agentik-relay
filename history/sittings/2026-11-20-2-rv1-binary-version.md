@@ -18,7 +18,7 @@
 - [x] F5: `TestAgentikR1_5_InstallTarget` pins `make -n build`'s stamped line too
 - [x] F6, F4, F7: NICE n28 (rr6's F3) in rr6's section; n29 (F4), n30 (F7) in a section from RV1 review 1; recordlint holds 29 rows
 - [x] the packet true to what is built (R3's states and the flag, R4's choices, the counts 3 and 4); the plugin at 0.2.7 with its pin; `TestP1_1_CommandsHidden`'s doctor body sha (doctor.md's call changed); `internal/...` but night `ok`
-- [ ] the gate's `make check` on this commit
+- [x] the gate's `make check`: job `20261120-234411-2942` exit 0 on `1772fc3` in 9 min; cmd `ok`; `binary-version: relay 0.2.7, the plugin's`; hygiene over `main..HEAD` 0 hits
 
 ## Handover
 - If this sitting is cut: the first unticked line above.
@@ -27,7 +27,7 @@
 - decide, owner: the coordinator (the review): the help's doctor line names `--plugin-root`; describe's verb rows take no flags, so they are unchanged.
 
 ## Next act
-The gate's `make check`.
+The coordinator's read of build 2.
 
 ## Exit
-Open.
+Build 2 done: review 1's F1, F2, F3 and F5 built, F4, F6 and F7 in NICE, the packet true; the gate green on `1772fc3` (job `20261120-234411-2942`). This commit holds this file alone.
