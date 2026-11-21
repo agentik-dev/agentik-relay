@@ -12,7 +12,7 @@
 
 ## Done-ness
 - [x] act 0: the packet
-- [ ] act 1: R1, `ar10_test.go` and `ar21_4_test.go` read their packet's copy
+- [x] act 1: R1, `ar10_test.go` and `ar21_4_test.go` read their packet's copy under `internal/packet/testdata/packets/`, the bytes at the pin; packet and queue `ok`
 - [ ] act 2: R2, the four globbing tests read a fixed sample
 - [ ] act 3: R3, the rehearsal's `make check` green through the gate; its reds mended
 - [ ] the gate's `make check` on the head handed back; hygiene over `main..HEAD` 0 hits
@@ -21,7 +21,7 @@
 - If this sitting is cut: the first unticked line above.
 
 ## Next act
-Act 1: R1.
+Act 2: R2.
 
 ## Exit
 Open.
