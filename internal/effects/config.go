@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -37,6 +38,9 @@ import (
 // Band is the session band's mode (key `band`, band-pacing-r1 §2.1; AR80):
 // BandPace, the default, or BandOff; any other value is an error naming its
 // line.
+// Enabled is the session tool's key of the relay section (RV1 R4): read by
+// that tool, kept here so it warns nothing, read by no behaviour of the
+// relay; a value outside EnabledChoices stays in Unknown, as before.
 type Config struct {
 	Ntfy          struct{ URL, Topic string }
 	Tmux          string
@@ -44,6 +48,7 @@ type Config struct {
 	Caffeinate    bool
 	Band          string
 	Queue, Merge  string
+	Enabled       string
 	Packets       string
 	VerifySeconds int
 	Unknown       []string
@@ -319,6 +324,10 @@ func underRepo(repo, path string) (string, error) {
 	return rel, nil
 }
 
+// EnabledChoices are the values of the session tool's `enabled` the relay
+// knows (RV1 R4): the session reads auto, on and a YAML true as on.
+var EnabledChoices = []string{"auto", "on", "off", "true", "false"}
+
 func (c *Config) apply(p string, n yaml.Node) error {
 	if n.Kind != yaml.Map {
 		return fmt.Errorf("line %d: want a mapping", n.Line)
@@ -351,6 +360,12 @@ func (c *Config) apply(p string, n yaml.Node) error {
 			err = str(kv, &c.Queue)
 		case "merge":
 			err = str(kv, &c.Merge)
+		case "enabled": // the session tool's (RV1 R4): known, never read here
+			if v, ok := kv.Val.String(); !ok || !slices.Contains(EnabledChoices, v) {
+				unknown(kv.Key, kv)
+				continue
+			}
+			c.Enabled = kv.Val.Str
 		case "packets":
 			if err = str(kv, &c.Packets); err == nil && c.Packets != "" && !filepath.IsAbs(c.Packets) {
 				return fmt.Errorf("line %d: packets: %q: want an absolute dir", kv.Val.Line, c.Packets)

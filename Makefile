@@ -5,16 +5,21 @@ PY := $(shell pyenv which python3 2>/dev/null || command -v python3)
 UNLOCKED := $(MAKE)
 DOCLINT_SHA := 3040666c1e9ad08faf1befe9c2efffaff0660f0464554d240f1d07437a03fcda
 BINDIR ?= $(HOME)/.local/bin
+# The plugin's version, the one read of plugin.json (readme-status's), and the
+# stamp build and install give the binary (RV1 R1); a bare go build says unstamped.
+PLUGIN_VERSION := $(shell sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' plugin/.claude-plugin/plugin.json)
+STAMP := -X main.version=$(PLUGIN_VERSION)
+NIGHT := github.com/agentik-dev/agentik-relay/internal/night
 
 JAVA ?= $(shell test -x /opt/homebrew/opt/openjdk/bin/java && echo /opt/homebrew/opt/openjdk/bin/java || command -v java)
 TLA_JAR = design/tla/.tools/tla2tools.jar
 
-.PHONY: help check check-unlocked test vet fmt lint doclint hygiene descriptions validate build install doctor readme readme-status readme-stamp clean tla tla-tools
+.PHONY: help check check-unlocked test vet fmt lint doclint hygiene descriptions validate binary-version-check build install doctor readme readme-status readme-stamp clean tla tla-tools
 help:
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
 check:  ## the gate, bounded (conventions §5): one per tree (.check.lock), an 840 s wall, held above load 4 x cores only when the CPU confirms the load
 	$(PY) -B scripts/bounded --lock .check.lock --wall 840 --load 4 -- $(UNLOCKED) check-unlocked
-check-unlocked: test vet fmt doclint hygiene plugin-version-check descriptions validate  ## the gate's body: test, vet, fmt, doclint, hygiene, descriptions, validate, README freshness
+check-unlocked: test vet fmt doclint hygiene plugin-version-check binary-version-check descriptions validate  ## the gate's body: test, vet, fmt, doclint, hygiene, the binary's stamp, descriptions, validate, README freshness
 	@if [ ! -f design/readme/source.md ]; then echo "readme: skipped, absent design/readme/source.md"; \
 	elif shasum -c --status design/readme/rendered.sha256; then echo "readme: fresh"; \
 	else echo "readme: stale, run make readme"; exit 2; fi
@@ -38,22 +43,29 @@ hygiene:  ## the public-hygiene scan (conventions §6); scripts/{agentik,hygiene
 	$(PY) -B scripts/hygiene
 plugin-version-check:  ## the plugin's version check (agentik-commons GUIDE §7): red when a file under plugin/ changed after the commit that last set its version
 	$(PY) -B scripts/plugin-version-check
+binary-version-check:  ## the stamp (RV1 R2): build's flags into a temp folder, the pid home and lock port linked there as the tests link them; --version says the plugin's version; the binary and its folder removed
+	@d=$$(mktemp -d) && trap 'rm -f "$$d/agentik-relay"; rmdir "$$d"' EXIT && \
+	port=$$($(PY) -B -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1])') && \
+	go build -ldflags "$(STAMP) -X $(NIGHT).PidHomeLink=$$d -X $(NIGHT).LockPortLink=$$port" -o "$$d/agentik-relay" ./cmd/agentik-relay && \
+	got=$$("$$d/agentik-relay" --version) && \
+	if [ -n "$(PLUGIN_VERSION)" ] && [ "$$got" = "relay $(PLUGIN_VERSION)" ]; then echo "binary-version: $$got, the plugin's"; \
+	else echo "binary-version: --version says '$$got', want 'relay $(PLUGIN_VERSION)'"; exit 2; fi
 descriptions:  ## the plugin's loaded description bytes (hq design/09 §2, packet P1): one line each and the sum, red over 1,024 B; scripts/plugin-description-bytes vendored from agentik-commons
 	$(PY) -B scripts/plugin-description-bytes plugin
 validate:  ## claude plugin validate plugin/ (doclint's plugin rule runs in check's doclint step)
 	$(PY) -B scripts/bounded --wall 60 -- claude plugin validate plugin/
-build:  ## bin/agentik-relay
-	go build -o bin/agentik-relay ./cmd/agentik-relay
+build:  ## bin/agentik-relay, stamped with the plugin's version
+	go build -ldflags "$(STAMP)" -o bin/agentik-relay ./cmd/agentik-relay
 install:  ## agentik-relay into BINDIR, relay a link to it (until 2026-12-31), the agentik front door beside it where none or an older one is there (scripts/install-door, DW1R); GOPATH's relay relinked when it exists (agentik-r1 §4.1, D3)
 	mkdir -p $(BINDIR)
-	go build -o $(BINDIR)/agentik-relay ./cmd/agentik-relay
+	go build -ldflags "$(STAMP)" -o $(BINDIR)/agentik-relay ./cmd/agentik-relay
 	ln -sf agentik-relay $(BINDIR)/relay
 	sh scripts/install-door scripts/agentik $(BINDIR)/agentik
 	g="$$(go env GOPATH)/bin/relay"; if [ -e "$$g" ] || [ -L "$$g" ]; then ln -sf $(BINDIR)/agentik-relay "$$g"; fi
 doctor:  ## claude, git, tmux on PATH
 	go run ./cmd/agentik-relay doctor
 readme-status:  ## rewrite the source's one Status: line (plugin version, today, the Go test count); idempotent
-	@v=$$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' plugin/.claude-plugin/plugin.json); \
+	@v=$(PLUGIN_VERSION); \
 	n=$$(grep -rhc '^func Test' internal cmd | paste -sd+ - | bc); d=$$(date +%F); \
 	sed "s/^Status: .*/Status: version \`$$v\`, rendered \`$$d\`, \`$$n\` Go tests./" design/readme/source.md > design/readme/source.md.tmp && \
 	mv design/readme/source.md.tmp design/readme/source.md

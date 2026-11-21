@@ -42,9 +42,9 @@ func TestRV1_3_EnabledKnown(t *testing.T) {
 // or a misspelt key, warns as at the pin, where both were unknown keys.
 func TestRV1_3_EnabledBadStaysUnknown(t *testing.T) {
 	for text, want := range map[string]string{
-		"relay: {enabled: 7, queue: q}\n":      "enabled",
-		"relay: {enabled: {x: 1}, queue: q}\n": "enabled",
-		"relay: {enabeld: auto, queue: q}\n":   "enabeld",
+		"relay: {enabled: 7, queue: q}\n":    "enabled",
+		"relay:\n  enabled:\n    x: 1\n":     "enabled",
+		"relay: {enabeld: auto, queue: q}\n": "enabeld",
 	} {
 		c := rv1Load(t, text)
 		if !reflect.DeepEqual(c.Unknown, []string{"/r/" + RepoConfigFile + ": " + want}) || c.Enabled != "" {

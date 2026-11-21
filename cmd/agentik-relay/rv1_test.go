@@ -61,7 +61,7 @@ func TestRV1_1_DoctorBinary(t *testing.T) {
 	const remedy = "reinstall the binary (make install in a clone)"
 	for _, c := range []struct {
 		name, bin, file string // file "" writes none; "-" sets no variable
-		status, detail      string
+		status, detail  string
 	}{
 		{"older binary", "0.2.3", "0.2.4", "warn", "relay 0.2.3, the plugin 0.2.4: " + remedy},
 		{"equal", "0.2.4", "0.2.4", "ok", "relay 0.2.4, the plugin's"},

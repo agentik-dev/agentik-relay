@@ -34,7 +34,10 @@ import (
 	"github.com/agentik-dev/agentik-relay/internal/relay"
 )
 
-const version = "0.1.0-dev"
+// version is the binary's version (RV1 R1): the Makefile's build and
+// install lines stamp the plugin's through -ldflags "-X main.version=...";
+// go run, go test and a bare build keep unstamped.
+var version = "unstamped"
 
 // Exit codes (design/relay-r1.md §9; D21 moved usage from 1 to 2).
 const (
@@ -339,6 +342,12 @@ func doctor(asJSON bool, stdout io.Writer) int {
 	if note := effects.PycacheNote(pinned); note != "" {
 		add("python3", true, true, "%s", note)
 	}
+	// RV1 R3: the running binary against the plugin that execs it.
+	{
+		ok, warn, detail, remedy := binaryRow(version, pluginVersion(getenv))
+		add("binary", ok, warn, "%s", detail)
+		checks[len(checks)-1].Remedy = remedy
+	}
 	add("template", true, false, "sha256 %s", prompt.TemplateHash())
 	switch {
 	case cfgErr != nil:
@@ -406,6 +415,45 @@ func doctor(asJSON bool, stdout io.Writer) int {
 		return exitUnwell
 	}
 	return exitOK
+}
+
+// reinstallRemedy is the binary row's remedy when the binary is not the
+// plugin's (RV1 R3).
+const reinstallRemedy = "make install"
+
+// pluginVersion is the version in $CLAUDE_PLUGIN_ROOT/.claude-plugin/
+// plugin.json (RV1 R3); "" when the variable is unset, or the file does not
+// read or holds no version.
+func pluginVersion(getenv func(string) string) string {
+	root := getenv("CLAUDE_PLUGIN_ROOT")
+	if root == "" {
+		return ""
+	}
+	b, err := os.ReadFile(filepath.Join(root, ".claude-plugin", "plugin.json"))
+	if err != nil {
+		return ""
+	}
+	var m struct {
+		Version string `json:"version"`
+	}
+	if json.Unmarshal(b, &m) != nil {
+		return ""
+	}
+	return m.Version
+}
+
+// binaryRow is the doctor's binary row (RV1 R3): ok with the version alone
+// when no plugin version is known, ok when it equals bin, else a warning
+// naming both and the reinstall.
+func binaryRow(bin, plugin string) (ok, warn bool, detail string, remedy *string) {
+	switch plugin {
+	case "":
+		return true, false, "relay " + bin, nil
+	case bin:
+		return true, false, "relay " + bin + ", the plugin's", nil
+	}
+	r := reinstallRemedy
+	return true, true, fmt.Sprintf("relay %s, the plugin %s: reinstall the binary (%s in a clone)", bin, plugin, r), &r
 }
 
 // wrapWords is s broken at spaces into lines of at most n runes; a word

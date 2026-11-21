@@ -13,7 +13,7 @@
 ## Done-ness
 - [x] act 0, the packet
 - [x] act 1, the tests (red, undefined names under `go vet`): `internal/effects/rv1_test.go`, `cmd/agentik-relay/rv1_test.go`; `TestVerbs` reads `relay unstamped`, `TestDoctorTable` gains `binary`, `TestAK8_2` counts eleven settings
-- [ ] act 2, R1 to R4 (green)
+- [x] act 2, R1 to R4: `var version = "unstamped"`, the Makefile's `STAMP` on build and install, `binary-version-check` in `check-unlocked`; the doctor's `binary` row before `template`; `enabled` known with five choices, `describe config`'s eleventh setting; `go test ./internal/effects` ok; cmd's tests wait for the gate
 - [ ] act 3, R5: the README clause, the plugin at 0.2.6
 - [ ] act 4, rr6's review in words: its packet mended, NICE gains its rows
 - [ ] `make check` through the gate queue
@@ -22,7 +22,7 @@
 - If this sitting is cut: the first unticked line above.
 
 ## Next act
-Act 2, R1 to R4.
+Act 3, R5.
 
 ## Exit
 (open)
