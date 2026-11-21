@@ -319,6 +319,12 @@ func doctor(asJSON bool, stdout io.Writer) int {
 	} else {
 		add("root", true, false, "%s clean, on main", root)
 	}
+	// rr6 R3: whether the relay runs here at all (R1's one question).
+	if effects.RecordsOut(recordsRoot()) {
+		add("records", true, true, "outside the clone: the relay does not run here (git config %s)", effects.RecordsKey)
+	} else {
+		add("records", true, false, "in the repo")
+	}
 	// AR29 act 4 (ADV17-4): what the breaker reads a helper's executable
 	// by; with neither /proc nor a pinned lsof it counts a claude by its
 	// comm alone, a warning, never a fail.
@@ -506,6 +512,9 @@ func plan(args []string, stdout, stderr io.Writer) int {
 			return exitUsage
 		}
 	}
+	if recordsRefused(stderr) { // rr6 R2: before the pid file, the ledger and any measure
+		return exitUsage
+	}
 	fail := func(err error) int {
 		if asJSON {
 			writeJSON(stdout, struct {
@@ -635,6 +644,34 @@ func repoConfig() (repo, state string, cfg effects.Config, err error) {
 	}
 	cfg, err = loadConfig(effects.OSFS{}, getenv, repo)
 	return repo, state, cfg, err
+}
+
+// recordsRefusal is R2's line (packet rr6-relay-records): the relay does
+// not plan, run, gate or resume in a repo whose records live outside its
+// clone, until it reads them through a resolver.
+const recordsRefusal = "relay: this repo keeps its records outside its clone (git config " + effects.RecordsKey + "); the relay does not run in such a repo yet"
+
+// recordsRoot is the root R1 is asked at: the toplevel's main worktree,
+// through the hermetic runner, else the toplevel itself.
+func recordsRoot() string {
+	repo, err := toplevel()
+	if err != nil || repo == "" {
+		repo = "."
+	}
+	if root, err := (effects.OSGit{}).Root(repo); err == nil && root != "" {
+		return root
+	}
+	return repo
+}
+
+// recordsRefused prints recordsRefusal and reports true when the repo's
+// records are out (effects.RecordsOut); it writes nothing else.
+func recordsRefused(stderr io.Writer) bool {
+	if !effects.RecordsOut(recordsRoot()) {
+		return false
+	}
+	fmt.Fprintln(stderr, recordsRefusal)
+	return true
 }
 
 // orchestrateRefusal is why `agentik-relay run --orchestrate` refuses before the
@@ -880,6 +917,9 @@ func gateVerb(args []string, stdout, stderr io.Writer) int {
 	}
 	if id == "" {
 		fmt.Fprintln(stderr, "usage: relay gate <row> [--json]")
+		return exitUsage
+	}
+	if recordsRefused(stderr) { // rr6 R2: before the pid file
 		return exitUsage
 	}
 	// The hand gate runs branch code: the account's one relay while it
@@ -1245,6 +1285,9 @@ func runVerb(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "relay run: --stall-seconds %q: want a whole number of seconds over 0\n%s\n", v, use)
 			return exitUsage
 		}
+	}
+	if recordsRefused(stderr) { // rr6 R2: before the lock, the plan and any stage
+		return exitUsage
 	}
 	if f["--orchestrate"] != "" { // AR32A act 5 (orchestrator r1 §8): before the lock and the plan
 		why := ""
@@ -1716,6 +1759,9 @@ func resumeVerb(args []string, stdout, stderr io.Writer) int {
 	f, row, err := flagSet(args, nil, []string{"--json"}, true)
 	if err != nil {
 		fmt.Fprintf(stderr, "relay resume: %v\nusage: agentik relay resume [<row>]\n", err)
+		return exitUsage
+	}
+	if recordsRefused(stderr) { // rr6 R2: before the pid file
 		return exitUsage
 	}
 	// A refused resume prints the line it would exec (as --print does), so
