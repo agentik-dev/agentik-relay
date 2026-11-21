@@ -122,18 +122,18 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	case verb == "describe":
 		return describeVerb(args[1:], stdout, stderr)
 	case verb == "doctor":
-		f, _, err := flagSet(args[1:], []string{"--verify", "--line"}, []string{"--json"}, false)
+		f, _, err := flagSet(args[1:], []string{"--verify", "--line", "--plugin-root"}, []string{"--json"}, false)
 		if err == nil && f["--line"] != "" && f["--verify"] == "" {
 			err = fmt.Errorf("--line needs --verify")
 		}
 		if err != nil {
-			fmt.Fprintf(stderr, "relay doctor: %v\nusage: relay doctor [--verify <dir> [--line <shell line>]] [--json]\n", err)
+			fmt.Fprintf(stderr, "relay doctor: %v\nusage: relay doctor [--verify <dir> [--line <shell line>]] [--plugin-root <dir>] [--json]\n", err)
 			return exitUsage
 		}
 		if dir := f["--verify"]; dir != "" {
 			return doctorVerify(dir, f["--line"], asJSON, stdout, stderr)
 		}
-		return doctor(asJSON, stdout)
+		return doctor(asJSON, f["--plugin-root"], stdout)
 	case verb == "plan":
 		return plan(args[1:], stdout, stderr)
 	case verb == "run":
@@ -212,8 +212,9 @@ var gitWorktree = func(repo string) error {
 
 // doctor runs §9's checks in order. A warning is ok with warn set (tmux
 // absent: file windows, D16); unknown is never a pass. Exit 0 when no check
-// is not ok, 2 otherwise.
-func doctor(asJSON bool, stdout io.Writer) int {
+// is not ok, 2 otherwise. pluginRoot is --plugin-root's dir, "" when none
+// was given (the binary row's, RV1 R3).
+func doctor(asJSON bool, pluginRoot string, stdout io.Writer) int {
 	var checks []check
 	add := func(name string, ok, warn bool, format string, a ...any) {
 		status := "ok"
@@ -347,7 +348,7 @@ func doctor(asJSON bool, stdout io.Writer) int {
 	}
 	// RV1 R3: the running binary against the plugin that execs it.
 	{
-		ok, warn, detail, remedy := binaryRow(version, pluginVersion(getenv))
+		ok, warn, detail, remedy := binaryRow(version, pluginVersion(pluginRootOf(pluginRoot, getenv)))
 		add("binary", ok, warn, "%s", detail)
 		checks[len(checks)-1].Remedy = remedy
 	}
@@ -424,11 +425,20 @@ func doctor(asJSON bool, stdout io.Writer) int {
 // plugin's (RV1 R3).
 const reinstallRemedy = "make install"
 
-// pluginVersion is the version in $CLAUDE_PLUGIN_ROOT/.claude-plugin/
-// plugin.json (RV1 R3); "" when the variable is unset, or the file does not
-// read or holds no version.
-func pluginVersion(getenv func(string) string) string {
-	root := getenv("CLAUDE_PLUGIN_ROOT")
+// pluginRootOf is the plugin's root the binary row reads (RV1 R3, review 1
+// F2): doctor's --plugin-root, which /relay:doctor fills, since the Bash
+// tool's shell holds no CLAUDE_PLUGIN_ROOT; else that variable, as a hook
+// gets it. An empty flag reads as none given.
+func pluginRootOf(flag string, getenv func(string) string) string {
+	if flag != "" {
+		return flag
+	}
+	return getenv("CLAUDE_PLUGIN_ROOT")
+}
+
+// pluginVersion is the version in <root>/.claude-plugin/plugin.json (RV1
+// R3); "" when root is empty, or the file does not read or holds no version.
+func pluginVersion(root string) string {
 	if root == "" {
 		return ""
 	}
@@ -918,7 +928,7 @@ func usage(w io.Writer) {
   gate    <row>                       the gate by hand
   clean   --merged                    remove the worktrees of merged rows
   clean   --stale                     remove dead relays' locks and their untouched worktrees
-  doctor                              check claude, git, tmux, the state directory, the config
+  doctor  [--plugin-root <dir>]       check claude, git, tmux, the state directory, the config
   describe  [config [KEY]] --json     the tool, or its settings and the file and line of each
   version
 every verb takes --json

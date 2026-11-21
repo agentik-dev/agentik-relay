@@ -65,7 +65,7 @@ func TestAgentikR1_5_InstallTarget(t *testing.T) {
 	}
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 	// rv1 R1: the build stamped with the plugin's version, as plugin.json says it.
-	v := pluginVersion(func(string) string { return filepath.Join("..", "..", "plugin") })
+	v := pluginVersion(filepath.Join("..", "..", "plugin"))
 	if v == "" {
 		t.Fatal("plugin/.claude-plugin/plugin.json holds no version")
 	}

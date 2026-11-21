@@ -119,6 +119,49 @@ func TestRV1_1_DoctorBinary(t *testing.T) {
 	}
 }
 
+// TestRV1_2_DoctorPluginRoot (RV1 R3, review 1 F2): doctor --plugin-root
+// names the plugin's root, since the Bash tool's shell holds no
+// CLAUDE_PLUGIN_ROOT; the flag wins over the variable, and an empty or
+// unreadable root reads as none.
+func TestRV1_2_DoctorPluginRoot(t *testing.T) {
+	old := version
+	t.Cleanup(func() { version = old })
+	version = "0.2.4"
+	for _, c := range []struct {
+		name   string
+		env    string // the variable's root's version; "-" sets none
+		args   func(t *testing.T) []string
+		status string
+		detail string
+	}{
+		{"the flag alone", "-", func(t *testing.T) []string { return []string{"--plugin-root", rv1PluginRoot(t, "0.2.4")} },
+			"ok", "relay 0.2.4, the plugin's"},
+		{"the flag's = form", "-", func(t *testing.T) []string { return []string{"--plugin-root=" + rv1PluginRoot(t, "0.2.3")} },
+			"warn", "relay 0.2.4, the plugin 0.2.3: reinstall the binary (make install in a clone, or the README's go install line)"},
+		{"the flag over the variable", "0.2.3", func(t *testing.T) []string { return []string{"--plugin-root", rv1PluginRoot(t, "0.2.4")} },
+			"ok", "relay 0.2.4, the plugin's"},
+		{"the variable alone", "0.2.3", func(t *testing.T) []string { return nil },
+			"warn", "relay 0.2.4, the plugin 0.2.3: reinstall the binary (make install in a clone, or the README's go install line)"},
+		{"an empty root", "-", func(t *testing.T) []string { return []string{"--plugin-root", ""} },
+			"ok", "relay 0.2.4"},
+		{"an unreadable root", "-", func(t *testing.T) []string { return []string{"--plugin-root", rv1PluginRoot(t, "")} },
+			"ok", "relay 0.2.4"},
+		{"a root that is not there", "-", func(t *testing.T) []string { return []string{"--plugin-root", filepath.Join(t.TempDir(), "gone")} },
+			"ok", "relay 0.2.4"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			env := map[string]string{"CLAUDE_PLUGIN_ROOT": ""}
+			if c.env != "-" {
+				env["CLAUDE_PLUGIN_ROOT"] = rv1PluginRoot(t, c.env)
+			}
+			checks, _ := rv1Doctor(t, env, nil, c.args(t)...)
+			if row := rv1Row(t, checks, "binary"); row.Status != c.status || row.Detail != c.detail {
+				t.Fatalf("binary row %+v, want %s %q", row, c.status, c.detail)
+			}
+		})
+	}
+}
+
 // TestRV1_3_DoctorEnabled (RV1 R4, acceptance 3): a repo file holding only
 // the session tool's relay section reads an ok config row.
 func TestRV1_3_DoctorEnabled(t *testing.T) {
