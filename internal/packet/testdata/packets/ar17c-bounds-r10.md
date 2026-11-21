@@ -3,8 +3,8 @@
 | item | value |
 |---|---|
 | from | `design/review-adv10.md` whole; example-mac's `history/relay/2026-09-23-defects.md` D2 §4, §6, §9; `design/relay-r1.md` §9, §11, §15, §16; `design/tla/`; the code the review cites. Never a ledger but a fixture's |
-| pin | agent-relay `main` after `ar17b-guards-r10` merged (cut off `main`, no `base`); worktree `.claude/worktrees/ar17c-bounds-r10` |
-| wall | this repo only. No push, `--amend`, rebase, device or network; every test path under `t.TempDir()`, never the real queue, ledger or state root; a hand `relay plan` only with `--rows`, `RELAY_MEASURE_DEPTH=1` and a temp `XDG_STATE_HOME`; `go test ./...` only inside `make check` |
+| pin | night-relay `main` after `ar17b-guards-r10` merged (cut off `main`, no `base`); worktree `.claude/worktrees/ar17c-bounds-r10` |
+| wall | this repo only. No push, `--amend`, rebase, device or network; every test path under `t.TempDir()`, never the real queue, ledger or state root; a hand `rally plan` only with `--rows`, `RELAY_MEASURE_DEPTH=1` and a temp `XDG_STATE_HOME`; `go test ./...` only inside `make check` |
 | may touch | `internal/packet/`, `internal/night/`, `internal/effects/`, `internal/stream/`, `cmd/relay/`, `scripts/bounded`, `design/relay-r1.md`, `design/tla/Night.tla`, `design/tla/Night.cfg`, `history/sittings/*.md`, `history/sessions/NEXT` (removed if present). Nothing else |
 | acceptance | `for p in packet night effects stream; do go test ./internal/$p -run TestAR17C_ -count=1 >/dev/null 2>&1 \|\| exit 1; done; echo ok` reads `ok`; `go test ./cmd/relay -run TestAR17C_ -count=1 2>&1 \| cut -c1-2 \| tail -1` reads `ok`; `grep -rhc '^func TestAR17C_' internal cmd \| paste -sd+ - \| bc` reads 9 or more; `grep -c 'TestAR17C_' design/relay-r1.md` reads 6 or more; `test -e history/sessions/NEXT; echo $?` reads 1 |
 | budget | 80 turns, 130k context, `claude-opus-5-5`; one commit per act (0 to 4) plus the charter's; `make check` is the verify line, never acceptance; checkpoint at 80%; the charter is the first free `history/sittings/2026-09-23-<n>-ar17c.md`, closed before the last commit |
@@ -12,7 +12,7 @@
 
 ## 1. What the source says (quoted)
 
-review-adv10: "The one fix that matters most: ADV10-4 ... close by target name and command-word shape"; "three doors remain: another spelling of the suite (4), `go run` (6), a killed plan's orphan (5)". Its tests 2 and 3: "`TestADV10_UnboundedSpellings`" and "`TestADV10_SignalMidPlan`: SIGTERM to `relay plan --rows r` mid-baseline; no descendant alive, `groups.json` records the line."
+review-adv10: "The one fix that matters most: ADV10-4 ... close by target name and command-word shape"; "three doors remain: another spelling of the suite (4), `go run` (6), a killed plan's orphan (5)". Its tests 2 and 3: "`TestADV10_UnboundedSpellings`" and "`TestADV10_SignalMidPlan`: SIGTERM to `rally plan --rows r` mid-baseline; no descendant alive, `groups.json` records the line."
 
 ## 2. Rulings
 

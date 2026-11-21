@@ -3,8 +3,8 @@
 | item | value |
 |---|---|
 | from | `design/review-adv10.md` whole; `design/relay-r1.md` §6, §11, §16; `design/tla/`; the code the review cites. Never a ledger but a fixture's |
-| pin | agent-relay `main` after `packets-34-relay` (cut off `main`, no `base`); worktree `.claude/worktrees/ar17a-gate-r10` |
-| wall | this repo only. No push, `--amend`, rebase, device or network; every test path under `t.TempDir()`, never the real queue, ledger or state root; a hand `relay plan` only with `--rows`, `RELAY_MEASURE_DEPTH=1` and a temp `XDG_STATE_HOME`; `go test ./...` only inside `make check` |
+| pin | night-relay `main` after `packets-34-relay` (cut off `main`, no `base`); worktree `.claude/worktrees/ar17a-gate-r10` |
+| wall | this repo only. No push, `--amend`, rebase, device or network; every test path under `t.TempDir()`, never the real queue, ledger or state root; a hand `rally plan` only with `--rows`, `RELAY_MEASURE_DEPTH=1` and a temp `XDG_STATE_HOME`; `go test ./...` only inside `make check` |
 | may touch | `internal/gate/`, `internal/night/`, `internal/effects/`, `internal/relay/`, `cmd/relay/`, `design/relay-r1.md`, `design/tla/Night.tla`, `design/tla/Night.cfg`, `history/sittings/*.md`, `history/sessions/NEXT` (removed if present). Nothing else |
 | acceptance | `for p in gate night effects relay; do go test ./internal/$p -run TestAR17A_ -count=1 >/dev/null 2>&1 \|\| exit 1; done; echo ok` reads `ok`; `go test ./cmd/relay -run TestAR17A_ -count=1 2>&1 \| cut -c1-2 \| tail -1` reads `ok`; `grep -rhc '^func TestAR17A_' internal cmd \| paste -sd+ - \| bc` reads 7 or more; `grep -c 'TestAR17A_' design/relay-r1.md` reads 5 or more; `grep -c NoMergeAfterMainMoved design/tla/Night.cfg` reads 1; `test -e history/sessions/NEXT; echo $?` reads 1 |
 | budget | 80 turns, 130k context, `claude-opus-5-5`; one commit per act (0 to 3) plus the charter's; `make check` is the verify line, never acceptance; checkpoint at 80%; the charter is the first free `history/sittings/2026-09-23-<n>-ar17a.md`, closed before the last commit |

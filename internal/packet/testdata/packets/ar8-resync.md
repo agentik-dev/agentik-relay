@@ -3,10 +3,10 @@
 | item | value |
 |---|---|
 | from | conventions §5 (`check`'s order; `validate`) and §6 (the two sha256s, the byte-identical rule); the owner's ruling of 2026-09-23 05:53 (4): the plugin rule lives in the canonical doclint and the charters rule in hygiene, settled in the session's S8 packet; `design/packets/ar6-sync-and-readme.md` §2 items 1 and 2 (the pin; `pluginlint` as the interim home). The builder reads THIS packet and those; never the brief or a ledger |
-| pin | agent-relay `main` after `ar7-fixes` merges (cut off `main`; no `base`); worktree `.claude/worktrees/ar8-resync`. Runs only after the session's `s8-conventions-plugins` row merged into its `main` (done 2026-09-23 06:23 at 27b22f9; the orchestrator's order) |
-| wall | this repo only, plus two reads outside it: `scripts/hygiene` and `scripts/doclint` of the `claude-code-session` checkout beside this repo's root, on its `main` with S8 merged (its log names the merge), copied with `cp`; nothing else there. No push, `--amend`, rebase, device or network; no `bin/relay`; `make readme` never; nothing under `cmd/`, `internal/`, `plugin/`, `design/` |
+| pin | night-relay `main` after `ar7-fixes` merges (cut off `main`; no `base`); worktree `.claude/worktrees/ar8-resync`. Runs only after the session's `s8-conventions-plugins` row merged into its `main` (done 2026-09-23 06:23 at 27b22f9; the orchestrator's order) |
+| wall | this repo only, plus two reads outside it: `scripts/hygiene` and `scripts/doclint` of the `example-tool-sitter` checkout beside this repo's root, on its `main` with S8 merged (its log names the merge), copied with `cp`; nothing else there. No push, `--amend`, rebase, device or network; no `bin/relay`; `make readme` never; nothing under `cmd/`, `internal/`, `plugin/`, `design/` |
 | may touch | `scripts/hygiene`, `scripts/doclint`, `scripts/pluginlint` (removed), `Makefile`, `.hygiene-allow`. Nothing else; the charter is admitted by §6 |
-| acceptance | `make check; echo $?` reads 0; `cmp -s scripts/hygiene ../claude-code-session/scripts/hygiene; echo $?` reads 0; `cmp -s scripts/doclint ../claude-code-session/scripts/doclint; echo $?` reads 0; `grep -c "^HYGIENE_SHA := $(shasum -a 256 scripts/hygiene \| cut -c1-64)$" Makefile` reads 1; `grep -c "^DOCLINT_SHA := $(shasum -a 256 scripts/doclint \| cut -c1-64)$" Makefile` reads 1; `test -e scripts/pluginlint; echo $?` reads 1; `grep -c pluginlint Makefile` reads 0; `make -n validate \| grep -c doclint` reads 1; `scripts/hygiene; echo $?` reads 0; `git log --oneline main..HEAD -- scripts Makefile .hygiene-allow \| wc -l` reads 1; `git status --short \| wc -l` reads 0 after the last commit |
+| acceptance | `make check; echo $?` reads 0; `cmp -s scripts/hygiene ../example-tool-sitter/scripts/hygiene; echo $?` reads 0; `cmp -s scripts/doclint ../example-tool-sitter/scripts/doclint; echo $?` reads 0; `grep -c "^HYGIENE_SHA := $(shasum -a 256 scripts/hygiene \| cut -c1-64)$" Makefile` reads 1; `grep -c "^DOCLINT_SHA := $(shasum -a 256 scripts/doclint \| cut -c1-64)$" Makefile` reads 1; `test -e scripts/pluginlint; echo $?` reads 1; `grep -c pluginlint Makefile` reads 0; `make -n validate \| grep -c doclint` reads 1; `scripts/hygiene; echo $?` reads 0; `git log --oneline main..HEAD -- scripts Makefile .hygiene-allow \| wc -l` reads 1; `git status --short \| wc -l` reads 0 after the last commit |
 | budget | 40 turns, 130k context, `claude-opus-5-5`; one commit for the sync (the charter is its own); checkpoint at 80%; the charter is the first free `history/sittings/<date>-<n>.md` on the branch |
 
 ## 1. What the source says (quoted)
@@ -34,7 +34,7 @@ Baseline on `main` at b79c2c7, 2026-09-23, S8 merged in the session at 27b22f9 (
 
 ## 5. Forbidden reads
 
-Every other repo beyond the two files the wall admits; `~/.claude/projects/`; `~/.local/state/agent-relay/`; any ledger; the brief; the relay ledgers under example-mac's `history/relay/`; `design/relay-r1.md`; `design/review-ar2.md`; `.claude/worktrees/`; any file over 8 KB whole unless in `may touch`.
+Every other repo beyond the two files the wall admits; `~/.claude/projects/`; `~/.local/state/night-relay/`; any ledger; the brief; the relay ledgers under example-mac's `history/relay/`; `design/relay-r1.md`; `design/review-ar2.md`; `.claude/worktrees/`; any file over 8 KB whole unless in `may touch`.
 
 ## 6. Report (capped: one table, at most five bullets, under 1,500 words)
 
