@@ -325,8 +325,10 @@ func underRepo(repo, path string) (string, error) {
 }
 
 // EnabledChoices are the values of the session tool's `enabled` the relay
-// knows (RV1 R4): the session reads auto, on and a YAML true as on.
-var EnabledChoices = []string{"auto", "on", "off", "true", "false"}
+// knows (RV1 R4): the session reads auto, on and a YAML true as on, and its
+// reader takes true, True and TRUE (false, False, FALSE) as a bool (review 1,
+// F1).
+var EnabledChoices = []string{"auto", "on", "off", "true", "True", "TRUE", "false", "False", "FALSE"}
 
 func (c *Config) apply(p string, n yaml.Node) error {
 	if n.Kind != yaml.Map {

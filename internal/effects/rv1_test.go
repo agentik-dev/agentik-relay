@@ -52,3 +52,27 @@ func TestRV1_3_EnabledBadStaysUnknown(t *testing.T) {
 		}
 	}
 }
+
+// TestRV1_5_EnabledSessionBools (RV1 R4, review 1 F1): enabled is known for
+// every spelling the session tool's reader takes as a bool or as auto, its
+// YAML bools true/True/TRUE and false/False/FALSE among them; any other
+// spelling, and a misspelt key, warns as at the pin.
+func TestRV1_5_EnabledSessionBools(t *testing.T) {
+	for _, v := range []string{"auto", "on", "off", "true", "True", "TRUE", "false", "False", "FALSE"} {
+		if c := rv1Load(t, "relay:\n  enabled: "+v+"\n"); len(c.Unknown) != 0 || c.Enabled != v {
+			t.Errorf("enabled: %s: Unknown %q, Enabled %q", v, c.Unknown, c.Enabled)
+		}
+	}
+	for text, want := range map[string]string{
+		"relay:\n  enabled: ON\n":   "enabled",
+		"relay:\n  enabled: Auto\n": "enabled",
+		"relay:\n  enabled: yes\n":  "enabled",
+		"relay:\n  enabled: tRUE\n": "enabled",
+		"relay:\n  enabeld: True\n": "enabeld",
+	} {
+		c := rv1Load(t, text)
+		if !reflect.DeepEqual(c.Unknown, []string{"/r/" + RepoConfigFile + ": " + want}) || c.Enabled != "" {
+			t.Errorf("%q: Unknown %q, Enabled %q", text, c.Unknown, c.Enabled)
+		}
+	}
+}
