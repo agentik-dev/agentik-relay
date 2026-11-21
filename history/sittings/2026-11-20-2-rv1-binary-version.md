@@ -17,13 +17,16 @@
 - [x] act 3, R5: the README's version clause in both files, the sidecar restamped (`shasum -c` OK); the plugin at 0.2.6 with TestAgentikR1_5's pin; `go test ./internal/packet` ok
 - [x] act 4, rr6's review in words: its packet's R1 without `--path` and with the main checkout as the root, R2's refusal makes nothing of the verb's own, §3's `recordsRefused(stderr io.Writer) bool`; NICE's section from RR6 review 1, n22 to n27; recordlint holds 26 rows
 - [x] check job `20261120-223447-2931` on `c5b2a36` exit 2 on `TestAgentikR1_5_InstallTarget` alone (it pins install's build line, which R1 stamps); mended: the test wants the stamp with plugin.json's version, the packet's may-touch names it
-- [ ] `make check` through the gate queue on this commit
+- [x] `make check` through the gate queue: job `20261120-225308-2932` on `13259e1` exit 0; its stamp line `binary-version: relay 0.2.6, the plugin's`; hygiene over `main..HEAD` exits 0
 
 ## Handover
 - If this sitting is cut: the first unticked line above.
+- decide, owner: the coordinator (the review): the binary row's remedy is `make install`, since no doctor row named a reinstall at the pin.
+- decide, owner: the coordinator (the review): `enabled`'s known values are `auto`, `on`, `off`, `true`, `false`; any other stays an unknown key, as at the pin.
+- decide, owner: the coordinator (the review): R2's build links the pid home and lock port at its temp folder beside the stamp, as the tests' builds do; build and install carry the stamp alone.
 
 ## Next act
-`make check` through the gate queue.
+The review of `rv1-binary-version`.
 
 ## Exit
-(open)
+Every ruling built and committed, and rr6's review in words; the gate green on `13259e1` (job `20261120-225308-2932`). This commit holds this file alone.
