@@ -73,6 +73,9 @@ plugin/agents/*.md: sibling
 # The respeak config names the plugin in its path, and this file names that path.
 .claude/respeak/config.yaml: sibling
 .hygiene-allow: sibling
+# The parser tests' samples are copies of old packets, which name the siblings as design/packets does.
+internal/packet/testdata/packets/*.md: sibling
+internal/packet/testdata/peract/*.md: sibling
 
 # agentik-r1 §6.1, packet agentik-r1-relay ruling 10: the record copies of old packets keep the names they had.
 internal/packet/testdata/a*.md: renamed

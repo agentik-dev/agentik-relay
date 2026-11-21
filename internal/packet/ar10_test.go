@@ -59,7 +59,7 @@ func TestAR10_0_ParseRefusesUnboundedLines(t *testing.T) {
 	if err := with("ar9-queue-and-resync", "make check; echo $?"); err != nil {
 		t.Errorf("a pre-AR10 record is refused: %v", err)
 	}
-	for _, p := range []string{filepath.Join(copyIn(t, "../..", "design/packets/ar10-bounded-night.md"), "design", "packets", "ar10-bounded-night.md")} {
+	for _, p := range []string{filepath.Join("testdata", "packets", "ar10-bounded-night.md")} {
 		b, err := os.ReadFile(p)
 		if err != nil {
 			t.Fatal(err)

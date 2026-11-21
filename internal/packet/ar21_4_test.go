@@ -97,10 +97,11 @@ func TestAR21_4_EndlessRead(t *testing.T) {
 	}
 }
 
-// TestAR21_4_OwnLinesPass: this packet's acceptance cell, read from a copy
-// of design/packets and parsed, admits every line.
+// TestAR21_4_OwnLinesPass: this packet's acceptance cell, read from its copy
+// under testdata/packets (the bytes it had in design/packets) and parsed,
+// admits every line.
 func TestAR21_4_OwnLinesPass(t *testing.T) {
-	p := filepath.Join(copyIn(t, "../..", "design/packets/ar21-fixes-adv12.md"), "design", "packets", "ar21-fixes-adv12.md")
+	p := filepath.Join("testdata", "packets", "ar21-fixes-adv12.md")
 	b, err := os.ReadFile(p)
 	if err != nil {
 		t.Fatal(err)

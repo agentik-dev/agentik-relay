@@ -9,12 +9,12 @@ import (
 	"testing"
 )
 
-// TestAR17D_3_RowsFilesRepoRelative (run 10 ruling 8, ADV10-8): every
-// tracked rows file, read from a copy under t.TempDir(), names its repo by
+// TestAR17D_3_RowsFilesRepoRelative (run 10 ruling 8, ADV10-8): every rows
+// file in the sample under testdata/rows, copied from design/packets, names its repo by
 // a bare name and its prompt repo-relative; no string in a row is an
 // absolute or `~` path.
 func TestAR17D_3_RowsFilesRepoRelative(t *testing.T) {
-	src, err := filepath.Glob(filepath.Join(copyIn(t, "../..", "design/packets"), "design", "packets", "rows-*.json"))
+	src, err := filepath.Glob(filepath.Join("testdata", "rows", "rows-*.json"))
 	if err != nil || len(src) == 0 {
 		t.Fatalf("no rows files: %v", err)
 	}
