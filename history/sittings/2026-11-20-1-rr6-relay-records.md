@@ -12,7 +12,7 @@
 
 ## Done-ness
 - [x] act 0, the packet
-- [ ] act 1, the tests (red): `cmd/agentik-relay/rr6_test.go`
+- [x] act 1, the tests (red, undefined names under `go vet`): `internal/effects/records_test.go`, `cmd/agentik-relay/rr6_test.go`, `TestDoctorTable` gains the `records` row
 - [ ] act 2, R1 to R4: the one question, the refusal, the doctor row
 - [ ] act 3, R5: the README sentence (both files, the sidecar) and the plugin at 0.2.5
 - [ ] `make check` through the gate queue
@@ -21,6 +21,6 @@
 - If this sitting is cut: the first unticked line above.
 
 ## Next act
-Act 1, the tests (red).
+Act 2, R1 to R4 in `internal/effects/records.go` and `cmd/agentik-relay/main.go`.
 
 ## Exit
