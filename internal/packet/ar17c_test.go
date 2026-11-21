@@ -45,9 +45,10 @@ func TestAR17C_0_NarrowTargetsAllowed(t *testing.T) {
 }
 
 // TestAR17C_0_LivePacketsParse: the packets from ar10-* on still parse
-// under the closed rule, read from copies under t.TempDir().
+// under the closed rule, read from the sample under testdata/packets: the
+// twelve spent ar1* records, each kept parseable by its own spent entry.
 func TestAR17C_0_LivePacketsParse(t *testing.T) {
-	src, err := filepath.Glob(filepath.Join(copyIn(t, "../..", "design/packets"), "design", "packets", "ar*.md"))
+	src, err := filepath.Glob(filepath.Join("testdata", "packets", "ar*.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +73,7 @@ func TestAR17C_0_LivePacketsParse(t *testing.T) {
 		}
 		n++
 	}
-	if n < 8 {
-		t.Fatalf("parsed %d packets from ar10-* on, want 8 or more", n)
+	if n < 12 {
+		t.Fatalf("parsed %d packets from ar10-* on, want 12 or more", n)
 	}
 }

@@ -90,11 +90,12 @@ func TestAR61_5_QuietGuards(t *testing.T) {
 	}
 }
 
-// TestAR61_6_CorpusQuiet (AR61 act 2, ruling 3): no packet in
-// design/packets, read from a copy as TestAR20_5_SpentStems reads it,
-// orders `make check` per act.
+// TestAR61_6_CorpusQuiet (AR61 act 2, ruling 3): no packet in the sample
+// under testdata/peract, copied from design/packets, orders `make check`
+// per act: each holds a clause a broken guard reads as per act (a guard
+// word; a `;` inside a clause).
 func TestAR61_6_CorpusQuiet(t *testing.T) {
-	src, err := filepath.Glob(filepath.Join(copyIn(t, "../..", "design/packets"), "design", "packets", "*.md"))
+	src, err := filepath.Glob(filepath.Join("testdata", "peract", "*.md"))
 	if err != nil || len(src) == 0 {
 		t.Fatalf("no packets: %v", err)
 	}

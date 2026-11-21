@@ -97,11 +97,12 @@ func TestAR20_5_AcceptanceAllowlist(t *testing.T) {
 	}
 }
 
-// TestAR20_5_SpentStems: every packet in design/packets (read from a copy)
-// still parses; the stems the allowlist refuses are exactly the spent ones,
+// TestAR20_5_SpentStems: every packet in the sample under testdata/packets
+// (every spent record, one bound record and one legacy record, copied from
+// design/packets) still parses; the stems the allowlist refuses are exactly the spent ones,
 // parsed as written and never rewritten; a new stem is bound.
 func TestAR20_5_SpentStems(t *testing.T) {
-	src, err := filepath.Glob(filepath.Join(copyIn(t, "../..", "design/packets"), "design", "packets", "*.md"))
+	src, err := filepath.Glob(filepath.Join("testdata", "packets", "*.md"))
 	if err != nil || len(src) == 0 {
 		t.Fatalf("no packets: %v", err)
 	}

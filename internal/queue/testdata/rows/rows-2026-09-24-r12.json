@@ -1,0 +1,3 @@
+[
+  {"id": "ar19-resync", "repo": "agent-relay", "prompt": "design/packets/ar19-resync.md", "depends_on": ["packets-37-relay"], "worktree": true, "model": "claude-opus-5-5", "max_turns": 50, "why": "the post-S13 re-sync: the session's hygiene (d63d0ffb) and bounded (e343b094) byte-identical with the hygiene pin moved in one commit; doclint held at its 3040666c pin because the canonical d5957c6c refuses two live packets (ar10, ar15) on false positives the Go parser does not share, re-measured at build and taken if the session fixed it first; the README and its source say 840 s, the live Go test count, one make readme at close with the contract checked"}
+]
