@@ -34,7 +34,13 @@ import (
 	"github.com/agentik-dev/agentik-relay/internal/relay"
 )
 
-const version = "0.1.0-dev"
+// version is the binary's version (RV1 R1): the Makefile's build and
+// install lines stamp the plugin's through -ldflags "-X main.version=...";
+// go run, go test and a bare build keep unstamped.
+var version = "unstamped"
+
+// unstamped is version's value when no build line stamped it.
+const unstamped = "unstamped"
 
 // Exit codes (design/relay-r1.md §9; D21 moved usage from 1 to 2).
 const (
@@ -116,18 +122,18 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	case verb == "describe":
 		return describeVerb(args[1:], stdout, stderr)
 	case verb == "doctor":
-		f, _, err := flagSet(args[1:], []string{"--verify", "--line"}, []string{"--json"}, false)
+		f, _, err := flagSet(args[1:], []string{"--verify", "--line", "--plugin-root"}, []string{"--json"}, false)
 		if err == nil && f["--line"] != "" && f["--verify"] == "" {
 			err = fmt.Errorf("--line needs --verify")
 		}
 		if err != nil {
-			fmt.Fprintf(stderr, "relay doctor: %v\nusage: relay doctor [--verify <dir> [--line <shell line>]] [--json]\n", err)
+			fmt.Fprintf(stderr, "relay doctor: %v\nusage: relay doctor [--verify <dir> [--line <shell line>]] [--plugin-root <dir>] [--json]\n", err)
 			return exitUsage
 		}
 		if dir := f["--verify"]; dir != "" {
 			return doctorVerify(dir, f["--line"], asJSON, stdout, stderr)
 		}
-		return doctor(asJSON, stdout)
+		return doctor(asJSON, f["--plugin-root"], stdout)
 	case verb == "plan":
 		return plan(args[1:], stdout, stderr)
 	case verb == "run":
@@ -206,8 +212,9 @@ var gitWorktree = func(repo string) error {
 
 // doctor runs §9's checks in order. A warning is ok with warn set (tmux
 // absent: file windows, D16); unknown is never a pass. Exit 0 when no check
-// is not ok, 2 otherwise.
-func doctor(asJSON bool, stdout io.Writer) int {
+// is not ok, 2 otherwise. pluginRoot is --plugin-root's dir, "" when none
+// was given (the binary row's, RV1 R3).
+func doctor(asJSON bool, pluginRoot string, stdout io.Writer) int {
 	var checks []check
 	add := func(name string, ok, warn bool, format string, a ...any) {
 		status := "ok"
@@ -339,6 +346,12 @@ func doctor(asJSON bool, stdout io.Writer) int {
 	if note := effects.PycacheNote(pinned); note != "" {
 		add("python3", true, true, "%s", note)
 	}
+	// RV1 R3: the running binary against the plugin that execs it.
+	{
+		ok, warn, detail, remedy := binaryRow(version, pluginVersion(pluginRootOf(pluginRoot, getenv)))
+		add("binary", ok, warn, "%s", detail)
+		checks[len(checks)-1].Remedy = remedy
+	}
 	add("template", true, false, "sha256 %s", prompt.TemplateHash())
 	switch {
 	case cfgErr != nil:
@@ -406,6 +419,60 @@ func doctor(asJSON bool, stdout io.Writer) int {
 		return exitUnwell
 	}
 	return exitOK
+}
+
+// reinstallRemedy is the binary row's remedy when the binary is not the
+// plugin's (RV1 R3).
+const reinstallRemedy = "make install"
+
+// pluginRootOf is the plugin's root the binary row reads (RV1 R3, review 1
+// F2): doctor's --plugin-root, which /relay:doctor fills, since the Bash
+// tool's shell holds no CLAUDE_PLUGIN_ROOT; else that variable, as a hook
+// gets it. An empty flag reads as none given.
+func pluginRootOf(flag string, getenv func(string) string) string {
+	if flag != "" {
+		return flag
+	}
+	return getenv("CLAUDE_PLUGIN_ROOT")
+}
+
+// pluginVersion is the version in <root>/.claude-plugin/plugin.json (RV1
+// R3); "" when root is empty, or the file does not read or holds no version.
+func pluginVersion(root string) string {
+	if root == "" {
+		return ""
+	}
+	b, err := os.ReadFile(filepath.Join(root, ".claude-plugin", "plugin.json"))
+	if err != nil {
+		return ""
+	}
+	var m struct {
+		Version string `json:"version"`
+	}
+	if json.Unmarshal(b, &m) != nil {
+		return ""
+	}
+	return m.Version
+}
+
+// binaryRow is the doctor's binary row (RV1 R3, as review 1's F3 rules it):
+// ok with the version alone when no plugin version is known, ok when it
+// equals bin; an unstamped bin beside a plugin version is ok too, saying a
+// go install build carries no version and make install stamps it, since no
+// reader of the README's go install line could clear a warning; a stamped bin
+// that differs warns, naming both versions and both ways to reinstall.
+func binaryRow(bin, plugin string) (ok, warn bool, detail string, remedy *string) {
+	switch plugin {
+	case "":
+		return true, false, "relay " + bin, nil
+	case bin:
+		return true, false, "relay " + bin + ", the plugin's", nil
+	}
+	if bin == unstamped {
+		return true, false, fmt.Sprintf("relay %s, the plugin %s: a go install build carries no version; %s from a clone stamps it", bin, plugin, reinstallRemedy), nil
+	}
+	r := reinstallRemedy
+	return true, true, fmt.Sprintf("relay %s, the plugin %s: reinstall the binary (%s in a clone, or the README's go install line)", bin, plugin, r), &r
 }
 
 // wrapWords is s broken at spaces into lines of at most n runes; a word
@@ -861,7 +928,7 @@ func usage(w io.Writer) {
   gate    <row>                       the gate by hand
   clean   --merged                    remove the worktrees of merged rows
   clean   --stale                     remove dead relays' locks and their untouched worktrees
-  doctor                              check claude, git, tmux, the state directory, the config
+  doctor  [--plugin-root <dir>]       check claude, git, tmux, the state directory, the config
   describe  [config [KEY]] --json     the tool, or its settings and the file and line of each
   version
 every verb takes --json

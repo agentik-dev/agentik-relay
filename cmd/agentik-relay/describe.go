@@ -216,7 +216,7 @@ type configFailed struct {
 	Error  readError `json:"error"`
 }
 
-// setting is one of the ten keys (R6, R8): its type, choices, summary,
+// setting is one of the eleven keys (R6, R8; RV1 R4 added enabled): its type, choices, summary,
 // its value in a Config, and a layer's written text as that type.
 type setting struct {
 	key, typ, summary string
@@ -241,7 +241,7 @@ func secret(s string) any {
 	return "(set)"
 }
 
-// settings are the ten, in the order a person meets them. Every default is
+// settings are the eleven, in the order a person meets them. Every default is
 // what LoadConfig gives with no file (shipped), never typed here.
 var settings = []setting{
 	{"tmux", "string", "Whether a run opens tmux windows: when tmux is there, never, or always.",
@@ -261,6 +261,8 @@ var settings = []setting{
 		nil, func(c effects.Config) any { return c.Queue }, asWritten},
 	{"merge", "string", "Parsed and kept, and read by no code yet: each row's own merge decides how its branch lands.",
 		nil, func(c effects.Config) any { return orNull(c.Merge) }, asWritten},
+	{"enabled", "string", "The session tool's key, read by it, whether a sitting expects a relay; the relay reads none.",
+		effects.EnabledChoices, func(c effects.Config) any { return orNull(c.Enabled) }, asWritten},
 	{"packets", "path", "A folder of packets the gate compares each row's committed packet against.",
 		nil, func(c effects.Config) any { return orNull(c.Packets) }, asWritten},
 	{"verify_seconds", "integer", "The seconds a row's verify line may run before it is cut and read red.",

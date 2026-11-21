@@ -27,7 +27,7 @@ func TestVerbs(t *testing.T) {
 		code     int
 		out, err string
 	}{
-		{[]string{"version"}, exitOK, "relay 0.1.0-dev\n", ""},
+		{[]string{"version"}, exitOK, "relay unstamped\n", ""}, // rv1 R1: go test builds no stamp
 		{[]string{"gate"}, exitUsage, "", "usage: relay gate <row> [--json]\n"},
 		{[]string{"clean"}, exitUsage, "", "usage: relay clean --merged|--stale [--json]\n"},
 		{[]string{"hook", "Stop"}, exitOK, "{}\n", ""},
@@ -74,7 +74,7 @@ func TestDoctorTable(t *testing.T) {
 	bandFor = func(string, func(string) string) (effects.Band, string) { return nil, "/fake/agentik-session" }
 	bandVersion = func(string) (string, error) { return "agentik-session 0.0.0", nil }
 	refused := errors.New("exit status 1")
-	names := "claude git git-worktree caffeinate band tmux ntfy state queue root records breaker template config"
+	names := "claude git git-worktree caffeinate band tmux ntfy state queue root records breaker binary template config"
 	table := []struct {
 		name, missing string
 		probe         error
@@ -82,11 +82,11 @@ func TestDoctorTable(t *testing.T) {
 		code          int
 		oks, warns    string // one letter per check: y or n
 	}{
-		{"all present", "", nil, false, exitOK, "yyyyyyyyyyyyyy", "nnnnnnnnnnnnn"},
-		{"probe refused", "", refused, false, exitUnwell, "nyyyyyyyyyyyyy", "nnnnnnnnnnnnn"},
-		{"tmux absent", "tmux", nil, false, exitOK, "yyyyyyyyyyyyyy", "nnnnnynnnnnnn"},
-		{"claude absent", "claude", nil, false, exitUnwell, "nyyyyyyyyyyyyy", "nnnnnnnnnnnnn"},
-		{"root dirty", "", nil, true, exitUnwell, "yyyyyyyyynyyyy", "nnnnnnnnnnnnn"},
+		{"all present", "", nil, false, exitOK, "yyyyyyyyyyyyyyy", "nnnnnnnnnnnnnn"},
+		{"probe refused", "", refused, false, exitUnwell, "nyyyyyyyyyyyyyy", "nnnnnnnnnnnnnn"},
+		{"tmux absent", "tmux", nil, false, exitOK, "yyyyyyyyyyyyyyy", "nnnnnynnnnnnnn"},
+		{"claude absent", "claude", nil, false, exitUnwell, "nyyyyyyyyyyyyyy", "nnnnnnnnnnnnnn"},
+		{"root dirty", "", nil, true, exitUnwell, "yyyyyyyyynyyyyy", "nnnnnnnnnnnnnn"},
 	}
 	for _, r := range table {
 		t.Run(r.name, func(t *testing.T) {

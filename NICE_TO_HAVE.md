@@ -26,3 +26,22 @@ One row per finding, in agentik-hq design/05 §2's table, held by `scripts/recor
 | n19 | S4 | `cmd/agentik-relay/describe.go` | `ntfy.url` reads its URL as `value` while the topic is unset, though the run then sends nothing (main.go's `Ntfy` needs both): arguably not what the tool would use | review 2 of AK8; `describe.go:271` | 2026-11-13, AK8 review 2 |
 | n20 | S4 | `design/packets/ak8-plug-relay.md` | the packet still states R1 (doctor's text the pin's) as before review 1's ruling; the ruling's amendment is in build 2's commit message alone | review 2 of AK8, from build 2's own "not done" | 2026-11-13, AK8 review 2 |
 | n21 | S4 | `README.md` `## Status` | The README's Status line trails the version: it says `0.1.3`, rendered `2026-10-14`, while `plugin/.claude-plugin/plugin.json` is `0.2.3`; a re-render or the landing's stamp would carry it (hq design/19 §6) | `README.md:119` against `plugin.json:3`, at `70eae23` | 2026-11-15, sy2-sync |
+
+## From row rr6-relay-records (review 1)
+
+| id | level | area | finding | evidence | from |
+|---|---|---|---|---|---|
+| n22 | S4 | `internal/effects/pin.go` | a records-out refusal on a fresh account leaves `<state>/home/`: the start-up pin runs before the verb and makes it (and clears a dead pid's home); no cmd test sees it, as cmd's TestMain stubs `pinFor` | review 1 of RR6, F1: a probe of `PinAt` then `Release` on a temp state, `[absent]` to `[. home]` | 2026-11-20, RR6 review 1 |
+| n23 | S4 | `cmd/agentik-relay/rr6_test.go` | no test pins what a records-out `gate` prints while another relay holds the lock: it takes the lock before R1 (ADV13-14), so it prints the lock's error, not the refusal's line | review 1 of RR6, F2: a reading of the gate verb against `night.PidFile`; not run | 2026-11-20, RR6 review 1 |
+| n24 | S4 | `cmd/agentik-relay/main.go` | the refusal's line and the doctor's `records` warning say `(git config agentik.records)` even where only the committed `records: out` line declares, and that command prints nothing | review 1 of RR6, observation 1 | 2026-11-20, RR6 review 1 |
+| n25 | S4 | `README.md` | the sentence "where `git config agentik.records` is set" invites counting a global key, which a plain `git config` shows and the relay, reading the clone's own config, does not | review 1 of RR6, observation 2 | 2026-11-20, RR6 review 1 |
+| n26 | S4 | `cmd/agentik-relay/main.go` | `doctor` outside any repo says `ok records in the repo`, a git failure reading as the repo's own; harmless beside the failing `root` row | review 1 of RR6, observation 3 | 2026-11-20, RR6 review 1 |
+| n27 | S3 | `internal/night` | `TestControlKill`'s 5 s bound is tight under load: the child exited 143, but after 7.02 s, and the check read red on it alone | gate job 20261120-191825-2881 on `f8c2ec1`, RR6 build 2 | 2026-11-20, RR6 review 1 |
+| n28 | S4 | `internal/effects/records.go` | from a linked worktree the relay reads the main checkout's `HEAD` (and its config), where commons reads the worktree's; on purpose, as the rr6 packet's R1 says | review 1 of RR6, F3; `design/packets/rr6-relay-records.md:33` | 2026-11-20, RR6 review 1 |
+
+## From row rv1-binary-version (review 1)
+
+| id | level | area | finding | evidence | from |
+|---|---|---|---|---|---|
+| n29 | S4 | `Makefile` | `PLUGIN_VERSION` reads plugin.json with `sed` where doctor parses the JSON: one-line JSON with a nested `version` stamps that one; `"version" :` stamps empty; a second `version` line adds a stray word; a `$(...)` in the value runs in the shell | review 1 of RV1, F4: the four cases on test files; `Makefile:10` | 2026-11-20, RV1 review 1 |
+| n30 | S4 | `Makefile` | `binary-version-check`'s trap removes the binary, then `rmdir`s the folder: a folder left non-empty stays behind and the target still exits 0; not reached today, as `--version` writes nothing; `rm -rf` would hold | review 1 of RV1, F7: the recipe under `/bin/sh` with a stand-in `go`; `Makefile:47` | 2026-11-20, RV1 review 1 |

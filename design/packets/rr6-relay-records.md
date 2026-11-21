@@ -23,20 +23,23 @@ repo's `DECISIONS.md` binds; no entry of it changes.
 ## 2. Rulings
 
 1. **R1, the one question.** A repo's records are out when, at the repo's root, `git config
-   --local --path --get agentik.records` prints a value (exit 0, whatever the value, resolving or
-   not), or `.hygiene-allow` at `HEAD`, read through git, holds the whole line `records: out`
+   --local --get agentik.records` prints a value (exit 0, whatever the value), or `.hygiene-allow` at `HEAD`, read through git, holds the whole line `records: out`
    (trailing white space stripped, as commons' `_declares` reads it). Else they are the repo's
    own; a git failure reading either is the repo's own. One function, through the hermetic runner.
    The coordinator's ruling (2026-11-20, build 2): the key's presence decides, asked as `git
    config --local --get` with no `--path`, so a value `--path` cannot expand (`~nouser/x`, exit
    128), which commons reads `broken`, is refused and shown by the doctor like any set key; a git
-   failure not about the key (no repo, a config git cannot parse) stays the repo's own.
+   failure not about the key (no repo, a config git cannot parse) stays the repo's own. The repo's
+   root is the main checkout: from a linked worktree the relay reads the main checkout's config and
+   `HEAD`, on purpose, since it plans and merges there; commons reads the worktree's own top.
 2. **R2, the refusal.** `plan`, `run` and `resume` ask R1 after their argument checks and before
    the pid file, the lock, the ledger or any stage; `gate` asks it just after it takes the lock,
    since ADV13-14 (`TestAR22_2_HandGateHoldsLock`) has the hand gate read no root while another
    relay holds it, and its refusal releases the lock and removes the pid file it wrote. Out: one
    line on stderr, exit 2 (a failed pre-check): `relay: this repo keeps its records outside its
-   clone (git config agentik.records); the relay does not run in such a repo yet`. Nothing stays.
+   clone (git config agentik.records); the relay does not run in such a repo yet`. Nothing of the
+   verb's own is made or written on a refusal: the start-up pin, which R1's git needs, still makes
+   `<state>/home/` before the verb, and the gate asks after it takes the lock, as ADV13-14 forces.
 3. **R3, the doctor.** One row, `records`, after `root`: `ok`, `in the repo`; or `warn`,
    `outside the clone: the relay does not run here (git config agentik.records)`. Text and JSON.
 4. **R4, what stands.** In a repo whose records are its own, every verb reads as at the pin; no
@@ -47,7 +50,7 @@ repo's `DECISIONS.md` binds; no entry of it changes.
 ## 3. Interfaces
 
 `effects.RecordsOut(root string) bool` (`internal/effects/records.go`): R1. `effects.Declares(text
-string) bool`: a file's text holds the line. `main.recordsRefused(verb, stderr) bool`: the root
+string) bool`: a file's text holds the line. `main.recordsRefused(stderr io.Writer) bool`: the root
 (`toplevel`, then `OSGit.Root`) asked R1, the line printed. The runner's env is the pin's own, so
 neither `GIT_CONFIG_*` nor a global file reaches it; `--local` reads the clone's common config,
 so a worktree sees the main checkout's key, and `HEAD` is the main checkout's.

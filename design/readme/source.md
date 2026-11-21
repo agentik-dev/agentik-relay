@@ -39,7 +39,7 @@ GOBIN="$HOME/.local/bin" go install github.com/agentik-dev/agentik-relay/cmd/age
 ```
 
 - The binary lands in `~/.local/bin`, beside every other agentik command, so one PATH line serves them all.
-- From a clone: `make install`: `agentik-relay` into `BINDIR` (default `~/.local/bin`), `relay` a link to it until 2026-12-31, and the `agentik` front door beside it.
+- From a clone: `make install`: `agentik-relay` into `BINDIR` (default `~/.local/bin`), stamped with the plugin's version, `relay` a link to it until 2026-12-31, and the `agentik` front door beside it.
 - Then `agentik relay doctor`: checks claude and its flags, git worktrees, caffeinate, tmux (a warning only), a writable state directory, and that the queue parses. Exit 0 or 2; an unknown result is never a pass.
 - Requires: Go, git, the `claude` CLI. No plugin dependency is required.
 - Optional: `respeak` (>=0.6.0) renders `/relay:report` as a narrative and renders this README; `agentik-session` is an optional override layer (its resolved config, read when present).
@@ -53,7 +53,7 @@ GOBIN="$HOME/.local/bin" go install github.com/agentik-dev/agentik-relay/cmd/age
 - `agentik relay stop`: ask the run to stop after the running sittings; `agentik relay kill ar2`: stop a row now. Both write the run's control file, read after every event.
 - `agentik relay attach ar2`: the row's tmux window; without tmux, `tail -f` of its log.
 - `agentik relay gate ar2`: the gate by hand. `agentik relay clean --merged`: remove merged rows' worktrees; `agentik relay clean --stale`: remove dead relays' locks and their untouched worktrees.
-- `agentik relay version`. Every verb takes `--json`.
+- `agentik relay version`: the plugin's version, stamped by `make install`. Every verb takes `--json`.
 - The queue is `relay/queue.yaml` in the target repo; packets are `design/packets/<id>.md`.
 - The target repo keeps its records in its own clone: where `git config agentik.records` is set, or `records: out` is committed in `.hygiene-allow`, `plan`, `run`, `gate` and `resume` refuse in one line, and `doctor` warns.
 - State directory: `${XDG_STATE_HOME:-~/.local/state}/agentik-relay` (the old name's folder while only it exists) (ledger, `status.json`, logs, control file). The ledger never enters a repo.

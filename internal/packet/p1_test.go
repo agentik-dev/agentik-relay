@@ -30,7 +30,7 @@ func p1Body(t *testing.T, path string) (string, string) {
 // disable-model-invocation: true, and its body is the pin's byte for byte.
 func TestP1_1_CommandsHidden(t *testing.T) {
 	bodies := map[string]string{ // sha256 of each body at a3c501d; IR1: the not-on-PATH line names the README's go install
-		"doctor": "1bbe2cb76aa6723599a46dee7b13d641003130fc3b84456b2e76c176fea1415d", // AK8 R10: its last sentence
+		"doctor": "de95be1ef39110926d22121dd7cec87aa980a1ffad02c517656ba49fd0a9e019", // AK8 R10: its last sentence; RV1 review 1, F2: --plugin-root
 		"gate":   "8ada68533e1b7990d5c447f386415ace8a0a94e473b53b3ff03569532b12487f",
 		"plan":   "d91bcdadc466bf338c734ba5d48a881be2671bc96f54b869c9dff4bfffaac509",
 		"report": "3403cb291e67a5b6a99daf2707f5fc6a8bc27e29dfae673bfe63c6c26af1a570",
