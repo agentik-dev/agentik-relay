@@ -13,7 +13,8 @@
 ## Done-ness
 - [x] build 1: R1 to R5 and rr6's review in words; check job `20261120-225308-2932` exit 0 on `13259e1`
 - [x] F1: `enabled` known for auto, on, off and the YAML bools true/True/TRUE, false/False/FALSE (effects `TestRV1_5_EnabledSessionBools`); red at `13259e1` on True, TRUE, False, FALSE, green now; effects `ok`
-- [ ] F2 and F3: `doctor --plugin-root <dir>` over `CLAUDE_PLUGIN_ROOT`; the row's four states; `/relay:doctor` passes the root
+- [x] F3, ruled: the `binary` row's states (`TestRV1_1_DoctorBinary`): equal ok; stamped and different warns naming both ways; unstamped beside a plugin file ok, saying `make install` stamps it; no root ok with the version; the README's install clause in both files, the sidecar restamped
+- [ ] F2: `doctor --plugin-root <dir>` over `CLAUDE_PLUGIN_ROOT` (`TestRV1_2_DoctorPluginRoot`); `/relay:doctor` passes the root; the plugin's next version
 - [ ] F5: the install-line test pins `build`'s stamp too
 - [ ] F6, F4, F7: NICE rows
 - [ ] the packet true to what is built; the gate's `make check`
@@ -22,7 +23,7 @@
 - If this sitting is cut: the first unticked line above.
 
 ## Next act
-F2 and F3.
+F2.
 
 ## Exit
 Open.

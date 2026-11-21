@@ -39,6 +39,9 @@ import (
 // go run, go test and a bare build keep unstamped.
 var version = "unstamped"
 
+// unstamped is version's value when no build line stamped it.
+const unstamped = "unstamped"
+
 // Exit codes (design/relay-r1.md §9; D21 moved usage from 1 to 2).
 const (
 	exitOK       = 0 // ok or green
@@ -442,9 +445,12 @@ func pluginVersion(getenv func(string) string) string {
 	return m.Version
 }
 
-// binaryRow is the doctor's binary row (RV1 R3): ok with the version alone
-// when no plugin version is known, ok when it equals bin, else a warning
-// naming both and the reinstall.
+// binaryRow is the doctor's binary row (RV1 R3, as review 1's F3 rules it):
+// ok with the version alone when no plugin version is known, ok when it
+// equals bin; an unstamped bin beside a plugin version is ok too, saying a
+// go install build carries no version and make install stamps it, since no
+// reader of the README's go install line could clear a warning; a stamped bin
+// that differs warns, naming both versions and both ways to reinstall.
 func binaryRow(bin, plugin string) (ok, warn bool, detail string, remedy *string) {
 	switch plugin {
 	case "":
@@ -452,8 +458,11 @@ func binaryRow(bin, plugin string) (ok, warn bool, detail string, remedy *string
 	case bin:
 		return true, false, "relay " + bin + ", the plugin's", nil
 	}
+	if bin == unstamped {
+		return true, false, fmt.Sprintf("relay %s, the plugin %s: a go install build carries no version; %s from a clone stamps it", bin, plugin, reinstallRemedy), nil
+	}
 	r := reinstallRemedy
-	return true, true, fmt.Sprintf("relay %s, the plugin %s: reinstall the binary (%s in a clone)", bin, plugin, r), &r
+	return true, true, fmt.Sprintf("relay %s, the plugin %s: reinstall the binary (%s in a clone, or the README's go install line)", bin, plugin, r), &r
 }
 
 // wrapWords is s broken at spaces into lines of at most n runes; a word

@@ -12,8 +12,9 @@ import (
 )
 
 // rv1Doctor runs doctor --json and text over planFakes with every program
-// present, env's keys added to the fake env; the checks and the text.
-func rv1Doctor(t *testing.T, env map[string]string, setup func(top string)) ([]check, string) {
+// present, env's keys added to the fake env and args after the verb; the
+// checks and the text.
+func rv1Doctor(t *testing.T, env map[string]string, setup func(top string), args ...string) ([]check, string) {
 	t.Helper()
 	planFakes(t, "main")
 	oldLook, oldProbe, oldWT := lookPath, claudeProbe, gitWorktree
@@ -33,12 +34,14 @@ func rv1Doctor(t *testing.T, env map[string]string, setup func(top string)) ([]c
 		setup(top)
 	}
 	var out, text bytes.Buffer
-	run([]string{"doctor", "--json"}, strings.NewReader(""), &out, &bytes.Buffer{})
+	if code := run(append([]string{"doctor", "--json"}, args...), strings.NewReader(""), &out, &bytes.Buffer{}); code == exitUsage {
+		t.Fatalf("doctor --json %q: exit %d", args, code)
+	}
 	var rep struct{ Checks []check }
 	if err := json.Unmarshal(out.Bytes(), &rep); err != nil {
 		t.Fatalf("%v: %s", err, out.String())
 	}
-	run([]string{"doctor"}, strings.NewReader(""), &text, &bytes.Buffer{})
+	run(append([]string{"doctor"}, args...), strings.NewReader(""), &text, &bytes.Buffer{})
 	return rep.Checks, text.String()
 }
 
@@ -53,32 +56,46 @@ func rv1Row(t *testing.T, checks []check, name string) check {
 	return check{}
 }
 
-// TestRV1_1_DoctorBinary (RV1 R3, acceptance 1): the binary row against
-// the plugin file under CLAUDE_PLUGIN_ROOT.
+// rv1PluginRoot is a temp plugin root whose plugin file says v; "" writes
+// no file.
+func rv1PluginRoot(t *testing.T, v string) string {
+	t.Helper()
+	root := t.TempDir()
+	if v != "" {
+		os.MkdirAll(filepath.Join(root, ".claude-plugin"), 0o755)
+		os.WriteFile(filepath.Join(root, ".claude-plugin", "plugin.json"), []byte(`{"name": "relay", "version": "`+v+`"}`), 0o644)
+	}
+	return root
+}
+
+// TestRV1_1_DoctorBinary (RV1 R3 as review 1's F3 rules it, acceptance 1):
+// the binary row against the plugin file under CLAUDE_PLUGIN_ROOT. Stamped
+// and equal: ok. Stamped and different: a warning naming both versions and
+// both ways to reinstall. Unstamped beside a readable plugin file: ok, saying
+// a go install build carries no version and make install stamps it. No root
+// known: ok with the binary's version alone.
 func TestRV1_1_DoctorBinary(t *testing.T) {
 	old := version
 	t.Cleanup(func() { version = old })
-	const remedy = "reinstall the binary (make install in a clone)"
+	const remedy = "reinstall the binary (make install in a clone, or the README's go install line)"
+	const unstamped = "relay unstamped, the plugin 0.2.4: a go install build carries no version; make install from a clone stamps it"
 	for _, c := range []struct {
 		name, bin, file string // file "" writes none; "-" sets no variable
 		status, detail  string
 	}{
 		{"older binary", "0.2.3", "0.2.4", "warn", "relay 0.2.3, the plugin 0.2.4: " + remedy},
+		{"newer binary", "0.2.5", "0.2.4", "warn", "relay 0.2.5, the plugin 0.2.4: " + remedy},
 		{"equal", "0.2.4", "0.2.4", "ok", "relay 0.2.4, the plugin's"},
-		{"unstamped", "unstamped", "0.2.4", "warn", "relay unstamped, the plugin 0.2.4: " + remedy},
+		{"unstamped", "unstamped", "0.2.4", "ok", unstamped},
 		{"no variable", "0.2.4", "-", "ok", "relay 0.2.4"},
+		{"unstamped, no variable", "unstamped", "-", "ok", "relay unstamped"},
 		{"no file", "0.2.4", "", "ok", "relay 0.2.4"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			version = c.bin
 			env := map[string]string{"CLAUDE_PLUGIN_ROOT": ""}
 			if c.file != "-" {
-				root := t.TempDir()
-				env["CLAUDE_PLUGIN_ROOT"] = root
-				if c.file != "" {
-					os.MkdirAll(filepath.Join(root, ".claude-plugin"), 0o755)
-					os.WriteFile(filepath.Join(root, ".claude-plugin", "plugin.json"), []byte(`{"name": "relay", "version": "`+c.file+`"}`), 0o644)
-				}
+				env["CLAUDE_PLUGIN_ROOT"] = rv1PluginRoot(t, c.file)
 			}
 			checks, text := rv1Doctor(t, env, nil)
 			row := rv1Row(t, checks, "binary")

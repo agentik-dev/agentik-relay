@@ -39,7 +39,7 @@ GOBIN="$HOME/.local/bin" go install github.com/agentik-dev/agentik-relay/cmd/age
 ```
 
 - The binary lands in `~/.local/bin`, beside every other agentik command, so one PATH line serves them all.
-- From a clone: `make install`: `agentik-relay` into `BINDIR` (default `~/.local/bin`), `relay` a link to it until 2026-12-31, and the `agentik` front door beside it.
+- From a clone: `make install`: `agentik-relay` into `BINDIR` (default `~/.local/bin`), stamped with the plugin's version, `relay` a link to it until 2026-12-31, and the `agentik` front door beside it.
 - Then `agentik relay doctor`: checks claude and its flags, git worktrees, caffeinate, tmux (a warning only), a writable state directory, and that the queue parses. Exit 0 or 2; an unknown result is never a pass.
 - Requires: Go, git, the `claude` CLI. No plugin dependency is required.
 - Optional: `respeak` (>=0.6.0) renders `/relay:report` as a narrative and renders this README; `agentik-session` is an optional override layer (its resolved config, read when present).
