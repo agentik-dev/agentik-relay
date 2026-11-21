@@ -40,6 +40,27 @@ greatest (date, n) is the newest, n compared as an integer. No file, or no
 line, means no charter is live; a line holding a `/` or a space exits 2.
 Its verb pattern wants a lowercase verb; the rest ignore case.
 
+The `records` group (hq design/28 section 3 item 10) is judged by path alone. A repo
+declares its working records out with the line `records: out` in `.hygiene-allow`: a
+line as `str.splitlines` cuts it, equal to that text but for trailing white space,
+the rule `scripts/agentik_records.py` reads it by. That line is no allow row; any other
+line naming the group `out`, and any row naming `records`, is a bad entry (exit 2), so
+the scanner and the resolver never differ on a line in silence. In a tree that declares
+(the working `.hygiene-allow`, the one at `HEAD` or the `--allow` file), each scanned
+path under a record name is one `records` line that no row excuses: `history/`,
+`design/packets/`, `bugs/`, `HANDOFF.md`, `NICE_TO_HAVE.md`, `OPEN-QUESTIONS.md`,
+`relay/queue.yaml` and `.hygiene-live`, each at the root, the names case-folded (a
+case-blind file system holds `History/` as `history/`). Under `--commits` each path a
+commit adds or modifies under a record name is one line where the tip or the base
+declares (each read from its `.hygiene-allow` blob, the base being the range's negative
+revisions), a merge's against its first parent (`git diff-tree`; its diff is still
+never scanned for the other groups); a removal is none; a base that declares with a tip
+that does not is one more line, on `.hygiene-allow`, so the push it would refuse cannot
+switch the guard off. Read for the declaration alone, an allow file never fails a scan:
+an entry that is no regular file (a symlink) declares nothing, and bytes that are not
+UTF-8 decode as the resolver's (`surrogateescape`); the read as rows fails as before.
+The group shows only where the scan declares.
+
 This file holds the generic groups only: patterns that name nobody. The terms
 private to one owner (a name, a host, a domain, a private repo) live outside the
 repo, in the private list: `$AGENTIK_HYGIENE_PRIVATE` when set and not empty,
@@ -176,6 +197,16 @@ MESSAGE_SKIP = ("sibling", "renamed")
 TRAILER = re.compile(r"(?:co-authored-by|signed-off-by):", re.IGNORECASE)
 SHORT = 12
 ALLOW_FILE = ".hygiene-allow"
+# hq design/28 section 3 items 5, 7 and 10: the one declaration, read as the resolver
+# (`scripts/agentik_records.py`'s DECLARED) reads it, and the names it holds out of the tree
+DECLARATION = "records: out"
+OUT = "out"
+RECORDS_GROUP = "records"
+RECORD_DIRS = ("history/", "design/packets/", "bugs/")
+RECORD_FILES = ("HANDOFF.md", "NICE_TO_HAVE.md", "OPEN-QUESTIONS.md", "relay/queue.yaml",
+                LIVE_FILE)
+RECORD_DIRS_FOLDED = tuple(n.casefold() for n in RECORD_DIRS)
+RECORD_FILES_FOLDED = tuple(n.casefold() for n in RECORD_FILES)
 # Git reads these before `-C`: a caller's would point it at another repo, work tree or
 # index than `--repo`'s, so they leave its environment in both modes.
 GIT_ENV_DROP = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE")
@@ -343,41 +374,137 @@ def git_out(repo, args, what):
         raise Failure("%s in %s: exit %d" % (what, repo, exc.returncode)) from None
 
 
-def load_allow_tip(repo, rng, known, strict):
-    """The range tip's `.hygiene-allow` blob, parsed as `load_allow` parses a file; no
-    such path at the tip is no row. A range naming more than one tip is a Failure: the
-    allowlist is one reviewed policy."""
+def range_ends(repo, rng):
+    """(tip, [base, ...]) of the range: its one positive revision and its negative ones.
+    A range naming more than one tip is a Failure: the allowlist is one reviewed policy."""
     out = git_out(repo, ["rev-parse", "--revs-only", "--end-of-options", rng, "--"],
                   "git log of the range failed: its tip does not resolve")
-    tips = [t for t in out.decode("ascii", "replace").split() if not t.startswith(("^", "-"))]
+    revs = out.decode("ascii", "replace").split()
+    tips = [t for t in revs if not t.startswith(("^", "-"))]
     if len(tips) != 1:
         raise Failure("the range names %d tips; its allowlist is one tip's" % len(tips))
-    label = "%s:%s" % (tips[0][:SHORT], ALLOW_FILE)
-    entry = git_out(repo, ["ls-tree", "-z", "--full-tree", tips[0], "--", ALLOW_FILE],
+    return tips[0], [b[1:] for b in revs if b.startswith("^")]
+
+
+def allow_blob(repo, rev):
+    """(text, label) of `.hygiene-allow` in commit `rev`, or (None, label) with no such path."""
+    label = "%s:%s" % (rev[:SHORT], ALLOW_FILE)
+    entry = git_out(repo, ["ls-tree", "-z", "--full-tree", rev, "--", ALLOW_FILE],
                     "git ls-tree of the range's tip failed").split(b"\0")[0]
     if not entry:
-        return []
+        return None, label
     meta = entry.split(b"\t")[0].split()
     if meta[:2] != [b"100644", b"blob"] and meta[:2] != [b"100755", b"blob"]:
         raise Failure("cannot read the allow file %s: not a regular file" % label)
     blob = git_out(repo, ["cat-file", "blob", meta[2].decode("ascii")],
                    "git cat-file of the allow file failed")
     try:
-        text = blob.decode("utf-8")
+        return blob.decode("utf-8"), label
     except UnicodeDecodeError as exc:
         raise Failure("cannot read the allow file %s: %s" % (label, why(exc))) from None
-    return parse_allow(text, label, known, strict)
+
+
+def load_allow_tip(repo, tip, known, strict):
+    """The range tip's `.hygiene-allow` blob, parsed as `load_allow` parses a file; no
+    such path at the tip is no row."""
+    text, label = allow_blob(repo, tip)
+    return [] if text is None else parse_allow(text, label, known, strict)
+
+
+def declares(text):
+    """True where an allow file's text declares its repo's records out: one of its lines,
+    as `str.splitlines` cuts them, is `records: out` but for trailing white space. The
+    resolver's rule, so the two readers never differ on a line."""
+    return any(row.rstrip() == DECLARATION for row in text.splitlines())
+
+
+def is_record(path):
+    """True for a path under a record name of design/28 item 7, at the repo's root, the
+    names case-folded: on a case-blind file system `History/` is `history/`."""
+    folded = path.casefold()
+    return folded.startswith(RECORD_DIRS_FOLDED) or folded in RECORD_FILES_FOLDED
+
+
+def declared_file(path):
+    """Whether a working allow file declares, read for the declaration alone: what is
+    absent, no regular file or unreadable declares nothing, and its bytes decode as the
+    resolver's (`surrogateescape`). It never fails a scan; the rows' read still does."""
+    if os.path.islink(path) or not os.path.isfile(path):
+        return False
+    try:
+        with open(path, "rb") as fh:
+            return declares(fh.read().decode("utf-8", "surrogateescape"))
+    except OSError:
+        return False
+
+
+def declared_blob(repo, rev):
+    """Whether `.hygiene-allow` in commit `rev` declares, read for the declaration alone:
+    no such path, an entry that is no regular file, or git failing declares nothing."""
+    try:
+        entry = git_out(repo, ["ls-tree", "-z", "--full-tree", rev, "--", ALLOW_FILE],
+                        "git ls-tree failed").split(b"\0")[0]
+        meta = entry.split(b"\t")[0].split()
+        if meta[:2] not in ([b"100644", b"blob"], [b"100755", b"blob"]):
+            return False
+        blob = git_out(repo, ["cat-file", "blob", meta[2].decode("ascii")],
+                       "git cat-file failed")
+    except Failure:
+        return False
+    return declares(blob.decode("utf-8", "surrogateescape"))
+
+
+def tree_declares(repo, allow):
+    """True where the working `.hygiene-allow`, the one at HEAD or the `--allow` file
+    (`allow`, or None) declares: removing the line in the working file alone keeps the
+    guard on."""
+    if declared_file(os.path.join(repo, ALLOW_FILE)):
+        return True
+    if allow is not None and declared_file(allow):
+        return True
+    head = subprocess.run(list(GIT) + [repo, "rev-parse", "--verify", "--quiet",
+                                       "HEAD^{commit}"],
+                          capture_output=True, env=git_env())
+    return head.returncode == 0 and declared_blob(
+        repo, head.stdout.decode("ascii", "replace").strip())
+
+
+def merge_records(repo, rng):
+    """[(short sha, path)] for each path a merge of the range adds or modifies against its
+    first parent under a record name: a merge's diff is never scanned, but a record its
+    resolution alone adds reaches the remote in its tree."""
+    out = git_out(repo, ["rev-list", "--min-parents=2", "--end-of-options", rng, "--"],
+                  "git rev-list of the range's merges failed")
+    found = []
+    for merge in out.decode("ascii", "replace").split():
+        names = git_out(repo, ["diff-tree", "-z", "-r", "--no-renames", "--no-ext-diff",
+                               "--no-textconv", "--name-status", "--no-commit-id",
+                               merge + "^1", merge], "git diff-tree of a merge failed")
+        parts = names.split(b"\0")
+        for status, path in zip(parts[0::2], parts[1::2]):
+            path = path.decode("utf-8", "surrogateescape")
+            if status[:1] != b"D" and is_record(path):
+                found.append((merge[:SHORT], path))
+    return found
 
 
 def parse_allow(text, path, known, strict):
     entries = []
     for n, raw in enumerate(text.split("\n"), 1):
+        if raw.rstrip() == DECLARATION:
+            continue  # the declaration, no row
         line = raw.split("#", 1)[0].strip()
         if not line:
             continue
         glob, sep, groups = line.rpartition(":")
         names = {g.strip() for g in groups.split(",") if g.strip()}
         glob = glob.strip()
+        if sep and OUT in names:
+            raise UsageError("%s:%d: bad entry (the declaration is the whole line `%s`)"
+                             % (path, n, DECLARATION))
+        if sep and RECORDS_GROUP in names:
+            raise UsageError("%s:%d: bad entry (no row excuses a %s hit)"
+                             % (path, n, RECORDS_GROUP))
         if not sep or not glob or not names or (strict and names - set(known)) or any(
                 not GROUP_NAME.match(g) for g in names):
             raise UsageError("%s:%d: bad entry" % (path, n))
@@ -561,10 +688,13 @@ def live_files(paths, chains):
     return live
 
 
-def scan(repo, entries, compiled):
+def scan(repo, entries, compiled, declared=False):
     """Counts per group over `compiled` ([(group, regex)], a group may hold several);
-    a line counts once per group it matches."""
+    a line counts once per group it matches. Where the tree `declared` its records out,
+    the group `records` counts each path under a record name, outside every row."""
     order = list(dict.fromkeys(name for name, _ in compiled))
+    if declared:
+        order.append(RECORDS_GROUP)
     groups = {name: {"lines": 0, "files": 0, "outside_lines": 0, "outside_files": 0}
               for name in order}
     outside, oversize = [], 0
@@ -584,12 +714,14 @@ def scan(repo, entries, compiled):
                     counts[name] += 1
         except OSError as exc:
             raise Failure("cannot read %s: %s" % (path, why(exc))) from None
+        if declared and is_record(path):
+            counts[RECORDS_GROUP] = 1
         for name in order:
             if not counts[name]:
                 continue
             groups[name]["lines"] += counts[name]
             groups[name]["files"] += 1
-            if not allowed(path, name, entries):
+            if name == RECORDS_GROUP or not allowed(path, name, entries):
                 outside.append({"path": path, "group": name, "lines": counts[name]})
                 groups[name]["outside_lines"] += counts[name]
                 groups[name]["outside_files"] += 1
@@ -644,14 +776,19 @@ def log_pieces(fh):
         tail = piece[-OVERLAP:] if more else b""
 
 
-def scan_commits(repo, rng, entries, compiled):
+def scan_commits(repo, rng, entries, compiled, declared=False, switched_off=None):
     """Counts per group over the range's added lines (on their path) and its messages'
     lines (on MESSAGE), in the tree scan's shape plus `commits`: the number scanned and
     the short shas with a hit outside the allowlist, and those touching the allowlist
-    when any do. A line counts once per group, however many pieces it came in. Git
-    failing, the log or a blob, is a Failure."""
+    when any do. A line counts once per group, however many pieces it came in. Where
+    an end `declared`, each path a commit adds or modifies under a record name is one
+    `records` line; `switched_off`, the tip's short sha where the base declares and the
+    tip does not, is one more, on `.hygiene-allow`. Git failing, the log or a blob, is
+    a Failure."""
     compiled = [(name, rx) for name, rx in compiled if name not in LIVE_ONLY]
     order = list(dict.fromkeys(name for name, _ in compiled))
+    if declared:
+        order.append(RECORDS_GROUP)
     message_rx = [(name, rx) for name, rx in compiled if name not in MESSAGE_SKIP]
     # A trailer line skips the generic email pattern alone; a private row always scans.
     generic_email = {id(rx) for name, rx in COMPILED if name == "email"}
@@ -666,7 +803,13 @@ def scan_commits(repo, rng, entries, compiled):
         return rules[path]
 
     def outside(path, name):
-        return path == MESSAGE or not allowed(path, name, entries)
+        return path == MESSAGE or name == RECORDS_GROUP or not allowed(path, name, entries)
+
+    record = []  # the open diff's (sha, path) while it may count as a record
+
+    def settle_record():
+        if record:
+            count(*record.pop(), names=(RECORDS_GROUP,))
 
     def count(sha, path, names):
         for name in names:
@@ -736,6 +879,7 @@ def scan_commits(repo, rng, entries, compiled):
             if not cont:  # a line's first piece: what it is
                 kind, trailer = None, False
                 if piece.startswith(START):
+                    settle_record()
                     end_message()  # a message git never closed is settled as it stands
                     sha, mode = piece[len(START):].decode("ascii", "replace")[:SHORT], "msg"
                     scanned += 1
@@ -747,10 +891,15 @@ def scan_commits(repo, rng, entries, compiled):
                     mode, oid = "header", None
                     path = header_path(piece[len(b"diff --git "):]
                                        .decode("utf-8", "surrogateescape"))
+                    settle_record()
+                    if declared and is_record(path):
+                        record.append((sha, path))
                     if path == ALLOW_FILE and sha not in allow_changed:
                         allow_changed.append(sha)
                 elif mode == "header":
-                    if piece.startswith(b"new file mode "):
+                    if piece.startswith(b"deleted file mode "):
+                        record.clear()  # a removal holds no record
+                    elif piece.startswith(b"new file mode "):
                         count(sha, path, matches(path, live(path)))
                     elif piece.startswith(b"index "):
                         oid = piece.split()[1].split(b"..")[-1].decode("ascii", "replace")
@@ -782,12 +931,18 @@ def scan_commits(repo, rng, entries, compiled):
             elif found:
                 count(sha, where, found)
             cont, found, found_t, blank = False, set(), set(), True
+        settle_record()
         end_message()
     finally:
         proc.stdout.close()
         code = proc.wait()
     if code != 0:
         raise Failure("git log of the range failed in %s: exit %d" % (repo, code))
+    if declared:
+        for merge, where in merge_records(repo, rng):
+            count(merge, where, (RECORDS_GROUP,))
+    if switched_off:
+        count(switched_off, ALLOW_FILE, (RECORDS_GROUP,))
     groups = {name: {"lines": 0, "files": 0, "outside_lines": 0, "outside_files": 0}
               for name in order}
     rows_outside = []
@@ -838,14 +993,20 @@ def main(argv):
         private = load_private(private_path(), opts["require_private"])
         compiled = COMPILED + private
         known = [name for name, _ in compiled]
+        if opts["commits"] is not None:
+            tip, bases = range_ends(repo, opts["commits"])
         if opts["commits"] is not None and opts["allow"] is None:
-            entries = load_allow_tip(repo, opts["commits"], known, bool(private))
+            entries = load_allow_tip(repo, tip, known, bool(private))
         else:
             entries = load_allow(allow, opts["allow"] is not None, known, bool(private))
         if opts["commits"] is not None:
-            result = scan_commits(repo, opts["commits"], entries, compiled)
+            at_tip = declared_blob(repo, tip)
+            at_base = any(declared_blob(repo, b) for b in bases)
+            result = scan_commits(repo, opts["commits"], entries, compiled, at_tip or at_base,
+                                  tip[:SHORT] if at_base and not at_tip else None)
         else:
-            result = scan(repo, entries, compiled)
+            declared = tree_declares(repo, allow if opts["allow"] is not None else None)
+            result = scan(repo, entries, compiled, declared)
     except Help:
         print(USAGE)
         return 0
