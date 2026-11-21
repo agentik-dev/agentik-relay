@@ -10,10 +10,11 @@ import (
 	"testing"
 )
 
-// TestAgentikR1_2_VendoredPinned (agentik-r1 §8.2, §7.3; packet P1): the seven
+// TestAgentikR1_2_VendoredPinned (agentik-r1 §8.2, §7.3; packet P1): the nine
 // files vendored from agentik-commons are the bytes scripts/vendored.sha256
-// pins, as `make hygiene` checks them: `shasum -a 256 -c` reads seven OK lines
-// (sy2-sync: commons' sync places scripts/readme-top too; it was six).
+// pins, as `make hygiene` checks them: `shasum -a 256 -c` reads nine OK lines
+// (sy2-sync: commons' sync places scripts/readme-top too; it was six;
+// sy5-sync: and CONTRIBUTING.md and SECURITY.md at the root; it was seven).
 func TestAgentikR1_2_VendoredPinned(t *testing.T) {
 	sum, err := exec.LookPath("shasum")
 	if err != nil {
@@ -30,14 +31,15 @@ func TestAgentikR1_2_VendoredPinned(t *testing.T) {
 		t.Fatalf("shasum -c scripts/vendored.sha256: %v\n%s", err, out)
 	}
 	ok := 0
-	for _, name := range []string{"agentik", "hygiene", "recordlint", "readme-top", "bounded", "plugin-version-check",
-		"plugin-description-bytes"} {
-		if strings.Contains(string(out), "scripts/"+name+": OK\n") {
+	for _, name := range []string{"scripts/agentik", "scripts/hygiene", "scripts/recordlint", "scripts/readme-top",
+		"scripts/bounded", "scripts/plugin-version-check", "scripts/plugin-description-bytes", "CONTRIBUTING.md",
+		"SECURITY.md"} {
+		if strings.Contains(string(out), name+": OK\n") {
 			ok++
 		}
 	}
-	if ok != 7 || strings.Count(string(out), "\n") != 7 {
-		t.Errorf("shasum -c read %d of 7 OK lines:\n%s", ok, out)
+	if ok != 9 || strings.Count(string(out), "\n") != 9 {
+		t.Errorf("shasum -c read %d of 9 OK lines:\n%s", ok, out)
 	}
 }
 
