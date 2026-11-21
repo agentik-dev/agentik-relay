@@ -19,7 +19,7 @@
 
 - [x] build 2, act 1: the packet's budget row in the parser's shape (`90 turns, 200k context`); `go test ./internal/packet` ok
 - [x] build 2, act 2: the coordinator's ruling: a set key `--path` cannot expand is refused, the key asked with no `--path` (R1's added line; effects `TestRR6_3_KeyPathCannotExpand` red at `c7eb007`, green now; cmd `TestRR6_3` and `TestRR6_6` gain `~nouser/x`); no file under `plugin/` changed, so no version step
-- [ ] build 2: hygiene, then `make check` once through the gate queue
+- [ ] build 2: hygiene exits 0 (8 commits scanned); check job `20261120-191825-2881` on `f8c2ec1` exit 2 on `TestControlKill` alone (`internal/night`, untouched here: the child exited 143 but past the test's 5 s bound, 7.02 s under a loaded queue); job `20261120-194915-2892` queued on this commit, its line in the build's hand-back
 
 ## Handover
 - If this sitting is cut: the first unticked line above.
@@ -27,7 +27,7 @@
 - ruled, the coordinator 2026-11-20: a set key that `--path` cannot expand (`~nouser/x`) is refused like any set key; build 2 act 2.
 
 ## Next act
-Hygiene, then one `make check` through the gate queue.
+Read job `20261120-194915-2892`'s line; green, the review; red on this row's code, a fresh builder.
 
 ## Exit
-Build 2 in flight.
+Build 2 handed back with every item built and committed: the budget row, the unexpandable key refused; the last check is job `20261120-194915-2892`. This commit holds this file alone.
