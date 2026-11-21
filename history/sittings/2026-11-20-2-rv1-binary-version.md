@@ -15,7 +15,7 @@
 - [x] F1: `enabled` known for auto, on, off and the YAML bools true/True/TRUE, false/False/FALSE (effects `TestRV1_5_EnabledSessionBools`); red at `13259e1` on True, TRUE, False, FALSE, green now; effects `ok`
 - [x] F3, ruled: the `binary` row's states (`TestRV1_1_DoctorBinary`): equal ok; stamped and different warns naming both ways; unstamped beside a plugin file ok, saying `make install` stamps it; no root ok with the version; the README's install clause in both files, the sidecar restamped
 - [x] F2: `doctor --plugin-root <dir>` over `CLAUDE_PLUGIN_ROOT` (`TestRV1_2_DoctorPluginRoot`: the flag, its `=` form, the flag over the variable, empty, unreadable and absent roots); `/relay:doctor` passes the root; the help's and the usage line's doctor name it
-- [ ] F5: the install-line test pins `build`'s stamp too
+- [x] F5: `TestAgentikR1_5_InstallTarget` pins `make -n build`'s stamped line too
 - [ ] F6, F4, F7: NICE rows
 - [ ] the packet true to what is built; the plugin at 0.2.7 (doctor.md changed after 0.2.6); the gate's `make check`
 
@@ -23,7 +23,7 @@
 - If this sitting is cut: the first unticked line above.
 
 ## Next act
-F5.
+F6, F4, F7.
 
 ## Exit
 Open.

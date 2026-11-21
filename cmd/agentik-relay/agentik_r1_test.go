@@ -48,21 +48,27 @@ func TestAgentikR1_4_OldNameNote(t *testing.T) {
 // TestAgentikR1_5_InstallTarget (agentik-r1 §4.1, D3): `make -n install
 // BINDIR=D` builds agentik-relay into D, stamped with the plugin's version (rv1 R1), links relay to it, places the
 // agentik front door through scripts/install-door (DW1R), then relinks
-// GOPATH's relay only when it exists.
+// GOPATH's relay only when it exists. `make -n build` stamps its build the
+// same way (rv1 review 1, F5).
 // make -n runs no recipe: nothing is built or installed.
 func TestAgentikR1_5_InstallTarget(t *testing.T) {
 	d := t.TempDir()
-	cmd := exec.Command("make", "--no-print-directory", "-n", "install", "BINDIR="+d)
-	cmd.Dir = filepath.Join("..", "..")
-	for _, kv := range os.Environ() {
-		if !strings.HasPrefix(kv, "MAKE") && !strings.HasPrefix(kv, "MFLAGS=") {
-			cmd.Env = append(cmd.Env, kv)
+	makeN := func(args ...string) []byte {
+		t.Helper()
+		cmd := exec.Command("make", append([]string{"--no-print-directory", "-n"}, args...)...)
+		cmd.Dir = filepath.Join("..", "..")
+		for _, kv := range os.Environ() {
+			if !strings.HasPrefix(kv, "MAKE") && !strings.HasPrefix(kv, "MFLAGS=") {
+				cmd.Env = append(cmd.Env, kv)
+			}
 		}
+		out, err := cmd.Output()
+		if err != nil {
+			t.Fatalf("make -n %s: %v\n%s", strings.Join(args, " "), err, out)
+		}
+		return out
 	}
-	out, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("make -n install: %v\n%s", err, out)
-	}
+	out := makeN("install", "BINDIR="+d)
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 	// rv1 R1: the build stamped with the plugin's version, as plugin.json says it.
 	v := pluginVersion(filepath.Join("..", "..", "plugin"))
@@ -77,5 +83,8 @@ func TestAgentikR1_5_InstallTarget(t *testing.T) {
 	if l := lines[4]; !strings.Contains(l, "$(go env GOPATH)/bin/relay") || !strings.Contains(l, "ln -sf "+d+"/agentik-relay") ||
 		!strings.Contains(l, "-e ") {
 		t.Errorf("the GOPATH relink: %q", l)
+	}
+	if b, want := strings.TrimSpace(string(makeN("build"))), `go build -ldflags "-X main.version=`+v+`" -o bin/agentik-relay ./cmd/agentik-relay`; b != want {
+		t.Errorf("make -n build printed:\n%s\nwant:\n%s", b, want)
 	}
 }
