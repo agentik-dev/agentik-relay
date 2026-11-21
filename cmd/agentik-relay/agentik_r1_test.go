@@ -46,7 +46,7 @@ func TestAgentikR1_4_OldNameNote(t *testing.T) {
 }
 
 // TestAgentikR1_5_InstallTarget (agentik-r1 §4.1, D3): `make -n install
-// BINDIR=D` builds agentik-relay into D, links relay to it, places the
+// BINDIR=D` builds agentik-relay into D, stamped with the plugin's version (rv1 R1), links relay to it, places the
 // agentik front door through scripts/install-door (DW1R), then relinks
 // GOPATH's relay only when it exists.
 // make -n runs no recipe: nothing is built or installed.
@@ -64,7 +64,12 @@ func TestAgentikR1_5_InstallTarget(t *testing.T) {
 		t.Fatalf("make -n install: %v\n%s", err, out)
 	}
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	want := []string{"mkdir -p " + d, "go build -o " + d + "/agentik-relay ./cmd/agentik-relay",
+	// rv1 R1: the build stamped with the plugin's version, as plugin.json says it.
+	v := pluginVersion(func(string) string { return filepath.Join("..", "..", "plugin") })
+	if v == "" {
+		t.Fatal("plugin/.claude-plugin/plugin.json holds no version")
+	}
+	want := []string{"mkdir -p " + d, `go build -ldflags "-X main.version=` + v + `" -o ` + d + "/agentik-relay ./cmd/agentik-relay",
 		"ln -sf agentik-relay " + d + "/relay", "sh scripts/install-door scripts/agentik " + d + "/agentik"}
 	if len(lines) != 5 || !reflect.DeepEqual(lines[:4], want) {
 		t.Fatalf("make -n install printed:\n%s\nwant first:\n%s", out, strings.Join(want, "\n"))
