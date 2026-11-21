@@ -37,3 +37,11 @@ One row per finding, in agentik-hq design/05 §2's table, held by `scripts/recor
 | n25 | S4 | `README.md` | the sentence "where `git config agentik.records` is set" invites counting a global key, which a plain `git config` shows and the relay, reading the clone's own config, does not | review 1 of RR6, observation 2 | 2026-11-20, RR6 review 1 |
 | n26 | S4 | `cmd/agentik-relay/main.go` | `doctor` outside any repo says `ok records in the repo`, a git failure reading as the repo's own; harmless beside the failing `root` row | review 1 of RR6, observation 3 | 2026-11-20, RR6 review 1 |
 | n27 | S3 | `internal/night` | `TestControlKill`'s 5 s bound is tight under load: the child exited 143, but after 7.02 s, and the check read red on it alone | gate job 20261120-191825-2881 on `f8c2ec1`, RR6 build 2 | 2026-11-20, RR6 review 1 |
+| n28 | S4 | `internal/effects/records.go` | from a linked worktree the relay reads the main checkout's `HEAD` (and its config), where commons reads the worktree's; on purpose, as the rr6 packet's R1 says | review 1 of RR6, F3; `design/packets/rr6-relay-records.md:33` | 2026-11-20, RR6 review 1 |
+
+## From row rv1-binary-version (review 1)
+
+| id | level | area | finding | evidence | from |
+|---|---|---|---|---|---|
+| n29 | S4 | `Makefile` | `PLUGIN_VERSION` reads plugin.json with `sed` where doctor parses the JSON: one-line JSON with a nested `version` stamps that one; `"version" :` stamps empty; a second `version` line adds a stray word; a `$(...)` in the value runs in the shell | review 1 of RV1, F4: the four cases on test files; `Makefile:10` | 2026-11-20, RV1 review 1 |
+| n30 | S4 | `Makefile` | `binary-version-check`'s trap removes the binary, then `rmdir`s the folder: a folder left non-empty stays behind and the target still exits 0; not reached today, as `--version` writes nothing; `rm -rf` would hold | review 1 of RV1, F7: the recipe under `/bin/sh` with a stand-in `go`; `Makefile:47` | 2026-11-20, RV1 review 1 |

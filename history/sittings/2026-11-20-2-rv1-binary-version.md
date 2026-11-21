@@ -16,14 +16,14 @@
 - [x] F3, ruled: the `binary` row's states (`TestRV1_1_DoctorBinary`): equal ok; stamped and different warns naming both ways; unstamped beside a plugin file ok, saying `make install` stamps it; no root ok with the version; the README's install clause in both files, the sidecar restamped
 - [x] F2: `doctor --plugin-root <dir>` over `CLAUDE_PLUGIN_ROOT` (`TestRV1_2_DoctorPluginRoot`: the flag, its `=` form, the flag over the variable, empty, unreadable and absent roots); `/relay:doctor` passes the root; the help's and the usage line's doctor name it
 - [x] F5: `TestAgentikR1_5_InstallTarget` pins `make -n build`'s stamped line too
-- [ ] F6, F4, F7: NICE rows
+- [x] F6, F4, F7: NICE n28 (rr6's F3) in rr6's section; n29 (F4), n30 (F7) in a section from RV1 review 1; recordlint holds 29 rows
 - [ ] the packet true to what is built; the plugin at 0.2.7 (doctor.md changed after 0.2.6); the gate's `make check`
 
 ## Handover
 - If this sitting is cut: the first unticked line above.
 
 ## Next act
-F6, F4, F7.
+The packet, the version step, the gate.
 
 ## Exit
 Open.
