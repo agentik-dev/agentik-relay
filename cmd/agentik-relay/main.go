@@ -919,9 +919,6 @@ func gateVerb(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "usage: relay gate <row> [--json]")
 		return exitUsage
 	}
-	if recordsRefused(stderr) { // rr6 R2: before the pid file
-		return exitUsage
-	}
 	// The hand gate runs branch code: the account's one relay while it
 	// runs (AR22 act 2, ADV13-14).
 	release, code := holdPid("gate", stderr, nil)
@@ -929,6 +926,12 @@ func gateVerb(args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	defer release()
+	// rr6 R2, under the lock: ADV13-14's gate reads no root while another
+	// relay holds it. A refusal releases the lock and leaves its pid file
+	// removed; nothing else is read or written.
+	if recordsRefused(stderr) {
+		return exitUsage
+	}
 	repo, err := toplevel()
 	if err != nil || repo == "" {
 		repo = "."

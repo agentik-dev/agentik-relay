@@ -15,10 +15,12 @@
 - [x] act 1, the tests (red, undefined names under `go vet`): `internal/effects/records_test.go`, `cmd/agentik-relay/rr6_test.go`, `TestDoctorTable` gains the `records` row
 - [x] act 2, R1 to R4: `effects.RecordsOut` and `Declares`; `recordsRefused` in plan, run, gate, resume before the pid file; doctor's `records` row after `root`; `go test ./internal/effects` ok; cmd's tests wait for the gate (`go test` there builds the relay)
 - [x] act 3, R5: the README sentence beside the queue's (both files, the sidecar restamped, `shasum -c` OK); the plugin at 0.2.5 with TestAgentikR1_5's pin; no RUNBOOK.md in the repo
-- [ ] `make check` through the gate queue
+- [ ] `make check` through the gate queue: job `20261120-170317-2851` on `8b55bb1` red on two tests, `TestAR22_2_HandGateHoldsLock` (gate read the root before the lock) and `TestRR6_1` (each plan's fresh session id); both mended, the check again
 
 ## Handover
 - If this sitting is cut: the first unticked line above.
+- decide, owner: the coordinator (the review): gate asks R1 under the account's lock, not before it, so ADV13-14's pin test stands; the refusal releases the lock and removes its pid file.
+- decide, owner: the coordinator: a set key that `--path` cannot expand (`~nouser/x`, git exit 128) reads own under R1's "a git failure is the repo's own".
 
 ## Next act
 `make check` through the gate queue, then the record.

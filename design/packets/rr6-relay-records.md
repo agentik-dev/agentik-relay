@@ -27,10 +27,12 @@ repo's `DECISIONS.md` binds; no entry of it changes.
    not), or `.hygiene-allow` at `HEAD`, read through git, holds the whole line `records: out`
    (trailing white space stripped, as commons' `_declares` reads it). Else they are the repo's
    own; a git failure reading either is the repo's own. One function, through the hermetic runner.
-2. **R2, the refusal.** `plan`, `run`, `gate` and `resume` ask R1 after their argument checks and
-   before the pid file, the lock, the ledger or any stage. Out: one line on stderr, exit 2 (a
-   failed pre-check): `relay: this repo keeps its records outside its clone (git config
-   agentik.records); the relay does not run in such a repo yet`. Nothing is written.
+2. **R2, the refusal.** `plan`, `run` and `resume` ask R1 after their argument checks and before
+   the pid file, the lock, the ledger or any stage; `gate` asks it just after it takes the lock,
+   since ADV13-14 (`TestAR22_2_HandGateHoldsLock`) has the hand gate read no root while another
+   relay holds it, and its refusal releases the lock and removes the pid file it wrote. Out: one
+   line on stderr, exit 2 (a failed pre-check): `relay: this repo keeps its records outside its
+   clone (git config agentik.records); the relay does not run in such a repo yet`. Nothing stays.
 3. **R3, the doctor.** One row, `records`, after `root`: `ok`, `in the repo`; or `warn`,
    `outside the clone: the relay does not run here (git config agentik.records)`. Text and JSON.
 4. **R4, what stands.** In a repo whose records are its own, every verb reads as at the pin; no

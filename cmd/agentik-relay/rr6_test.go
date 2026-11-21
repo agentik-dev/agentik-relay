@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -110,7 +111,8 @@ func rr6Listing(t *testing.T, dirs ...string) string {
 // rr6Refused runs plan, run, gate and resume outside a measurement (so
 // each would take the pid file, the lock and the ledger) and wants R2's
 // line alone on stderr, nothing on stdout, exit 2, and the fake home (the
-// repo, its .git, the state root) and the pid dir as they were.
+// repo, its .git, the state root) and the pid dir as they were. Plan, run
+// and resume ask R1 before the lock; gate under it, released at once.
 func rr6Refused(t *testing.T, why string, home string) {
 	t.Helper()
 	measuring(t)
@@ -121,6 +123,12 @@ func rr6Refused(t *testing.T, why string, home string) {
 	state := effects.StateDir(getenv)
 	if !strings.HasPrefix(state, home) {
 		t.Fatalf("the state root %s is not under the fake home %s", state, home)
+	}
+	// The account's pid dir stands once any relay has run; gate takes its
+	// lock before it reads the root (ADV13-14), and its refusal removes
+	// the pid file it wrote.
+	if err := os.MkdirAll(pid, 0o755); err != nil {
+		t.Fatal(err)
 	}
 	for _, args := range [][]string{{"plan"}, {"plan", "--json"}, {"run"}, {"run", "--dry"}, {"gate", "ok-minimal"}, {"resume", "ok-minimal"}, {"resume"}} {
 		before := rr6Listing(t, home, pid)
@@ -165,6 +173,9 @@ func TestRR6_1_OwnPlansAsAtThePin(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &p); err != nil || code != exitOK || !p.Valid || len(p.Rows) != 1 {
 		t.Fatalf("own: plan --json = %d (%v), valid %v, %d rows: %s %s", code, err, p.Valid, len(p.Rows), out, errs)
 	}
+	// Each plan draws its rows' session ids afresh: the one field compared as a shape.
+	uuid := regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+	out0, out = uuid.ReplaceAllString(out0, "<uuid>"), uuid.ReplaceAllString(out, "<uuid>")
 	if code != code0 || out != out0 || errs != err0 {
 		t.Errorf("own: plan --json differs from the tree's before git:\n%d %s %s\n%d %s %s", code0, out0, err0, code, out, errs)
 	}
