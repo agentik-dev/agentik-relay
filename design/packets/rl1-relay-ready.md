@@ -49,7 +49,7 @@ record at the pin under its own name, since `Parse` takes the id from the file s
 
 ## 4. Findings that name this row
 
-The rehearsal's reds beyond the six, each with its commit, are listed here as they are mended.
+The rehearsal (a scratch clone of `2de57c2`, the records removed and `records: out` committed there alone) ran the whole `make check` green through the gate, job `20261121-101533-3051`, exit 0 in 6 min: every package `ok`, recordlint skipping the two absent files, the scan's `records` group 0, so nothing else turned red and no commit mends one. The live-file scan refused the old tool names and the sibling words in the first samples (`be35ebb`); `2de57c2` swaps each for a made-up word of the same length, R1's two copies included, every verdict unchanged. That commit's words still count under `--commits`: its allow rows are the coordinator's ruling.
 
 ## 5. Forbidden reads
 
