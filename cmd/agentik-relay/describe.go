@@ -491,7 +491,18 @@ func blockValue(s setting, v any) string {
 // (the packet's R1); the masked error wraps nothing, so no caller reaches
 // the value through it. describe's read of what ships is the one other call.
 func loadConfig(fsys effects.FS, env func(string) string, repo string) (effects.Config, error) {
-	cfg, err := effects.LoadConfig(fsys, env, repo)
+	return maskConfig(effects.LoadConfig(fsys, env, repo))
+}
+
+// loadUserConfig is effects.LoadUserConfig, its refusal masked as
+// loadConfig's: doctor's read where no repo stands (packet
+// dr3-relay-doctor-folder, R2).
+func loadUserConfig(fsys effects.FS, env func(string) string) (effects.Config, error) {
+	return maskConfig(effects.LoadUserConfig(fsys, env))
+}
+
+// maskConfig is a config read with its error as quotesNoValue prints it.
+func maskConfig(cfg effects.Config, err error) (effects.Config, error) {
 	if err != nil {
 		if s := quotesNoValue(err); s != err.Error() {
 			err = errors.New(s)

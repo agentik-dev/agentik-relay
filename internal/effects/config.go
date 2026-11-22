@@ -202,6 +202,34 @@ func LoadConfig(fs FS, env func(string) string, repo string) (Config, error) {
 	return c, nil
 }
 
+// LoadUserConfig is the configuration where no repo stands (packet
+// dr3-relay-doctor-folder, R2): the defaults and the user's file alone,
+// the new name else the old, as LoadConfig reads it. No repo, local or
+// session layer is read, the session's being resolved for a checkout;
+// the queue path stays as written, since no repo holds it. A file that
+// does not parse, or a known key of the wrong shape, is an error.
+func LoadUserConfig(fs FS, env func(string) string) (Config, error) {
+	c := Config{Tmux: "auto", AllowedTools: DefaultAllowedTools, Caffeinate: true, Band: BandPace, Queue: DefaultQueue}
+	home := env("HOME")
+	p := NewElseOld(fs.Exists, filepath.Join(home, userConfig), filepath.Join(home, oldUserConfig))
+	if !fs.Exists(p) {
+		return c, nil
+	}
+	src, err := fs.ReadFile(p)
+	if err != nil {
+		return c, err
+	}
+	root, err := yaml.Parse(src)
+	if err != nil {
+		return c, fmt.Errorf("config %s: %w", p, err)
+	}
+	c.Sources = append(c.Sources, p)
+	if err := c.apply(p, root); err != nil {
+		return c, fmt.Errorf("config %s: %w", p, err)
+	}
+	return c, nil
+}
+
 // recordedSum is a sha256 as a session file records it.
 var recordedSum = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
