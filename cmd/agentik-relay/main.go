@@ -204,6 +204,21 @@ var claudeProbe = func(path string) error {
 	return cmd.Run()
 }
 
+// noRepoAnswer is whether toplevel's error is git's own answer that no
+// folder from the cwd up is a git repository: "not a git repository (or any
+// of the parent directories)", or "(or any parent up to mount point ...)".
+// Every other failure, git missing, an unsafe-directory refusal, a corrupt
+// config, a .git file that points nowhere ("not a git repository: <path>"),
+// a bare repo or a folder inside .git, is no answer that the folder is
+// outside one, so the doctor reads it as at the pin (dr3 brief 2, R1).
+func noRepoAnswer(err error) bool {
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) {
+		return false
+	}
+	return strings.Contains(strings.ToLower(string(exit.Stderr)), "not a git repository (or any")
+}
+
 // gitWorktree is `git worktree list` in the repo; a variable so a test can
 // fake it.
 var gitWorktree = func(repo string) error {
@@ -214,8 +229,9 @@ var gitWorktree = func(repo string) error {
 // absent: file windows, D16); unknown is never a pass. Exit 0 when no check
 // is not ok, 2 otherwise. pluginRoot is --plugin-root's dir, "" when none
 // was given (the binary row's, RV1 R3). Outside a git checkout, toplevel's
-// one answer, each check that reads the checkout is a note, the config the
-// user's layer alone (packet dr3-relay-doctor-folder, R1, R2).
+// one answer when git says so (noRepoAnswer), each check that reads the
+// checkout is a note, the config the user's layer alone (packet
+// dr3-relay-doctor-folder, R1, R2).
 func doctor(asJSON bool, pluginRoot string, stdout io.Writer) int {
 	var checks []check
 	add := func(name string, ok, warn bool, format string, a ...any) {
@@ -233,8 +249,8 @@ func doctor(asJSON bool, pluginRoot string, stdout io.Writer) int {
 		checks = append(checks, check{name, true, false, detail, "note", nil})
 	}
 	repo, err := toplevel()
-	inRepo := err == nil && repo != ""
-	if !inRepo {
+	inRepo := !noRepoAnswer(err)
+	if err != nil || repo == "" {
 		repo = "."
 	}
 	cfg, cfgErr := loadConfig(effects.OSFS{}, getenv, repo)

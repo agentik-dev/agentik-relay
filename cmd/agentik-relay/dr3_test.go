@@ -111,14 +111,16 @@ func dr3Counts(t *testing.T, a dr3Answer) {
 	}
 }
 
-// dr3Folder is a temp folder that is no git checkout.
+// dr3Folder is a temp folder that is no git checkout. A temp folder inside
+// a checkout fails the test, never skips it, so the acceptance count never
+// reads a skip as a pass (review 1, L7).
 func dr3Folder(t *testing.T) string {
 	t.Helper()
 	dir, _ := filepath.EvalSymlinks(t.TempDir())
 	dir = filepath.Join(dir, "folder")
 	os.MkdirAll(dir, 0o755)
 	if out, err := exec.Command("git", "-C", dir, "rev-parse", "--show-toplevel").CombinedOutput(); err == nil {
-		t.Skipf("the temp folder lies in a checkout: %s", out)
+		t.Fatalf("the temp folder lies in a checkout, so no folder outside one can be made: %s", out)
 	}
 	return dir
 }
@@ -244,6 +246,104 @@ func TestDR3_3_ConfigOutsideReadsTheUserLayer(t *testing.T) {
 			detail := strings.ReplaceAll(tc.detail, "$HOME", home)
 			if c.Status != tc.status || !strings.HasPrefix(c.Detail, detail) || strings.Contains(c.Detail, "another checkout") {
 				t.Errorf("config = %s %q, want %s from %q", c.Status, c.Detail, tc.status, detail)
+			}
+		})
+	}
+}
+
+// TestDR3_4_ACheckoutGitRefusesAsAtThePin is brief 2's R2: only git's own
+// "not a git repository" answer puts the doctor outside a checkout. A
+// checkout git refuses (another owner, a corrupt config, a .git file that
+// points nowhere), git off PATH inside a checkout, a bare repo and a folder
+// inside .git each answer as at the pin `7bd9623`: the folder's checks, the
+// failed count and the text exit, the repo's config layer read (its
+// `tmux: required` fails tmux where tmux is missing), and no note.
+func TestDR3_4_ACheckoutGitRefusesAsAtThePin(t *testing.T) {
+	repoLayer := filepath.Join(".claude", "agentik", "config.yaml")
+	checkout := func(t *testing.T, base string) string {
+		root := filepath.Join(base, "site")
+		ar32bGit(t, base, "init", "-q", "-b", "main", root)
+		ar32bGit(t, root, "commit", "-q", "--allow-empty", "-m", "init")
+		return root
+	}
+	breakConfig := func(t *testing.T, root string) {
+		f, err := os.OpenFile(filepath.Join(root, ".git", "config"), os.O_APPEND|os.O_WRONLY, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.WriteString("[core\n")
+		f.Close()
+	}
+	for _, tc := range []struct {
+		name     string
+		setup    func(t *testing.T, base string) string // the working folder
+		missing  string                                 // a program lookPath does not find
+		noPath   bool                                   // git off the process's PATH too
+		statuses string                                 // git, git worktree, tmux, queue, root, records, config
+		failed   int
+		code     int
+	}{
+		{"another owner", func(t *testing.T, base string) string {
+			root := checkout(t, base)
+			ak8Write(t, filepath.Join(root, repoLayer), "relay:\n  tmux: required\n")
+			ak8Write(t, filepath.Join(root, "loose"), "x\n")
+			t.Setenv("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
+			return root
+		}, "tmux", false, "ok fail fail ok fail ok ok", 3, exitUnwell},
+		{"a corrupt config", func(t *testing.T, base string) string {
+			root := checkout(t, base)
+			ak8Write(t, filepath.Join(root, repoLayer), "relay:\n  tmux: required\n")
+			breakConfig(t, root)
+			return root
+		}, "tmux", false, "ok fail fail ok fail ok ok", 3, exitUnwell},
+		{"a .git file that points nowhere", func(t *testing.T, base string) string {
+			d := filepath.Join(base, "site")
+			ak8Write(t, filepath.Join(d, ".git"), "gitdir: "+filepath.Join(base, "gone")+"\n")
+			return d
+		}, "", false, "ok fail ok ok fail ok ok", 2, exitUnwell},
+		{"git off PATH inside a checkout", func(t *testing.T, base string) string {
+			return checkout(t, base)
+		}, "git", true, "fail fail ok ok ok ok ok", 2, exitUnwell},
+		{"a bare repo", func(t *testing.T, base string) string {
+			b := filepath.Join(base, "b.git")
+			ar32bGit(t, base, "init", "-q", "--bare", "-b", "main", b)
+			return b
+		}, "", false, "ok ok ok ok fail ok ok", 1, exitUnwell},
+		{"a folder inside .git", func(t *testing.T, base string) string {
+			return filepath.Join(checkout(t, base), ".git")
+		}, "", false, "ok ok ok ok ok ok ok", 0, exitOK},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+			t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+			base, _ := filepath.EvalSymlinks(t.TempDir())
+			dir := tc.setup(t, base)
+			dr3World(t, dir, nil)
+			lookPath = func(name string) (string, error) {
+				if name == tc.missing {
+					return "", exec.ErrNotFound
+				}
+				return "/fake/" + name, nil
+			}
+			if tc.noPath {
+				t.Setenv("PATH", t.TempDir())
+			}
+			a, text, code := dr3Doctor(t)
+			dr3Counts(t, a)
+			var got []string
+			for _, name := range []string{"git", "git worktree", "tmux", "queue", "root", "records", "config"} {
+				got = append(got, dr3Check(t, a, name).Status)
+			}
+			if s := strings.Join(got, " "); s != tc.statuses {
+				t.Errorf("statuses %q, the pin's %q:\n%s", s, tc.statuses, text)
+			}
+			for _, c := range a.Checks {
+				if c.Status == "note" || strings.Contains(c.Detail, "no git checkout") {
+					t.Errorf("%s reads as outside a checkout: %s %q", c.Name, c.Status, c.Detail)
+				}
+			}
+			if a.Failed != tc.failed || code != tc.code {
+				t.Errorf("failed %d, text exit %d; the pin's %d, %d:\n%s", a.Failed, code, tc.failed, tc.code, text)
 			}
 		})
 	}
