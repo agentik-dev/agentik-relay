@@ -213,7 +213,9 @@ var gitWorktree = func(repo string) error {
 // doctor runs §9's checks in order. A warning is ok with warn set (tmux
 // absent: file windows, D16); unknown is never a pass. Exit 0 when no check
 // is not ok, 2 otherwise. pluginRoot is --plugin-root's dir, "" when none
-// was given (the binary row's, RV1 R3).
+// was given (the binary row's, RV1 R3). Outside a git checkout, toplevel's
+// one answer, each check that reads the checkout is a note, the config the
+// user's layer alone (packet dr3-relay-doctor-folder, R1, R2).
 func doctor(asJSON bool, pluginRoot string, stdout io.Writer) int {
 	var checks []check
 	add := func(name string, ok, warn bool, format string, a ...any) {
@@ -225,11 +227,20 @@ func doctor(asJSON bool, pluginRoot string, stdout io.Writer) int {
 		}
 		checks = append(checks, check{name, ok, warn, fmt.Sprintf(format, a...), status, nil})
 	}
+	// note is the contract's fourth status (dr3 R3): ok, no warning, and
+	// counted in neither failed nor warned.
+	note := func(name, detail string) {
+		checks = append(checks, check{name, true, false, detail, "note", nil})
+	}
 	repo, err := toplevel()
-	if err != nil || repo == "" {
+	inRepo := err == nil && repo != ""
+	if !inRepo {
 		repo = "."
 	}
 	cfg, cfgErr := loadConfig(effects.OSFS{}, getenv, repo)
+	if !inRepo {
+		cfg, cfgErr = loadUserConfig(effects.OSFS{}, getenv)
+	}
 
 	if p, err := lookPath("claude"); err != nil {
 		add("claude", false, false, "not on PATH")
@@ -243,7 +254,9 @@ func doctor(asJSON bool, pluginRoot string, stdout io.Writer) int {
 	} else {
 		add("git", true, false, "%s", p)
 	}
-	if err := gitWorktree(repo); err != nil {
+	if !inRepo {
+		note("git worktree", "the folder is no git checkout, so no worktree list was asked")
+	} else if err := gitWorktree(repo); err != nil {
 		add("git worktree", false, false, "git worktree list in %s: %v", repo, err)
 	} else {
 		add("git worktree", true, false, "git worktree list runs in %s", repo)
@@ -304,7 +317,9 @@ func doctor(asJSON bool, pluginRoot string, stdout io.Writer) int {
 	if cfgErr == nil { // the config's queue path is under the repo (ar32a review round 2)
 		qpath = filepath.Join(repo, cfg.Queue)
 	}
-	if !fx.FS.Exists(qpath) {
+	if !inRepo {
+		note("queue", "the folder is no git checkout, so no queue was read")
+	} else if !fx.FS.Exists(qpath) {
 		add("queue", true, false, "none at %s", qpath)
 	} else if q, err := queue.Load(repo, qpath); err != nil {
 		add("queue", false, false, "%v", err)
@@ -315,7 +330,9 @@ func doctor(asJSON bool, pluginRoot string, stdout io.Writer) int {
 	} else {
 		add("queue", true, false, "%s parses, %d rows, valid", qpath, len(q.Rows))
 	}
-	if root, err := fx.Git.Root(repo); err != nil {
+	if !inRepo {
+		note("root", "the folder is no git checkout, so no root was checked for clean and on main")
+	} else if root, err := fx.Git.Root(repo); err != nil {
 		add("root", false, false, "the root is unknown: %v", err)
 	} else if status, err := fx.Git.RootStatus(root); err != nil {
 		add("root", false, false, "%s: status unknown: %v", root, err)
@@ -327,7 +344,9 @@ func doctor(asJSON bool, pluginRoot string, stdout io.Writer) int {
 		add("root", true, false, "%s clean, on main", root)
 	}
 	// rr6 R3: whether the relay runs here at all (R1's one question).
-	if effects.RecordsOut(recordsRoot()) {
+	if !inRepo {
+		note("records", "the folder is no git checkout, so where its records live was not checked")
+	} else if effects.RecordsOut(recordsRootOf(repo)) {
 		add("records", true, true, "outside the clone: the relay does not run here (git config %s)", effects.RecordsKey)
 	} else {
 		add("records", true, false, "in the repo")
@@ -364,6 +383,8 @@ func doctor(asJSON bool, pluginRoot string, stdout io.Writer) int {
 		add("config", true, true, "unknown keys or values: %s", strings.Join(append(unknown, cfg.Warnings...), "; "))
 	case len(cfg.Warnings) > 0: // agentik-r1 §6.3 c4, c6, session-layer-r1 §2.3: an old name or an unread session layer warns, never fails
 		add("config", true, true, "%d files read, warnings: %s", len(cfg.Sources), strings.Join(cfg.Warnings, "; "))
+	case !inRepo:
+		add("config", true, false, "%d files read, no unknown keys; the folder is no git checkout, so the user's layer alone", len(cfg.Sources))
 	default:
 		add("config", true, false, "%d files read, no unknown keys", len(cfg.Sources))
 	}
@@ -401,6 +422,8 @@ func doctor(asJSON bool, pluginRoot string, stdout io.Writer) int {
 				mark = "FAIL"
 			} else if c.Warn {
 				mark = "warn"
+			} else if c.Status == "note" {
+				mark = "note"
 			}
 			detail := c.Detail
 			if home != "" {
@@ -725,6 +748,12 @@ func recordsRoot() string {
 	if err != nil || repo == "" {
 		repo = "."
 	}
+	return recordsRootOf(repo)
+}
+
+// recordsRootOf is recordsRoot for a toplevel already asked (doctor's,
+// dr3 R1): repo's main worktree, else repo itself.
+func recordsRootOf(repo string) string {
 	if root, err := (effects.OSGit{}).Root(repo); err == nil && root != "" {
 		return root
 	}
