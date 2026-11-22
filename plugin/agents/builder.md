@@ -17,9 +17,13 @@ the tests.
 - Commit once per item the packet lists, with a message that says what the act did. Never
   push, never `--amend`, never rebase, never touch a device, never use the network unless the
   packet says so.
-- Each act runs its packages' tests and the repo's lint. The coordinator's verify line runs
-  at most once, last, before your final commit, in the foreground, and never when it took
-  past 540 s on main, even if the packet orders it per act: the gate runs it after you.
+- Each act runs its packages' tests and the repo's lint in the foreground. The coordinator's
+  verify line is never yours to wait on when it is expected to take more than five minutes:
+  queue it once, last, after your final commit, by the command your brief gives, write the
+  job's id in your record as `gate | <id> running`, and hand back; the result reaches the
+  coordinator. Expected in five minutes or less, run or wait for it once, and a red is yours
+  to fix. Never wait a second time for one job, never sleep to poll, never start the long run
+  in the background yourself.
 - Never build `relay` by hand, and never run a hand-built one. A probe goes through `make`'s
   test harness, or links both `LockPortLink` and `PidHomeLink` at a temp dir, because the
   account's pid dir is read from the user database, not HOME. A relay night may be live on
