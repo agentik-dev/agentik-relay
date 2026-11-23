@@ -85,6 +85,8 @@ internal/packet/testdata/a*.md: renamed
 internal/effects/config.go: renamed
 cmd/agentik-relay/describe.go: renamed
 cmd/agentik-relay/ak8_fix_test.go: sibling,renamed
+# ak8w's test once named the rewrite pass by a sibling tool's name (its first commit).
+cmd/agentik-relay/ak8w_test.go: sibling
 internal/hooks/hooks.go: renamed
 
 # The guards deny the old spellings too (§6.3 c12, "the old stays denied"): the session guard's pattern, and the
