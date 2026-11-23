@@ -246,7 +246,7 @@ func secret(s string) any {
 var settings = []setting{
 	{"tmux", "string", "Whether a run opens tmux windows: when tmux is there, never, or always.",
 		[]string{"auto", "never", "required"}, tmuxRead, asWritten},
-	{"allowed_tools", "string", "The tools a row's child may use without asking, passed to Claude Code as written.",
+	{"allowed_tools", "string", "The tools a row's sitting may use without asking, passed to Claude Code as written.",
 		nil, toolsRead, asWritten},
 	{"caffeinate", "boolean", "Whether a run keeps the machine awake while it works.",
 		nil, func(c effects.Config) any { return c.Caffeinate }, func(s string) any {
@@ -259,7 +259,7 @@ var settings = []setting{
 		[]string{effects.BandPace, effects.BandOff}, func(c effects.Config) any { return c.Band }, asWritten},
 	{"queue", "path", "The queue file a run reads, as a path inside the repo.",
 		nil, func(c effects.Config) any { return c.Queue }, asWritten},
-	{"merge", "string", "Parsed and kept, and read by no code yet: each row's own merge decides how its branch lands.",
+	{"merge", "string", "Not read by this tool: each row's own merge decides how its branch lands.",
 		nil, func(c effects.Config) any { return orNull(c.Merge) }, asWritten},
 	{"enabled", "string", "The session tool's key, read by it, whether a sitting expects a relay; the relay reads none.",
 		effects.EnabledChoices, func(c effects.Config) any { return orNull(c.Enabled) }, asWritten},

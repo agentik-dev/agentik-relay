@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// TestAK8W_1_RespokenSummaries (ak8 owed-1, R1, R2): the respeak pass's two
+// TestAK8W_1_RespokenSummaries (ak8 owed-1, R1, R2): the two rewritten
 // summaries, byte for byte, in process through run(), and no setting's
 // summary says "child" or "read by no code".
 func TestAK8W_1_RespokenSummaries(t *testing.T) {
