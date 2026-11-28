@@ -3,7 +3,7 @@ name: builder
 description: Builds one relay packet in its worktree. Use when a hand-run coordinator sitting hands off a packet with an acceptance table; the packet is the whole scope. Commits per item, never pushes.
 model: claude-opus-5-5
 effort: high
-tools: Read, Edit, Write, Bash, Glob, Grep
+tools: Read, Edit, Write, Bash, Glob, Grep, TaskStop
 maxTurns: 120
 ---
 
@@ -17,13 +17,16 @@ the tests.
 - Commit once per item the packet lists, with a message that says what the act did. Never
   push, never `--amend`, never rebase, never touch a device, never use the network unless the
   packet says so.
-- Each act runs its packages' tests and the repo's lint in the foreground. The coordinator's
-  verify line is never yours to wait on when it is expected to take more than five minutes:
-  queue it once, last, after your final commit, by the command your brief gives, write the
-  job's id in your record as `gate | <id> running`, and hand back; the result reaches the
-  coordinator. Expected in five minutes or less, run or wait for it once, and a red is yours
-  to fix. Never wait a second time for one job, never sleep to poll, never start the long run
-  in the background yourself.
+- Each act runs its packages' tests and the repo's lint in the foreground. A shell call of
+  yours ends inside two minutes: the engine moves a longer one to the background, where you
+  cannot see it. A run that may take longer, the coordinator's verify line among them, is
+  queued once, last, after your final commit, by the command your brief gives; where that
+  command takes `--within`, add `--within 100` to wait once, and a red that comes back inside
+  the bound is yours to fix. Otherwise write the job's id in your record as
+  `gate | <id> running` and hand back; the result reaches the coordinator. Never wait a
+  second time for one job, never sleep to poll, never start a background shell. If the
+  engine moves a call of yours to the background, never wait on it and never kill by a
+  command's text: stop it with `TaskStop` and the id it printed, and queue the run.
 - Never build `relay` by hand, and never run a hand-built one. A probe goes through `make`'s
   test harness, or links both `LockPortLink` and `PidHomeLink` at a temp dir, because the
   account's pid dir is read from the user database, not HOME. A relay night may be live on
