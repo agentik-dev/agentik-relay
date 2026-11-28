@@ -210,14 +210,14 @@ func TestControlKill(t *testing.T) {
 	o := w.opts(t, by)
 	var wg sync.WaitGroup
 	waitSpawn(t, w, o, "kill r1", &wg)
-	start := time.Now()
 	n := runNight(t, w, q, o)
 	wg.Wait()
 	if n.State != relay.Stopped(relay.OwnerKill) || states(n) != "r1=failed r2=skipped" || n.Sittings["r1"].Reason != relay.OwnerKill {
 		t.Fatalf("night %s: %s", n.State, states(n))
 	}
-	if exit := lastOf(w.ledger.Written(), "exit"); number(exit["child_exit"]) != 128+15 || time.Since(start) > 5*time.Second {
-		t.Fatalf("the child was not terminated: %v", exit)
+	// No time bound: the child sleeps 2,000 ms and exits 0 unless signalled, so 143 proves the kill reached it while it ran; a hang is the package timeout's.
+	if exit := lastOf(w.ledger.Written(), "exit"); number(exit["child_exit"]) != 128+15 {
+		t.Fatalf("the child was not terminated: child_exit %v, want %d: %v", exit["child_exit"], 128+15, exit)
 	}
 	st := night.ReadStatus(effects.OSFS{}, o.State, n.ID)
 	if len(st.Resume) != 1 || st.Resume[0] != "agentik relay resume r1" {
